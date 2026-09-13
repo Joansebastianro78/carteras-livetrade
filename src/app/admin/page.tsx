@@ -24,7 +24,7 @@ export default async function Admin({
   }
 
   return (
-    <main className="min-h-dvh">
+    <main className="flex-1">
       <header className="border-b border-[var(--color-linea)] bg-[var(--color-papel)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
           <div>

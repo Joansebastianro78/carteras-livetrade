@@ -78,7 +78,7 @@ export default function Consulta() {
   // ---------------------------------------------------------------- formulario
   if (!datos) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-10">
         <header className="mb-8">
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-tight text-[var(--color-tinta)]">
             Tu cartera de hoy
@@ -162,7 +162,7 @@ export default function Consulta() {
 
   // ---------------------------------------------------------------- resultados
   return (
-    <main className="min-h-dvh">
+    <main className="flex-1">
       <header className="sticky top-0 z-20 border-b border-[var(--color-linea)] bg-[var(--color-papel)]">
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-3">
           <div className="min-w-0 flex-1">

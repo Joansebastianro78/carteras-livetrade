@@ -40,7 +40,7 @@ export default function LoginAdmin({ expirada }: { expirada?: boolean }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5">
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5">
       <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-tinta)]">
         Administración
       </h1>

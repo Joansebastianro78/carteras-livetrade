@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Cartera">
+  <rect width="32" height="32" rx="7" fill="#16242b"/>
+  <rect x="9" y="7.5" width="14" height="5" rx="1.6" fill="#ffffff" opacity="0.5"/>
+  <rect x="6.5" y="10.5" width="19" height="13.5" rx="2.6" fill="#ffffff"/>
+  <path d="M19.4 14.6h6.1v5.3h-6.1a2.65 2.65 0 0 1 0-5.3Z" fill="#16242b" opacity="0.12"/>
+  <circle cx="21.4" cy="17.25" r="1.85" fill="#c98a12"/>
+</svg>
