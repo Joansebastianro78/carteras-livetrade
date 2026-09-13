@@ -262,6 +262,8 @@ export async function POST(req: Request) {
     }
   }
 
+  let avisoBitacora: string | null = null;
+
   if (body.final && body.resumen) {
     const store = await cookies();
     const sesion = await leerSesion(
@@ -269,16 +271,40 @@ export async function POST(req: Request) {
       process.env.ADMIN_SECRET
     );
 
-    await supabaseAdmin.from("cargas_cartera").insert({
-      archivo: archivo ?? "sin-nombre.xlsx",
-      modo,
-      filas: body.resumen.filas,
-      filas_ok: body.resumen.filasOk,
-      filas_error: body.resumen.filasError,
-      detalle: body.resumen.detalle ?? null,
-      cargado_por: sesion?.usuario ?? null,
-    });
+    // Los puntos ya están guardados en este punto, así que un fallo aquí no
+    // debe tumbar la carga. Pero tampoco se silencia: antes este await no
+    // revisaba el error y una columna faltante en cargas_cartera hacía que la
+    // bitácora dejara de registrar sin que nadie se enterara.
+    const { error: errorBitacora } = await supabaseAdmin
+      .from("cargas_cartera")
+      .insert({
+        archivo: archivo ?? "sin-nombre.xlsx",
+        modo,
+        filas: body.resumen.filas,
+        filas_ok: body.resumen.filasOk,
+        filas_error: body.resumen.filasError,
+        detalle: body.resumen.detalle ?? null,
+        cargado_por: sesion?.usuario ?? null,
+      });
+
+    if (errorBitacora) {
+      console.error("[upload bitacora]", errorBitacora.message);
+
+      const faltaColumna = /column .* does not exist|schema cache/i.test(
+        errorBitacora.message
+      );
+
+      avisoBitacora = faltaColumna
+        ? "Los puntos se guardaron, pero la carga no quedó registrada en cargas_cartera: a esa tabla le falta una columna. Ejecuta supabase/gestion.sql en el SQL Editor."
+        : `Los puntos se guardaron, pero la carga no quedó registrada: ${errorBitacora.message}`;
+    }
   }
 
-  return NextResponse.json({ ok: true, guardadas, omitidas, noEncontradas });
+  return NextResponse.json({
+    ok: true,
+    guardadas,
+    omitidas,
+    noEncontradas,
+    avisoBitacora,
+  });
 }

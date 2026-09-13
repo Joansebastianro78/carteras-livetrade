@@ -50,6 +50,7 @@ type Estado =
       guardadas: number;
       omitidas: number;
       noEncontradas: string[];
+      avisoBitacora: string | null;
       lectura: ResultadoLectura;
     }
   | { fase: "error"; mensaje: string };
@@ -92,6 +93,7 @@ export default function Cargador() {
     const total = lectura.filas.length;
     let guardadas = 0;
     let omitidas = 0;
+    let avisoBitacora: string | null = null;
     const noEncontradas: string[] = [];
 
     for (let i = 0; i < total; i += TAM_LOTE) {
@@ -134,6 +136,7 @@ export default function Cargador() {
 
       guardadas += json.guardadas ?? 0;
       omitidas += json.omitidas ?? 0;
+      if (json.avisoBitacora) avisoBitacora = json.avisoBitacora;
       for (const id of json.noEncontradas ?? []) {
         if (noEncontradas.length < 50) noEncontradas.push(id);
       }
@@ -146,6 +149,7 @@ export default function Cargador() {
       guardadas,
       omitidas,
       noEncontradas,
+      avisoBitacora,
       lectura,
     });
   }
@@ -408,6 +412,13 @@ export default function Cargador() {
               </div>
             )}
           </dl>
+
+          {estado.avisoBitacora && (
+            <p className="mt-4 flex items-start gap-2 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] leading-snug text-[#7a5410]">
+              <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
+              {estado.avisoBitacora}
+            </p>
+          )}
 
           {estado.noEncontradas.length > 0 && (
             <details className="mt-4">
