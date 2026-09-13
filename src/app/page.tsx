@@ -84,7 +84,7 @@ export default function Consulta() {
             Tu cartera de hoy
           </h1>
           <p className="mt-3 max-w-[46ch] text-[15px] leading-relaxed text-[var(--color-tinta-suave)]">
-            Entra con tu usuario y tu cédula para ver en el mapa los puntos que
+            Entra con tu usuario y tu contraseña Livetrade para ver en el mapa los puntos que
             tienes asignados y descargar la lista en Excel.
           </p>
         </header>
