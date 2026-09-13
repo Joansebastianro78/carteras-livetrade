@@ -10,7 +10,7 @@
 export const COOKIE_ADMIN = "cartera_admin";
 const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
 
-export type Sesion = { usuario: string; expira: number };
+export type Sesion = { usuario: string; expira: string };
 
 function b64urlDesdeBytes(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -74,8 +74,8 @@ export async function leerSesion(
   const [usuarioB64, expiraTxt] = payload.split(".");
   if (!usuarioB64 || !expiraTxt || !/^\d+$/.test(expiraTxt)) return null;
 
-  const expira = Number(expiraTxt);
-  if (expira < Date.now()) return null;
+  const expira = String(expiraTxt);
+  if (expira < String(Date.now())) return null;
 
   const esperada = await firmar(payload, secreto);
   if (esperada.length !== firma.length) return null;
