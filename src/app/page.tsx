@@ -119,13 +119,13 @@ export default function Consulta() {
               <input
                 id="cedula"
                 name="cedula"
-                type="text"
                 required
                 inputMode="text"
                 autoComplete="off"
+                spellCheck={false}
                 placeholder="70816763"
                 value={cedula}
-                onChange={(e) => setCedula(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => setCedula(e.target.value)}
                 className="campo cifras"
               />
             </div>

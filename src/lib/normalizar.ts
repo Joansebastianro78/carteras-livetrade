@@ -126,9 +126,13 @@ export function normalizarUsuario(valor: unknown): string {
   return (aTexto(valor) ?? "").toUpperCase().replace(/\s+/g, "");
 }
 
-/** Cédula: solo dígitos, salvo el marcador 'LIBRE' de puntos sin asignar. */
+/**
+ * Cédula: admite números, letras y otros caracteres (algunos documentos
+ * traen guiones, puntos o letras). Se normaliza a mayúsculas y sin espacios
+ * para que la comparación sea consistente; 'LIBRE' sigue siendo el marcador
+ * de puntos sin vendedor asignado.
+ */
 export function normalizarCedula(valor: unknown): string {
   const t = (aTexto(valor) ?? "").toUpperCase().trim();
-  if (t === "LIBRE") return "LIBRE";
-  return t.replace(/[^\d]/g, "");
+  return t.replace(/\s+/g, "");
 }

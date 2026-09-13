@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         `pdv.ilike.*${limpio}*`,
         `direccion.ilike.*${limpio}*`,
         `usuario.eq.${limpio.toUpperCase()}`,
-        `ccuser.eq.${limpio.replace(/\D/g, "") || "0"}`,
+        `ccuser.eq.${limpio.toUpperCase()}`,
         `persona_hacku.ilike.*${limpio}*`,
       ].join(",")
     );

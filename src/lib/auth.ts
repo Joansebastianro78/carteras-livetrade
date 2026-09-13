@@ -4,7 +4,7 @@
  *
  * Formato del token: "<usuarioB64>.<expiraEnMs>.<firma>"
  * El usuario viaja en claro dentro de la cookie, pero va firmado: si alguien
- * lo edita, la firma deja de coincidir y la sesión se rechaza.
+ * SSlo edita, la firma deja de coincidir y la sesión se rechaza.
  */
 
 export const COOKIE_ADMIN = "cartera_admin";
