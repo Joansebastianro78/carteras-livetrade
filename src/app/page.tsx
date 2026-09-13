@@ -119,8 +119,9 @@ export default function Consulta() {
               <input
                 id="cedula"
                 name="cedula"
+                type="text"
                 required
-                inputMode="numeric"
+                inputMode="text"
                 autoComplete="off"
                 placeholder="70816763"
                 value={cedula}
