@@ -105,7 +105,7 @@ export default function Consulta() {
                 autoComplete="username"
                 autoCapitalize="characters"
                 spellCheck={false}
-                placeholder="BAV172"
+                placeholder="BAV006"
                 value={usuario}
                 onChange={(e) => setUsuario(e.target.value.toUpperCase())}
                 className="campo cifras"
@@ -114,7 +114,7 @@ export default function Consulta() {
 
             <div>
               <label htmlFor="cedula" className="campo-etiqueta">
-                Cédula
+                Contraseña Livetrade
               </label>
               <input
                 id="cedula"
@@ -123,7 +123,7 @@ export default function Consulta() {
                 inputMode="text"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="70816763"
+                placeholder="Ba-BAV006"
                 value={cedula}
                 onChange={(e) => setCedula(e.target.value)}
                 className="campo cifras"
