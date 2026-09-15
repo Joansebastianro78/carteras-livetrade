@@ -3,12 +3,15 @@
 import { useRef, useState } from "react";
 import {
   CheckCircle2,
+  Download,
   FileSpreadsheet,
   Loader2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
 import {
+  COLUMNAS_PLANTILLA,
+  descargarPlantillaVacia,
   etiquetaDeCampo,
   leerPlantilla,
   type ModoCarga,
@@ -226,7 +229,7 @@ export default function Cargador() {
         <p className="mt-3 text-[15px] font-medium">Arrastra el archivo aquí</p>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
           {modo === "reemplazar"
-            ? "La plantilla maestra con sus 37 columnas, por ejemplo 101_BOGOTA_12_SEP.xlsx"
+            ? `La plantilla maestra con sus ${COLUMNAS_PLANTILLA.length} columnas, por ejemplo 101_BOGOTA_12_SEP.xlsx`
             : "Cualquier Excel con columna ID y las columnas que quieras cambiar"}
         </p>
 
@@ -242,15 +245,27 @@ export default function Cargador() {
           }}
         />
 
-        <button
-          type="button"
-          disabled={ocupado}
-          onClick={() => inputRef.current?.click()}
-          className="mt-5 inline-flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
-        >
-          <Upload size={15} aria-hidden />
-          Elegir archivo
-        </button>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+          >
+            <Upload size={15} aria-hidden />
+            Elegir archivo
+          </button>
+
+          <button
+            type="button"
+            onClick={descargarPlantillaVacia}
+            title={`Excel vacío con las ${COLUMNAS_PLANTILLA.length} columnas en orden`}
+            className="inline-flex items-center gap-2 rounded-[4px] border border-[var(--color-linea)] bg-white px-4 py-2.5 text-sm text-[var(--color-tinta)] hover:border-[var(--color-tinta)]"
+          >
+            <Download size={15} aria-hidden />
+            Descargar plantilla vacía
+          </button>
+        </div>
       </div>
 
       {estado.fase === "leyendo" && (
@@ -450,4 +465,4 @@ export default function Cargador() {
       )}
     </section>
   );
-}
+} 

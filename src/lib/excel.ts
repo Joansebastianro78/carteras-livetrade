@@ -114,6 +114,42 @@ export function etiquetaDeCampo(campo: string): string {
   return DEFINICIONES.find((d) => d.campo === campo)?.etiqueta ?? campo;
 }
 
+/**
+ * Encabezados de la plantilla maestra, en el orden del archivo original.
+ * Se arma desde DEFINICIONES a propósito: si se agrega una columna al mapa de
+ * arriba, la plantilla que se descarga la trae sin tocar nada más. ID va de
+ * primera y CICLO justo después de FECHA_NACIMIENTO, como en el archivo real.
+ */
+export const COLUMNAS_PLANTILLA: string[] = (() => {
+  const nombres = DEFINICIONES.map((d) => d.columnas[0]);
+  const tras = nombres.indexOf("FECHA_NACIMIENTO");
+  nombres.splice(tras >= 0 ? tras + 1 : nombres.length, 0, COLS_CICLO[0]);
+  return [COLS_ID[0], ...nombres];
+})();
+
+/** Libro vacío con los encabezados de la plantilla, listo para llenar. */
+export function descargarPlantillaVacia() {
+  const hoja = XLSX.utils.aoa_to_sheet([COLUMNAS_PLANTILLA]);
+
+  const ANCHOS: Record<string, number> = {
+    PDV: 38,
+    DIRECCION: 42,
+    "PERSONA HACKU": 28,
+    COMENTARIO: 34,
+    MOTIVO: 24,
+    "MOTIVO DUEÑO": 24,
+    nom: 28,
+  };
+
+  hoja["!cols"] = COLUMNAS_PLANTILLA.map((c) => ({
+    wch: ANCHOS[c] ?? Math.max(12, c.length + 2),
+  }));
+
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Hoja1");
+  XLSX.writeFile(libro, "PLANTILLA_CARGA_MASIVA.xlsx");
+}
+
 export function leerPlantilla(buffer: ArrayBuffer): ResultadoLectura {
   const libro = XLSX.read(buffer, { type: "array", cellDates: true });
 
