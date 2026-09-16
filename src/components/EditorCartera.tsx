@@ -32,6 +32,14 @@ type Ciclo = {
   ultima_actualizacion: string | null;
 };
 
+type Archivo = {
+  archivo: string;
+  puntos: number;
+  ciclos: number;
+  primer_ciclo: string | null;
+  ultima_actualizacion: string | null;
+};
+
 const CAMPOS: { clave: keyof Punto; etiqueta: string; tipo?: string }[] = [
   { clave: "pdv", etiqueta: "Nombre del PDV" },
   { clave: "direccion", etiqueta: "Dirección" },
@@ -57,18 +65,24 @@ export default function EditorCartera() {
   const [aviso, setAviso] = useState<{ tipo: "ok" | "mal"; texto: string } | null>(null);
 
   const [ciclos, setCiclos] = useState<Ciclo[] | null>(null);
-  const [cicloElegido, setCicloElegido] = useState<string>("");
+  const [archivos, setArchivos] = useState<Archivo[]>([]);
+  const [avisoArchivos, setAvisoArchivos] = useState<string | null>(null);
+  /** "todo", "ciclo:<nombre>" o "archivo:<nombre>". */
+  const [objetivo, setObjetivo] = useState("todo");
   const [confirmacion, setConfirmacion] = useState("");
   const [purgando, setPurgando] = useState(false);
 
   useEffect(() => {
-    cargarCiclos();
+    cargarResumenes();
   }, []);
 
-  async function cargarCiclos() {
+  async function cargarResumenes() {
     const res = await fetch("/api/admin/purgar");
     const json = await res.json().catch(() => ({}));
-    if (res.ok) setCiclos(json.ciclos ?? []);
+    if (!res.ok) return;
+    setCiclos(json.ciclos ?? []);
+    setArchivos(json.archivos ?? []);
+    setAvisoArchivos(json.avisoArchivos ?? null);
   }
 
   async function buscar(e: React.FormEvent) {
@@ -145,7 +159,7 @@ export default function EditorCartera() {
 
     setResultados((prev) => prev?.filter((x) => x.id_registro !== p.id_registro) ?? null);
     setAviso({ tipo: "ok", texto: `Se eliminó ${nombre}.` });
-    cargarCiclos();
+    cargarResumenes();
   }
 
   async function purgar() {
@@ -155,10 +169,7 @@ export default function EditorCartera() {
     const res = await fetch("/api/admin/purgar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ciclo: cicloElegido || null,
-        confirmacion,
-      }),
+      body: JSON.stringify({ alcance, valor, confirmacion }),
     });
     const json = await res.json().catch(() => ({}));
     setPurgando(false);
@@ -169,12 +180,22 @@ export default function EditorCartera() {
     }
 
     setConfirmacion("");
+    setObjetivo("todo");
     setResultados(null);
-    setAviso({ tipo: "ok", texto: `Se eliminaron ${json.eliminados} puntos.` });
-    cargarCiclos();
+    setAviso({
+      tipo: "ok",
+      texto: `Se eliminaron ${json.eliminados} puntos de ${json.alcance ?? "la cartera"}.`,
+    });
+    cargarResumenes();
   }
 
-  const fraseEsperada = cicloElegido || FRASE_PURGA;
+  // "ciclo:101" → ["ciclo", "101"]. Se parte en el primer ":" por si el
+  // nombre del archivo trae otro.
+  const corte = objetivo.indexOf(":");
+  const alcance = corte === -1 ? "todo" : objetivo.slice(0, corte);
+  const valor = corte === -1 ? "" : objetivo.slice(corte + 1);
+
+  const fraseEsperada = alcance === "todo" || valor === "" ? FRASE_PURGA : valor;
   const total = ciclos?.reduce((a, c) => a + c.puntos, 0) ?? 0;
 
   return (
@@ -370,20 +391,50 @@ export default function EditorCartera() {
             </label>
             <select
               id="ciclo-purga"
-              value={cicloElegido}
+              value={objetivo}
               onChange={(e) => {
-                setCicloElegido(e.target.value);
+                setObjetivo(e.target.value);
                 setConfirmacion("");
               }}
               className="campo"
             >
-              <option value="">Toda la cartera</option>
-              {ciclos?.map((c) => (
-                <option key={c.ciclo} value={c.ciclo}>
-                  Solo {c.ciclo || "sin ciclo"} ({c.puntos} puntos)
-                </option>
-              ))}
+              <option value="todo">Toda la cartera</option>
+
+              {ciclos && ciclos.length > 0 && (
+                <optgroup label="Un ciclo completo">
+                  {ciclos.map((c) => (
+                    <option key={c.ciclo} value={`ciclo:${c.ciclo}`}>
+                      Ciclo {c.ciclo || "(sin ciclo)"} — {c.puntos} puntos
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {archivos.length > 0 && (
+                <optgroup label="Una carga en concreto">
+                  {archivos.map((a) => (
+                    <option key={a.archivo} value={`archivo:${a.archivo}`}>
+                      {a.archivo} — {a.puntos} puntos
+                      {a.ciclos > 1 ? ` · ${a.ciclos} ciclos` : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+
+            {alcance === "archivo" && (
+              <p className="mt-1.5 text-xs leading-snug text-[var(--color-tinta-suave)]">
+                Se borran los puntos cuyo último cargue haya sido ese archivo. Si
+                después corregiste alguno con otro Excel, ese punto ya cuenta para
+                el archivo nuevo y no se va con este.
+              </p>
+            )}
+
+            {avisoArchivos && (
+              <p className="mt-1.5 text-xs leading-snug text-[#7a5410]">
+                {avisoArchivos}
+              </p>
+            )}
           </div>
 
           <div>

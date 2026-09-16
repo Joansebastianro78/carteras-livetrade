@@ -59,7 +59,10 @@ export async function POST(req: Request) {
   // 'LIBRE' marca los puntos sin vendedor asignado: no es una credencial.
   if (usuario === "LIBRE" || cedula === "LIBRE") {
     return NextResponse.json(
-      { error: "Ese usuario no tiene cartera asignada." },
+      {
+        error:
+          "Ese usuario no tiene cartera asignada. Comunícate con Soporte BackOffice.",
+      },
       { status: 404 }
     );
   }
@@ -82,7 +85,10 @@ export async function POST(req: Request) {
 
   if (!data || data.length === 0) {
     return NextResponse.json(
-      { error: "No encontramos puntos con ese usuario y esa cédula. Revisa los dos datos." },
+      {
+        error:
+          "No encontramos puntos con ese usuario y esa cédula. Revisa los dos datos. Si siguen sin aparecer, comunícate con Soporte BackOffice.",
+      },
       { status: 404 }
     );
   }

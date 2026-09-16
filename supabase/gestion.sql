@@ -19,6 +19,23 @@ order by max(updated_at) desc;
 -- que la tabla: solo service_role la consulta.
 revoke all on public.resumen_ciclos from anon, authenticated;
 
+-- Resumen por archivo de origen: alimenta la opción de eliminar una carga
+-- concreta. Ojo: archivo_origen guarda el ÚLTIMO archivo que tocó el punto,
+-- así que un punto corregido después por otro Excel cuenta para ese otro.
+create or replace view public.resumen_archivos as
+select
+    archivo_origen                             as archivo,
+    count(*)                                   as puntos,
+    count(distinct ciclo)                      as ciclos,
+    min(ciclo)                                 as primer_ciclo,
+    max(updated_at)                            as ultima_actualizacion
+from public.puntos_cartera
+where archivo_origen is not null and archivo_origen <> ''
+group by archivo_origen
+order by max(updated_at) desc;
+
+revoke all on public.resumen_archivos from anon, authenticated;
+
 -- El histórico de cargas ahora guarda también con qué modo se hizo.
 alter table public.cargas_cartera
     add column if not exists modo text;

@@ -49,6 +49,11 @@ export default function ListaPuntos({ puntos, seleccionado, onSeleccionar }: Pro
                 </span>
 
                 <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
+                  {p.ciclo && (
+                    <span className="cifras rounded-full bg-[#eceeeb] px-2 py-0.5 text-[var(--color-tinta)]">
+                      Ciclo {p.ciclo}
+                    </span>
+                  )}
                   <span className="font-medium text-[var(--color-tinta)]">{p.que_hacer}</span>
                   {p.celular && (
                     <span className="inline-flex items-center gap-1 cifras">
