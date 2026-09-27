@@ -27,6 +27,7 @@ export async function GET(req: Request) {
       .select("*")
       .eq("usuario", usuario)
       .eq("ccuser", ccuser)
+      .order("num_de_ruta", { ascending: true })
       .order("ruta", { ascending: true })
       .order("pdv", { ascending: true });
 

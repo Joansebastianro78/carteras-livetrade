@@ -1,7 +1,7 @@
 "use client";
 
 import { MapPin, Phone } from "lucide-react";
-import { colorDeRuta, type PuntoCartera } from "@/lib/tipos";
+import { colorDeRuta, numeroDeRuta, type PuntoCartera } from "@/lib/tipos";
 
 type Props = {
   puntos: PuntoCartera[];
@@ -35,9 +35,9 @@ export default function ListaPuntos({ puntos, seleccionado, onSeleccionar }: Pro
               <span
                 aria-hidden
                 className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white cifras"
-                style={{ background: colorDeRuta(p.ruta) }}
+                style={{ background: colorDeRuta(numeroDeRuta(p)) }}
               >
-                {p.ruta ?? ""}
+                {numeroDeRuta(p) ?? ""}
               </span>
 
               <span className="min-w-0 flex-1">

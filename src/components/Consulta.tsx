@@ -7,7 +7,7 @@ import MapaCliente from "@/components/MapaCliente";
 import ListaPuntos from "@/components/ListaPuntos";
 import { exportarCartera } from "@/lib/excel";
 import { exportarCarteraImagen } from "@/lib/imagen";
-import { colorDeRuta, type RespuestaCartera } from "@/lib/tipos";
+import { colorDeRuta, numeroDeRuta, type RespuestaCartera } from "@/lib/tipos";
 
 export default function Consulta() {
   const [usuario, setUsuario] = useState("");
@@ -69,8 +69,9 @@ export default function Consulta() {
     if (!datos) return [];
     const mapa = new Map<number, number>();
     for (const p of datos.puntos) {
-      if (p.ruta === null) continue;
-      mapa.set(p.ruta, (mapa.get(p.ruta) ?? 0) + 1);
+      const n = numeroDeRuta(p);
+      if (n === null) continue;
+      mapa.set(n, (mapa.get(n) ?? 0) + 1);
     }
     return [...mapa.entries()].sort((a, b) => a[0] - b[0]);
   }, [datos]);

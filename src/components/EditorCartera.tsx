@@ -273,7 +273,8 @@ export default function EditorCartera() {
                         {p.direccion ?? "Sin dirección"}
                       </span>
                       <span className="cifras mt-1 block text-xs text-[var(--color-tinta-suave)]">
-                        {p.id_pdv} · {p.usuario} · cc {p.ccuser} · ruta {p.ruta ?? "—"} ·{" "}
+                        {p.id_pdv} · {p.usuario} · cc {p.ccuser} · ruta{" "}
+                        {p.num_de_ruta ?? "—"} ·{" "}
                         {p.ciclo || "sin ciclo"}
                       </span>
                     </button>

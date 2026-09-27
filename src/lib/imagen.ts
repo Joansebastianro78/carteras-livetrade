@@ -1,4 +1,4 @@
-import { colorDeRuta, type PuntoCartera } from "./tipos";
+import { colorDeRuta, numeroDeRuta, type PuntoCartera } from "./tipos";
 
 /**
  * Arma la cartera como una sola imagen PNG, pensada para mandar por WhatsApp
@@ -170,7 +170,7 @@ async function dibujarMapa(
 
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = colorDeRuta(p.ruta);
+    ctx.fillStyle = colorDeRuta(numeroDeRuta(p));
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#ffffff";
@@ -271,7 +271,7 @@ export async function exportarCarteraImagen(
 
     ctx.beginPath();
     ctx.arc(MARGEN + 22, y + 26, 22, 0, Math.PI * 2);
-    ctx.fillStyle = colorDeRuta(p.ruta);
+    ctx.fillStyle = colorDeRuta(numeroDeRuta(p));
     ctx.fill();
 
     ctx.fillStyle = "#ffffff";

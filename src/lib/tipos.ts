@@ -48,7 +48,18 @@ export type RespuestaCartera = {
 };
 
 /**
- * Paleta categórica para la columna RUTA (valores 0-17 en la plantilla).
+ * El número de ruta que se le muestra al vendedor sale de la columna
+ * "num de ruta" de la plantilla, no de "RUTA". Pasa por esta función para
+ * que el día que cambie de columna se cambie en un solo lugar.
+ */
+export function numeroDeRuta(
+  p: Pick<PuntoCartera, "num_de_ruta">
+): number | null {
+  return p.num_de_ruta;
+}
+
+/**
+ * Paleta categórica para el número de ruta (valores 0-17 en la plantilla).
  * Elegida para que dos rutas vecinas nunca se confundan en pantalla de celular
  * a pleno sol, y para seguir siendo distinguible en visión con deficiencia rojo-verde.
  */

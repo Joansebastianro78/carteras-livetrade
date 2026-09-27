@@ -83,6 +83,7 @@ export async function POST(req: Request) {
     .select("*")
     .eq("usuario", usuario)
     .eq("ccuser", cedula)
+    .order("num_de_ruta", { ascending: true })
     .order("ruta", { ascending: true })
     .order("pdv", { ascending: true });
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { CENTRO_BOGOTA, colorDeRuta, type PuntoCartera } from "@/lib/tipos";
+import { CENTRO_BOGOTA, colorDeRuta, numeroDeRuta, type PuntoCartera } from "@/lib/tipos";
 
 type Props = {
   puntos: PuntoCartera[];
@@ -74,20 +74,20 @@ export default function Mapa({ puntos, seleccionado, onSeleccionar }: Props) {
         <Marker
           key={p.id_pdv}
           position={[p.latitud as number, p.longitud as number]}
-          icon={iconoRuta(p.ruta, seleccionado === p.id_pdv)}
+          icon={iconoRuta(numeroDeRuta(p), seleccionado === p.id_pdv)}
           eventHandlers={{ click: () => onSeleccionar?.(p.id_pdv) }}
         >
           <Popup>
             <div className="p-3">
               <div
                 className="mb-2 inline-flex items-center gap-2 text-xs text-[var(--color-tinta-suave)]"
-                style={{ color: colorDeRuta(p.ruta) }}
+                style={{ color: colorDeRuta(numeroDeRuta(p)) }}
               >
                 <span
                   className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ background: colorDeRuta(p.ruta) }}
+                  style={{ background: colorDeRuta(numeroDeRuta(p)) }}
                 />
-                Ruta {p.ruta ?? "sin dato"}
+                Ruta {numeroDeRuta(p) ?? "sin dato"}
               </div>
 
               <h3 className="text-[15px] leading-snug font-semibold text-[var(--color-tinta)]">

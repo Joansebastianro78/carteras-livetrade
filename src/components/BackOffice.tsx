@@ -15,7 +15,7 @@ import MapaCliente from "./MapaCliente";
 import ListaPuntos from "./ListaPuntos";
 import { exportarCartera } from "@/lib/excel";
 import { exportarCarteraImagen } from "@/lib/imagen";
-import { colorDeRuta, type PuntoCartera } from "@/lib/tipos";
+import { colorDeRuta, numeroDeRuta, type PuntoCartera } from "@/lib/tipos";
 
 type Vendedor = {
   usuario: string;
@@ -115,8 +115,9 @@ export default function BackOffice() {
   const rutas = useMemo(() => {
     const mapa = new Map<number, number>();
     for (const p of puntos) {
-      if (p.ruta === null) continue;
-      mapa.set(p.ruta, (mapa.get(p.ruta) ?? 0) + 1);
+      const n = numeroDeRuta(p);
+      if (n === null) continue;
+      mapa.set(n, (mapa.get(n) ?? 0) + 1);
     }
     return [...mapa.entries()].sort((a, b) => a[0] - b[0]);
   }, [puntos]);
