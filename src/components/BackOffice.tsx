@@ -88,14 +88,13 @@ export default function BackOffice() {
       return;
     }
 
-    const datos = json as Detalle;
-    setDetalle(datos);
+    setDetalle(json as Detalle);
     setSeleccionado(null);
 
-    // Con varios ciclos encima se arranca por el más reciente: es lo que el
-    // vendedor está trabajando, y evita mostrar el mismo PDV dos veces.
-    const suyos = [...new Set(datos.puntos.map((p) => p.ciclo))].sort();
-    setCicloElegido(suyos.length > 1 ? suyos[suyos.length - 1] : "");
+    // Siempre abre con todo lo que tiene asignado el vendedor. El filtro por
+    // ciclo queda ahí para quien lo necesite, pero nadie debería tener que
+    // acordarse de cambiarlo para ver la cartera completa.
+    setCicloElegido("");
   }
 
   // Un vendedor puede tener puntos de varios ciclos a la vez. El filtro deja
@@ -282,7 +281,7 @@ export default function BackOffice() {
   return (
     <div className="space-y-4">
       <section>
-        <h2 className="text-sm font-semibold">Consultar la cartera de cualquier consultor</h2>
+        <h2 className="text-sm font-semibold">Consultar la cartera de un vendedor</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           Por usuario, cédula o nombre. Sirve para resolver por teléfono: ves lo
           mismo que ve él y puedes mandarle el Excel o la imagen.
@@ -323,7 +322,7 @@ export default function BackOffice() {
 
       {vendedores !== null && vendedores.length === 0 && (
         <p className="rounded-[4px] border border-dashed border-[var(--color-linea)] px-4 py-6 text-center text-[13px] text-[var(--color-tinta-suave)]">
-          Ningún Consultor coincide con esa búsqueda.
+          Ningún vendedor coincide con esa búsqueda.
         </p>
       )}
 

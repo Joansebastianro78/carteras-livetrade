@@ -135,3 +135,30 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+  Pantallas de acceso (consulta, admin y BackOffice).
+
+  El fondo lleva dos tintes muy suaves sobre el gris base: uno frío arriba a
+  la izquierda y uno cálido abajo a la derecha, los mismos dos colores que ya
+  usa la app (el petróleo de las rutas y el ámbar de las descargas). Son
+  claros a propósito: la tarjeta blanca tiene que seguir siendo lo primero
+  que se ve, y esto se mira muchas veces a pleno sol.
+*/
+.fondo-acceso {
+  background:
+    radial-gradient(85% 65% at 6% 0%, #d8ebf1 0%, transparent 58%),
+    radial-gradient(70% 60% at 100% 100%, #f7ead0 0%, transparent 55%),
+    var(--color-base);
+}
+
+/* Panel oscuro de la tarjeta: degradado en vez de tinta plana. */
+.panel-acceso {
+  background: linear-gradient(155deg, #1d4653 0%, #17303a 52%, #14242b 100%);
+}
+
+.tarjeta-acceso {
+  box-shadow:
+    0 1px 2px rgba(22, 36, 43, 0.06),
+    0 12px 32px -12px rgba(22, 36, 43, 0.22);
+}

@@ -72,7 +72,7 @@ export default function Mapa({ puntos, seleccionado, onSeleccionar }: Props) {
 
       {conCoords.map((p) => (
         <Marker
-          key={p.id_pdv}
+          key={`${p.ciclo}-${p.id_pdv}`}
           position={[p.latitud as number, p.longitud as number]}
           icon={iconoRuta(numeroDeRuta(p), seleccionado === p.id_pdv)}
           eventHandlers={{ click: () => onSeleccionar?.(p.id_pdv) }}

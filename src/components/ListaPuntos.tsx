@@ -23,7 +23,7 @@ export default function ListaPuntos({ puntos, seleccionado, onSeleccionar }: Pro
       {puntos.map((p) => {
         const activo = seleccionado === p.id_pdv;
         return (
-          <li key={p.id_pdv}>
+          <li key={`${p.ciclo}-${p.id_pdv}`}>
             <button
               type="button"
               onClick={() => onSeleccionar?.(p.id_pdv)}

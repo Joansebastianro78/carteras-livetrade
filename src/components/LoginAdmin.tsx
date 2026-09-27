@@ -3,19 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, TriangleAlert } from "lucide-react";
+import { Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
+import IlustracionRastreo from "@/components/IlustracionRastreo";
 
 type Props = {
   expirada?: boolean;
   /** Se reutiliza en /admin y en /backoffice: solo cambian el texto. */
   titulo?: string;
   descripcion?: string;
+  /** Rótulo pequeño del panel oscuro. */
+  rotulo?: string;
 };
 
 export default function LoginAdmin({
   expirada,
   titulo = "Administración",
   descripcion = "Esta sección carga la plantilla maestra y reemplaza la cartera de todo el equipo.",
+  rotulo = "Cartera LiveTrade",
 }: Props) {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
@@ -60,71 +64,96 @@ export default function LoginAdmin({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5">
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-tinta)]">
-        {titulo}
-      </h1>
-      <p className="mt-2 text-[14px] leading-relaxed text-[var(--color-tinta-suave)]">
-        {descripcion}
-      </p>
-
-      <form
-        onSubmit={entrar}
-        className="mt-6 rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] p-5"
-      >
-        <div className="space-y-4">
+    <main className="fondo-acceso flex-1 px-4 py-8 md:py-14">
+      <div className="tarjeta-acceso mx-auto w-full max-w-3xl overflow-hidden rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] md:grid md:grid-cols-[1fr_1fr]">
+        <aside className="panel-acceso hidden flex-col justify-between p-7 text-white md:flex">
           <div>
-            <label htmlFor="usuario" className="campo-etiqueta">
-              Usuario
-            </label>
-            <input
-              id="usuario"
-              required
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="jsrodriguez"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-              className="campo"
-            />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9dc0cc]">
+              {rotulo}
+            </p>
+            <h2 className="mt-3 text-[22px] leading-[1.2] font-semibold tracking-tight">
+              {titulo}
+            </h2>
           </div>
 
-          <div>
-            <label htmlFor="clave" className="campo-etiqueta">
-              Clave
-            </label>
-            <input
-              id="clave"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={clave}
-              onChange={(e) => setClave(e.target.value)}
-              className="campo"
-            />
-          </div>
-        </div>
+          <IlustracionRastreo className="my-5 h-auto w-full max-w-[260px] self-center" />
 
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
-          >
-            <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
-            {error}
+          <p className="flex items-start gap-3 text-[13px] leading-snug text-[#d7e3e7]">
+            <span
+              aria-hidden
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-[#9fd3e2]"
+            >
+              <ShieldCheck size={15} />
+            </span>
+            Acceso restringido. Cada ingreso queda registrado con el usuario que
+            entró.
           </p>
-        )}
+        </aside>
 
-        <button
-          type="submit"
-          disabled={cargando || !usuario || !clave}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-3 text-[15px] font-medium text-white disabled:opacity-45"
-        >
-          {cargando && <Loader2 size={16} className="animate-spin" aria-hidden />}
-          Entrar
-        </button>
-      </form>
+        <div className="p-6 sm:p-8">
+          <h1 className="text-[26px] leading-[1.15] font-semibold tracking-tight text-[var(--color-tinta)]">
+            {titulo}
+          </h1>
+          <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--color-tinta-suave)]">
+            {descripcion}
+          </p>
+
+          <form onSubmit={entrar} className="mt-6">
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="usuario" className="campo-etiqueta">
+                  Usuario
+                </label>
+                <input
+                  id="usuario"
+                  required
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="jsrodriguez"
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                  className="campo"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="clave" className="campo-etiqueta">
+                  Clave
+                </label>
+                <input
+                  id="clave"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={clave}
+                  onChange={(e) => setClave(e.target.value)}
+                  className="campo"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <p
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
+              >
+                <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={cargando || !usuario || !clave}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-[6px] bg-[#1F6F8B] px-4 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#195b73] disabled:bg-[#9fb3bb] disabled:hover:bg-[#9fb3bb]"
+            >
+              {cargando && <Loader2 size={16} className="animate-spin" aria-hidden />}
+              Entrar
+            </button>
+          </form>
+        </div>
+      </div>
 
       <p className="mt-6 text-center text-[13px]">
         <Link
