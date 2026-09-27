@@ -282,7 +282,7 @@ export default function BackOffice() {
   return (
     <div className="space-y-4">
       <section>
-        <h2 className="text-sm font-semibold">Consultar la cartera de un vendedor</h2>
+        <h2 className="text-sm font-semibold">Consultar la cartera de cualquier consultor</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           Por usuario, cédula o nombre. Sirve para resolver por teléfono: ves lo
           mismo que ve él y puedes mandarle el Excel o la imagen.
@@ -323,7 +323,7 @@ export default function BackOffice() {
 
       {vendedores !== null && vendedores.length === 0 && (
         <p className="rounded-[4px] border border-dashed border-[var(--color-linea)] px-4 py-6 text-center text-[13px] text-[var(--color-tinta-suave)]">
-          Ningún vendedor coincide con esa búsqueda.
+          Ningún Consultor coincide con esa búsqueda.
         </p>
       )}
 
