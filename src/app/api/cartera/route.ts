@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normalizarCedula, normalizarUsuario } from "@/lib/normalizar";
+import { leerMantenimiento } from "@/lib/mantenimiento";
 import type { PuntoCartera, RespuestaCartera } from "@/lib/tipos";
 
 export const runtime = "nodejs";
@@ -36,6 +37,16 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Demasiadas consultas seguidas. Espera un minuto e intenta de nuevo." },
       { status: 429 }
+    );
+  }
+
+  // Con la ventana de mantenimiento abierta nadie consulta, ni siquiera
+  // quien ya tenga la página cargada de antes.
+  const mantenimiento = await leerMantenimiento();
+  if (mantenimiento.activo) {
+    return NextResponse.json(
+      { error: mantenimiento.mensaje, mantenimiento: true },
+      { status: 503 }
     );
   }
 

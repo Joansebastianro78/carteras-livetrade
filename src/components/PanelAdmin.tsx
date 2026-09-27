@@ -4,10 +4,14 @@ import { useState } from "react";
 import Cargador from "./Cargador";
 import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
+import BackOffice from "./BackOffice";
+import Mantenimiento from "./Mantenimiento";
 
 const SECCIONES = [
   { id: "cargar", titulo: "Cargar plantilla" },
   { id: "editar", titulo: "Editar cartera" },
+  { id: "backoffice", titulo: "BackOffice" },
+  { id: "mantenimiento", titulo: "Mantenimiento" },
   { id: "usuarios", titulo: "Administradores" },
 ] as const;
 
@@ -20,7 +24,7 @@ export default function PanelAdmin() {
     <>
       <nav
         aria-label="Secciones del panel"
-        className="flex gap-1 border-b border-[var(--color-linea)]"
+        className="flex flex-wrap gap-1 border-b border-[var(--color-linea)]"
       >
         {SECCIONES.map((s) => (
           <button
@@ -77,6 +81,8 @@ export default function PanelAdmin() {
         )}
 
         {activa === "editar" && <EditorCartera />}
+        {activa === "backoffice" && <BackOffice />}
+        {activa === "mantenimiento" && <Mantenimiento />}
         {activa === "usuarios" && <AdminUsuarios />}
       </div>
     </>

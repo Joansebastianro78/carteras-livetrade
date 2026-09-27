@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COOKIE_ADMIN, COOKIE_OPTS, crearToken } from "@/lib/auth";
+import { COOKIE_ADMIN, COOKIE_OPTS, crearToken, esRol } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .rpc("verificar_admin", { p_usuario: usuario, p_clave: clave })
-    .maybeSingle<{ usuario: string; nombre: string | null }>();
+    .maybeSingle<{ usuario: string; nombre: string | null; rol: string | null }>();
 
   if (error) {
     console.error("[login] error Supabase:", error.message);
@@ -61,7 +61,20 @@ export async function POST(req: Request) {
   if (!data) return fallido();
 
   intentos.delete(ip);
-  const res = NextResponse.json({ ok: true, nombre: data.nombre ?? data.usuario });
-  res.cookies.set(COOKIE_ADMIN, await crearToken(secreto, data.usuario), COOKIE_OPTS);
+
+  // Si verificar_admin todavía es la versión sin rol, data.rol llega vacío y
+  // esRol lo trata como admin: el panel sigue funcionando igual que antes.
+  const rol = esRol(data.rol);
+
+  const res = NextResponse.json({
+    ok: true,
+    nombre: data.nombre ?? data.usuario,
+    rol,
+  });
+  res.cookies.set(
+    COOKIE_ADMIN,
+    await crearToken(secreto, data.usuario, rol),
+    COOKIE_OPTS
+  );
   return res;
 }

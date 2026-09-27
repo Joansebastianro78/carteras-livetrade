@@ -2,15 +2,22 @@
  * Sesión de administrador: cookie httpOnly firmada con HMAC-SHA256.
  * Usa Web Crypto para que funcione también en el runtime Edge (middleware).
  *
- * Formato del token: "<usuarioB64>.<expiraEnMs>.<firma>"
- * El usuario viaja en claro dentro de la cookie, pero va firmado: si alguien
- * SSlo edita, la firma deja de coincidir y la sesión se rechaza.
+ * Formato del token: "<usuarioB64>.<rolB64>.<expiraEnMs>.<firma>"
+ * El usuario y el rol viajan en claro dentro de la cookie, pero van firmados:
+ * si alguien los edita, la firma deja de coincidir y la sesión se rechaza.
  */
 
 export const COOKIE_ADMIN = "cartera_admin";
 const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
 
-export type Sesion = { usuario: string; expira: number };
+/** admin ve el panel completo; backoffice solo consulta carteras. */
+export type Rol = "admin" | "backoffice";
+
+export type Sesion = { usuario: string; rol: Rol; expira: number };
+
+export function esRol(valor: string | null | undefined): Rol {
+  return valor === "backoffice" ? "backoffice" : "admin";
+}
 
 function b64urlDesdeBytes(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -53,8 +60,16 @@ async function firmar(payload: string, secreto: string): Promise<string> {
   return b64urlDesdeBytes(sig);
 }
 
-export async function crearToken(secreto: string, usuario: string): Promise<string> {
-  const payload = `${b64urlDesdeTexto(usuario)}.${Date.now() + DURACION_MS}`;
+export async function crearToken(
+  secreto: string,
+  usuario: string,
+  rol: Rol = "admin"
+): Promise<string> {
+  const payload = [
+    b64urlDesdeTexto(usuario),
+    b64urlDesdeTexto(rol),
+    Date.now() + DURACION_MS,
+  ].join(".");
   return `${payload}.${await firmar(payload, secreto)}`;
 }
 
@@ -71,7 +86,12 @@ export async function leerSesion(
   const payload = token.slice(0, corte);
   const firma = token.slice(corte + 1);
 
-  const [usuarioB64, expiraTxt] = payload.split(".");
+  // Tokens viejos (antes de los roles) traían solo usuario y vencimiento.
+  // Se siguen aceptando como admin hasta que expiren, para no botar sesiones.
+  const partes = payload.split(".");
+  const [usuarioB64, rolB64, expiraTxt] =
+    partes.length === 3 ? partes : [partes[0], null, partes[1]];
+
   if (!usuarioB64 || !expiraTxt || !/^\d+$/.test(expiraTxt)) return null;
 
   const expira = Number(expiraTxt);
@@ -88,7 +108,13 @@ export async function leerSesion(
   if (diff !== 0) return null;
 
   const usuario = textoDesdeB64url(usuarioB64);
-  return usuario ? { usuario, expira } : null;
+  if (!usuario) return null;
+
+  return {
+    usuario,
+    rol: esRol(rolB64 ? textoDesdeB64url(rolB64) : null),
+    expira,
+  };
 }
 
 export async function tokenValido(

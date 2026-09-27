@@ -19,7 +19,7 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("admins")
     // clave_hash nunca sale de la base, ni siquiera hacia el panel.
-    .select("id,usuario,nombre,activo,ultimo_login,created_at")
+    .select("id,usuario,nombre,rol,activo,ultimo_login,created_at")
     .order("usuario");
 
   if (error) {
@@ -32,11 +32,14 @@ export async function GET() {
 
 // ------------------------------------------------- crear o cambiar clave
 export async function POST(req: Request) {
-  const { usuario, clave, nombre } = (await req.json().catch(() => ({}))) as {
+  const { usuario, clave, nombre, rol } = (await req.json().catch(() => ({}))) as {
     usuario?: string;
     clave?: string;
     nombre?: string;
+    rol?: string;
   };
+
+  const perfil = rol === "backoffice" ? "backoffice" : "admin";
 
   const limpio = (usuario ?? "").trim().toLowerCase();
 
@@ -61,17 +64,24 @@ export async function POST(req: Request) {
     p_usuario: limpio,
     p_clave: clave,
     p_nombre: (nombre ?? "").trim() || null,
+    p_rol: perfil,
   });
 
   if (error) {
     console.error("[usuarios POST]", error.message);
+
+    const faltaRol = /p_rol|crear_admin/i.test(error.message);
     return NextResponse.json(
-      { error: `No se pudo guardar: ${error.message}` },
+      {
+        error: faltaRol
+          ? "La función crear_admin todavía no acepta perfiles. Ejecuta supabase/roles.sql en el SQL Editor."
+          : `No se pudo guardar: ${error.message}`,
+      },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ ok: true, usuario: limpio });
+  return NextResponse.json({ ok: true, usuario: limpio, rol: perfil });
 }
 
 // ------------------------------------------------- activar / desactivar
@@ -95,12 +105,21 @@ export async function PATCH(req: Request) {
   }
 
   if (!activo) {
+    // Los perfiles BackOffice no cuentan: desactivarlos a todos no deja el
+    // panel sin dueño, pero quedarse sin administradores sí.
     const { count } = await supabaseAdmin
       .from("admins")
       .select("id", { count: "exact", head: true })
-      .eq("activo", true);
+      .eq("activo", true)
+      .eq("rol", "admin");
 
-    if ((count ?? 0) <= 1) {
+    const { data: objetivo } = await supabaseAdmin
+      .from("admins")
+      .select("rol")
+      .eq("usuario", limpio)
+      .maybeSingle();
+
+    if (objetivo?.rol !== "backoffice" && (count ?? 0) <= 1) {
       return NextResponse.json(
         { error: "Debe quedar al menos un administrador activo." },
         { status: 400 }
@@ -112,7 +131,7 @@ export async function PATCH(req: Request) {
     .from("admins")
     .update({ activo })
     .eq("usuario", limpio)
-    .select("usuario,activo")
+    .select("usuario,rol,activo")
     .maybeSingle();
 
   if (error) {

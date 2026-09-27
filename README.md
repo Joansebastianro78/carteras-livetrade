@@ -24,7 +24,7 @@ autorizarlo o hospedar el tarball internamente.
 
 1. Crear el proyecto en supabase.com.
 2. Abrir **SQL Editor** y ejecutar, en orden: `supabase/schema.sql`,
-   `supabase/admins.sql` y `supabase/gestion.sql`.
+   `supabase/admins.sql`, `supabase/roles.sql` y `supabase/gestion.sql`.
 3. En **Project Settings → API**, copiar la *Project URL* y la **service_role**
    key hacia `.env.local`.
 
@@ -46,33 +46,45 @@ directo con la base.
 | Ruta | Qué hace |
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
-| `/admin` | Login y cargador de la plantilla maestra. |
+| `/admin` | Login y panel completo: cargar, editar, BackOffice, mantenimiento y usuarios. |
+| `/backoffice` | Acceso de consulta: buscar un vendedor y ver o descargar su cartera. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
 | `POST /api/admin/upload` | UPSERT de un lote de hasta 1000 filas. |
 | `GET/PATCH/DELETE /api/admin/puntos` | Buscar, editar o borrar un punto. |
 | `GET/POST /api/admin/purgar` | Resumen por ciclo y borrado masivo. |
-| `GET/POST/PATCH /api/admin/usuarios` | Listar, crear y activar administradores. |
+| `GET/POST/PATCH /api/admin/usuarios` | Listar, crear y activar usuarios del panel. |
+| `GET /api/admin/vendedores` | Buscar un vendedor o traer su cartera completa. |
+| `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 
-### Administradores
+### Usuarios del panel
 
 Viven en `public.admins`, con la clave guardada como hash bcrypt. La comparación
 ocurre dentro de Postgres mediante la función `verificar_admin`, así que el hash
 nunca sale del motor ni pasa por la aplicación.
 
+Hay dos perfiles, en la columna `admins.rol`:
+
+- `admin`: el panel completo, incluido crear usuarios y borrar cartera.
+- `backoffice`: solo `/backoffice`, para consultar la cartera de un vendedor y
+  descargarla. El middleware le responde 403 en cualquier otra ruta de
+  `/api/admin`, así que la restricción no depende de que la interfaz esconda
+  botones.
+
 ```sql
--- crear o cambiarle la clave a alguien
+-- crear o cambiarle la clave a alguien (el cuarto argumento es el perfil)
 select public.crear_admin('joan', 'clave-larga-y-unica', 'Joan');
+select public.crear_admin('soporte1', 'otra-clave-larga', 'Soporte 1', 'backoffice');
 
 -- revocar acceso sin borrar el histórico
 update public.admins set activo = false where usuario = 'alguien';
 
 -- quién entró y cuándo
-select usuario, nombre, activo, ultimo_login from public.admins order by usuario;
+select usuario, nombre, rol, activo, ultimo_login from public.admins order by rol, usuario;
 ```
 
-El middleware protege `/admin` y `/api/admin/*` con una cookie httpOnly firmada
-con HMAC-SHA256 que lleva el usuario dentro. Cada carga queda registrada en
+El middleware protege `/admin`, `/backoffice` y `/api/admin/*` con una cookie
+httpOnly firmada con HMAC-SHA256 que lleva el usuario y el rol dentro. Cada carga queda registrada en
 `cargas_cartera.cargado_por`.
 
 El login responde el mismo mensaje para usuario inexistente y clave errada, para
@@ -149,15 +161,16 @@ El borrado masivo pide escribir la frase exacta —el nombre del ciclo, o
 `ELIMINAR TODA LA CARTERA`— porque no hay papelera ni respaldo automático. Todo
 borrado y toda edición quedan en `auditoria_cartera` con el usuario que la hizo.
 
-**Administradores.** Crear, cambiar clave, desactivar y reactivar. Guardas
-puestas: nadie puede desactivarse a sí mismo, y el sistema no permite quedarse
-sin ningún administrador activo. Escribir un usuario que ya existe reemplaza su
-clave, que es la única forma de recuperarla.
+**Usuarios del panel.** Crear, cambiar clave, elegir perfil, desactivar y
+reactivar. Guardas puestas: nadie puede desactivarse a sí mismo, y el sistema no
+permite quedarse sin ningún administrador activo (los perfiles BackOffice no
+cuentan para ese mínimo). Escribir un usuario que ya existe reemplaza su clave,
+que es la única forma de recuperarla, y le deja el perfil que esté marcado.
 
-Todo administrador puede hacer todo, incluido crear otros administradores y
-borrar la cartera completa. No hay roles. Si el equipo crece y necesitas que
-alguien solo cargue archivos sin poder borrar, hay que agregar una columna `rol`
-a `admins` y validarla en cada ruta.
+Los dos perfiles son `admin` y `backoffice`. Un administrador puede hacer todo,
+incluido crear otros usuarios y borrar la cartera completa. Si algún día hace
+falta un tercer perfil —por ejemplo alguien que cargue archivos pero no pueda
+borrar—, el sitio donde se decide es `API_BACKOFFICE` en `src/middleware.ts`.
 
 ## 6. Carga y duplicados
 

@@ -5,7 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, TriangleAlert } from "lucide-react";
 
-export default function LoginAdmin({ expirada }: { expirada?: boolean }) {
+type Props = {
+  expirada?: boolean;
+  /** Se reutiliza en /admin y en /backoffice: solo cambian el texto. */
+  titulo?: string;
+  descripcion?: string;
+};
+
+export default function LoginAdmin({
+  expirada,
+  titulo = "Administración",
+  descripcion = "Esta sección carga la plantilla maestra y reemplaza la cartera de todo el equipo.",
+}: Props) {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
@@ -31,6 +42,15 @@ export default function LoginAdmin({ expirada }: { expirada?: boolean }) {
         setError(json.error ?? "No pudimos validar el acceso.");
         return;
       }
+
+      // Un perfil BackOffice no tiene nada que hacer en /admin: se le lleva
+      // directo a lo suyo en vez de esperar a que el middleware lo desvíe.
+      if (json.rol === "backoffice") {
+        router.replace("/backoffice");
+        router.refresh();
+        return;
+      }
+
       router.refresh();
     } catch {
       setError("No hay conexión con el servidor.");
@@ -42,11 +62,10 @@ export default function LoginAdmin({ expirada }: { expirada?: boolean }) {
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5">
       <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-tinta)]">
-        Administración
+        {titulo}
       </h1>
       <p className="mt-2 text-[14px] leading-relaxed text-[var(--color-tinta-suave)]">
-        Esta sección carga la plantilla maestra y reemplaza la cartera de todo el
-        equipo.
+        {descripcion}
       </p>
 
       <form

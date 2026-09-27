@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
 import LoginAdmin from "@/components/LoginAdmin";
-import PanelAdmin from "@/components/PanelAdmin";
+import BackOffice from "@/components/BackOffice";
 import CerrarSesion from "@/components/CerrarSesion";
 
 export const dynamic = "force-dynamic";
 
-export default async function Admin({
+export default async function PaginaBackOffice({
   searchParams,
 }: {
   searchParams: Promise<{ sesion?: string }>;
@@ -21,12 +20,18 @@ export default async function Admin({
   );
 
   if (!activa) {
-    return <LoginAdmin expirada={sesion === "expirada"} />;
+    return (
+      <LoginAdmin
+        expirada={sesion === "expirada"}
+        titulo="BackOffice"
+        descripcion="Consulta la cartera de cualquier vendedor para resolverle por teléfono: su ruta, sus puntos en el mapa y las descargas."
+      />
+    );
   }
 
-  // El middleware ya desvía a los perfiles BackOffice, pero la página no se
-  // fía de eso: quien no sea admin no llega a ver el panel completo.
-  if (activa.rol !== "admin") redirect("/backoffice");
+  // Un administrador también puede entrar aquí; solo que él además tiene el
+  // panel completo a un clic.
+  const esAdmin = activa.rol === "admin";
 
   return (
     <main className="flex-1">
@@ -34,26 +39,30 @@ export default async function Admin({
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
           <div>
             <h1 className="text-[15px] font-semibold text-[var(--color-tinta)]">
-              Administración de cartera
+              BackOffice
             </h1>
             <p className="text-xs text-[var(--color-tinta-suave)]">
               Sesión de {activa.usuario}
+              {!esAdmin && " · perfil BackOffice"}
             </p>
           </div>
+
           <div className="flex items-center gap-3 text-[13px]">
-            <Link
-              href="/"
-              className="text-[var(--color-tinta-suave)] underline underline-offset-2"
-            >
-              Ver consulta
-            </Link>
+            {esAdmin && (
+              <Link
+                href="/admin"
+                className="text-[var(--color-tinta-suave)] underline underline-offset-2"
+              >
+                Panel completo
+              </Link>
+            )}
             <CerrarSesion />
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-3xl px-5 py-8">
-        <PanelAdmin />
+        <BackOffice />
       </div>
     </main>
   );

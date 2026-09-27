@@ -40,6 +40,46 @@ revoke all on public.resumen_archivos from anon, authenticated;
 alter table public.cargas_cartera
     add column if not exists modo text;
 
+-- Resumen por vendedor: alimenta el buscador del BackOffice. Un vendedor es
+-- la pareja usuario + cédula, que es justo con lo que entra a la página.
+create or replace view public.resumen_vendedores as
+select
+    usuario,
+    ccuser,
+    max(nom)                                   as nom,
+    max(num_de_ruta)                           as num_de_ruta,
+    count(*)                                   as puntos,
+    count(distinct ciclo)                      as ciclos,
+    max(ciclo)                                 as ciclo_reciente,
+    count(*) filter (where latitud is null)    as sin_ubicacion,
+    max(updated_at)                            as ultima_actualizacion
+from public.puntos_cartera
+where usuario <> 'LIBRE' and ccuser <> 'LIBRE'
+group by usuario, ccuser
+order by max(nom);
+
+revoke all on public.resumen_vendedores from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Ventana de mantenimiento
+-- Una sola fila. Mientras activo = true la página pública no consulta.
+-- El panel de administración sigue abierto: si no, no se podría apagar.
+-- ---------------------------------------------------------------------
+create table if not exists public.mantenimiento (
+    id               integer primary key default 1 check (id = 1),
+    activo           boolean not null default false,
+    mensaje          text not null default 'Estamos actualizando la cartera. Vuelve a intentar en unos minutos.',
+    hasta            timestamptz,
+    actualizado_por  text,
+    updated_at       timestamptz not null default now()
+);
+
+insert into public.mantenimiento (id) values (1) on conflict (id) do nothing;
+
+alter table public.mantenimiento enable row level security;
+alter table public.mantenimiento force row level security;
+revoke all on public.mantenimiento from anon, authenticated;
+
 -- ---------------------------------------------------------------------
 -- Bitácora de cambios manuales
 -- Editar o borrar puntos desde el panel deja rastro aquí.

@@ -3,16 +3,34 @@
 import { useEffect, useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 
+type Rol = "admin" | "backoffice";
+
 type Admin = {
   id: number;
   usuario: string;
   nombre: string | null;
+  rol: Rol | null;
   activo: boolean;
   ultimo_login: string | null;
   created_at: string;
 };
 
 const LARGO_MINIMO = 10;
+
+const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
+  {
+    id: "admin",
+    titulo: "Administrador",
+    detalle:
+      "Panel completo: cargar la plantilla, editar y borrar cartera, mantenimiento y usuarios.",
+  },
+  {
+    id: "backoffice",
+    titulo: "BackOffice",
+    detalle:
+      "Solo consulta: busca un vendedor, ve su mapa y sus puntos, y descarga el Excel o la imagen.",
+  },
+];
 
 export default function AdminUsuarios() {
   const [lista, setLista] = useState<Admin[] | null>(null);
@@ -22,6 +40,7 @@ export default function AdminUsuarios() {
   const [usuario, setUsuario] = useState("");
   const [nombre, setNombre] = useState("");
   const [clave, setClave] = useState("");
+  const [rol, setRol] = useState<Rol>("admin");
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -39,7 +58,14 @@ export default function AdminUsuarios() {
     }
   }
 
-  const yaExiste = lista?.some((a) => a.usuario === usuario.trim().toLowerCase());
+  const existente = lista?.find((a) => a.usuario === usuario.trim().toLowerCase());
+  const yaExiste = existente !== undefined;
+
+  // Al escribir un usuario que ya existe se precarga SU perfil: así cambiarle
+  // la clave no lo asciende ni lo degrada sin querer.
+  useEffect(() => {
+    if (existente) setRol(existente.rol === "backoffice" ? "backoffice" : "admin");
+  }, [existente]);
 
   async function crear(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +75,7 @@ export default function AdminUsuarios() {
     const res = await fetch("/api/admin/usuarios", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuario, clave, nombre }),
+      body: JSON.stringify({ usuario, clave, nombre, rol }),
     });
     const json = await res.json().catch(() => ({}));
     setGuardando(false);
@@ -59,15 +85,18 @@ export default function AdminUsuarios() {
       return;
     }
 
+    const comoRol = json.rol === "backoffice" ? "BackOffice" : "administrador";
+
     setAviso({
       tipo: "ok",
       texto: yaExiste
-        ? `Se cambió la clave de ${json.usuario}.`
-        : `Se creó ${json.usuario}. Entrégale la clave por un canal seguro: no se puede volver a consultar.`,
+        ? `Se actualizó ${json.usuario}: clave nueva y perfil ${comoRol}.`
+        : `Se creó ${json.usuario} como ${comoRol}. Entrégale la clave por un canal seguro: no se puede volver a consultar.`,
     });
     setUsuario("");
     setNombre("");
     setClave("");
+    setRol("admin");
     cargar();
   }
 
@@ -99,9 +128,10 @@ export default function AdminUsuarios() {
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="text-sm font-semibold">Administradores</h2>
+        <h2 className="text-sm font-semibold">Usuarios del panel</h2>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
-          Quien aparezca aquí puede cargar, editar y borrar la cartera completa.
+          Los administradores manejan toda la cartera. Los perfiles BackOffice
+          solo consultan vendedores y descargan su cartera.
         </p>
 
         {aviso && (
@@ -145,6 +175,16 @@ export default function AdminUsuarios() {
 
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                    a.rol === "backoffice"
+                      ? "bg-[#e8eef5] text-[#2b4c6f]"
+                      : "bg-[#f0ebf7] text-[#4b3a6b]"
+                  }`}
+                >
+                  {a.rol === "backoffice" ? "BackOffice" : "administrador"}
+                </span>
+
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                     a.activo
                       ? "bg-[#e7f2ec] text-[var(--color-exito)]"
                       : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
@@ -169,7 +209,7 @@ export default function AdminUsuarios() {
 
       <section>
         <h2 className="text-sm font-semibold">
-          {yaExiste ? "Cambiar la clave" : "Crear un administrador"}
+          {yaExiste ? "Cambiar la clave" : "Crear un usuario del panel"}
         </h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           Si escribes un usuario que ya existe, se le reemplaza la clave. Es la
@@ -212,6 +252,37 @@ export default function AdminUsuarios() {
             </div>
           </div>
 
+          <fieldset className="mt-4">
+            <legend className="campo-etiqueta">Perfil</legend>
+            <div className="mt-1 space-y-2">
+              {PERFILES.map((p) => (
+                <label
+                  key={p.id}
+                  className={`flex cursor-pointer gap-3 rounded-[4px] border p-3 ${
+                    rol === p.id
+                      ? "border-[var(--color-tinta)] bg-[#f7f9f7]"
+                      : "border-[var(--color-linea)]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="perfil"
+                    value={p.id}
+                    checked={rol === p.id}
+                    onChange={() => setRol(p.id)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{p.titulo}</span>
+                    <span className="mt-0.5 block text-[13px] leading-snug text-[var(--color-tinta-suave)]">
+                      {p.detalle}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           <div className="mt-4">
             <label htmlFor="nueva-clave" className="campo-etiqueta">
               Clave
@@ -237,8 +308,9 @@ export default function AdminUsuarios() {
           </div>
 
           {yaExiste && (
-            <p className="mt-3 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] text-[#7a5410]">
-              Ese usuario ya existe. Al guardar, su clave actual deja de servir.
+            <p className="mt-3 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] leading-snug text-[#7a5410]">
+              Ese usuario ya existe. Al guardar, su clave actual deja de servir y
+              queda con el perfil que esté marcado arriba.
             </p>
           )}
 
@@ -252,7 +324,11 @@ export default function AdminUsuarios() {
             ) : (
               <UserPlus size={15} aria-hidden />
             )}
-            {yaExiste ? "Cambiar la clave" : "Crear administrador"}
+            {yaExiste
+              ? "Cambiar la clave"
+              : rol === "backoffice"
+                ? "Crear perfil BackOffice"
+                : "Crear administrador"}
           </button>
         </form>
       </section>
