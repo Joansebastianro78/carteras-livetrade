@@ -162,3 +162,98 @@ body {
     0 1px 2px rgba(22, 36, 43, 0.06),
     0 12px 32px -12px rgba(22, 36, 43, 0.22);
 }
+
+/*
+  Temas de temporada.
+
+  Todo se anima con CSS, sin un bucle de JavaScript corriendo detrás: son
+  celulares de gama media trabajando en la calle. La capa va por encima de
+  todo pero con pointer-events: none, así que nunca tapa un botón.
+*/
+@keyframes tema-caer {
+  from {
+    transform: translate3d(0, -14vh, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--deriva, 0px), 110vh, 0) rotate(var(--giro, 0deg));
+  }
+}
+
+@keyframes tema-subir {
+  0% {
+    transform: translate3d(0, 12vh, 0) scale(0.85);
+    opacity: 0;
+  }
+  18%,
+  82% {
+    opacity: var(--opacidad, 0.55);
+  }
+  100% {
+    transform: translate3d(var(--deriva, 0px), -108vh, 0) scale(1.1);
+    opacity: 0;
+  }
+}
+
+@keyframes tema-colgar {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes tema-titilar {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tema-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tema-cae {
+  position: absolute;
+  top: 0;
+  will-change: transform;
+  animation: tema-caer linear infinite;
+}
+
+.tema-sube {
+  position: absolute;
+  bottom: 0;
+  will-change: transform, opacity;
+  animation: tema-subir linear infinite;
+}
+
+.tema-cuelga {
+  transform-origin: top center;
+  animation: tema-colgar 3.6s ease-in-out infinite;
+}
+
+.tema-titila {
+  animation: tema-titilar 2.4s ease-in-out infinite;
+}
+
+/* Quien pidió menos movimiento se queda con los adornos quietos y sin nieve. */
+@media (prefers-reduced-motion: reduce) {
+  .tema-cae,
+  .tema-sube {
+    display: none;
+  }
+
+  .tema-cuelga,
+  .tema-titila {
+    animation: none;
+  }
+}

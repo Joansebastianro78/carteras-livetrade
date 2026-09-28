@@ -6,12 +6,14 @@ import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
 import BackOffice from "./BackOffice";
 import Mantenimiento from "./Mantenimiento";
+import PanelTemas from "./PanelTemas";
 
 const SECCIONES = [
   { id: "cargar", titulo: "Cargar plantilla" },
   { id: "editar", titulo: "Editar cartera" },
   { id: "backoffice", titulo: "BackOffice" },
   { id: "mantenimiento", titulo: "Mantenimiento" },
+  { id: "temas", titulo: "Temas" },
   { id: "usuarios", titulo: "Administradores" },
 ] as const;
 
@@ -83,6 +85,7 @@ export default function PanelAdmin() {
         {activa === "editar" && <EditorCartera />}
         {activa === "backoffice" && <BackOffice />}
         {activa === "mantenimiento" && <Mantenimiento />}
+        {activa === "temas" && <PanelTemas />}
         {activa === "usuarios" && <AdminUsuarios />}
       </div>
     </>

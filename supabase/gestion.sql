@@ -81,6 +81,31 @@ alter table public.mantenimiento force row level security;
 revoke all on public.mantenimiento from anon, authenticated;
 
 -- ---------------------------------------------------------------------
+-- Temas de temporada
+-- Una sola fila. Los rangos de fechas viven en el código (src/lib/temas.ts);
+-- acá solo queda qué decidió el administrador.
+--   modo = automatico → el tema sale solo cuando llega su fecha
+--   modo = apagado    → nunca sale nada
+--   modo = fijo       → sale siempre tema_fijo, sin mirar el calendario
+--   apagados          → temas que el modo automático debe saltarse
+-- ---------------------------------------------------------------------
+create table if not exists public.tema (
+    id               integer primary key default 1 check (id = 1),
+    modo             text not null default 'automatico'
+                     check (modo in ('automatico', 'apagado', 'fijo')),
+    tema_fijo        text,
+    apagados         text[] not null default '{}',
+    actualizado_por  text,
+    updated_at       timestamptz not null default now()
+);
+
+insert into public.tema (id) values (1) on conflict (id) do nothing;
+
+alter table public.tema enable row level security;
+alter table public.tema force row level security;
+revoke all on public.tema from anon, authenticated;
+
+-- ---------------------------------------------------------------------
 -- Bitácora de cambios manuales
 -- Editar o borrar puntos desde el panel deja rastro aquí.
 -- ---------------------------------------------------------------------

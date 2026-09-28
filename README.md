@@ -56,6 +56,25 @@ directo con la base.
 | `GET/POST/PATCH /api/admin/usuarios` | Listar, crear y activar usuarios del panel. |
 | `GET /api/admin/vendedores` | Buscar un vendedor o traer su cartera completa. |
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
+| `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
+
+### Temas de temporada
+
+Adornos que salen solos en las fechas especiales: telarañas, araña y calabaza
+en Halloween; nieve y una tira de luces en Navidad; farolitos el Día de las
+Velitas; papelitos en Año Nuevo; corazones en Amor y Amistad.
+
+Los rangos de fechas viven en `src/lib/temas.ts`, no en la base: son los mismos
+todos los años y así nadie tiene que moverlos cada diciembre. Agregar una fecha
+nueva es añadir una entrada a ese arreglo con su rango y su adorno; el panel la
+recoge sola. En la tabla `tema` (una sola fila) queda solo lo que el
+administrador decide: el modo (automático, fijo o apagado) y qué temas apagó.
+
+La capa de adornos es `position: fixed` con `pointer-events: none`, así que
+nunca tapa un botón; se anima con CSS y no con un bucle de JavaScript; en
+celular dibuja la mitad de las partículas y los adornos van más pequeños; y con
+`prefers-reduced-motion` las partículas desaparecen y los adornos se quedan
+quietos.
 
 ### Usuarios del panel
 

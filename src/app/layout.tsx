@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import PieDePagina from "@/components/PieDePagina";
+import DecoracionTema from "@/components/DecoracionTema";
+import { leerEstadoTema } from "@/lib/temaServidor";
+import { resolverTema } from "@/lib/temas";
 
 const plex = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -21,7 +24,14 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // Los adornos se deciden en el servidor y salen en todas las vistas.
+  const tema = resolverTema(await leerEstadoTema());
+
   return (
     <html lang="es" className={plex.variable}>
       <body
@@ -30,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         {children}
         <PieDePagina />
+        {tema && <DecoracionTema tema={tema.id} />}
       </body>
     </html>
   );
