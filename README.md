@@ -63,18 +63,27 @@ Viven en `public.admins`, con la clave guardada como hash bcrypt. La comparació
 ocurre dentro de Postgres mediante la función `verificar_admin`, así que el hash
 nunca sale del motor ni pasa por la aplicación.
 
-Hay dos perfiles, en la columna `admins.rol`:
+Hay tres perfiles, en la columna `admins.rol`:
 
+- `superadmin`: todo lo del administrador y, además, el único que puede
+  desactivar, cambiarle la clave o cambiarle el perfil a otro superadministrador.
+  También es el único que puede crear superadministradores; si no, cualquier
+  admin se ascendería y la jerarquía no serviría de nada.
 - `admin`: el panel completo, incluido crear usuarios y borrar cartera.
 - `backoffice`: solo `/backoffice`, para consultar la cartera de un vendedor y
   descargarla. El middleware le responde 403 en cualquier otra ruta de
   `/api/admin`, así que la restricción no depende de que la interfaz esconda
   botones.
 
+Las tres reglas del superadministrador se validan en `/api/admin/usuarios`, no
+en la interfaz: los botones que no aplican salen deshabilitados, pero aunque
+alguien llame la API a mano recibe 403.
+
 ```sql
 -- crear o cambiarle la clave a alguien (el cuarto argumento es el perfil)
 select public.crear_admin('joan', 'clave-larga-y-unica', 'Joan');
 select public.crear_admin('soporte1', 'otra-clave-larga', 'Soporte 1', 'backoffice');
+select public.crear_admin('jefe@empresa.com', 'clave-larga-aqui', 'Jefe', 'superadmin');
 
 -- revocar acceso sin borrar el histórico
 update public.admins set activo = false where usuario = 'alguien';
@@ -167,10 +176,13 @@ permite quedarse sin ningún administrador activo (los perfiles BackOffice no
 cuentan para ese mínimo). Escribir un usuario que ya existe reemplaza su clave,
 que es la única forma de recuperarla, y le deja el perfil que esté marcado.
 
-Los dos perfiles son `admin` y `backoffice`. Un administrador puede hacer todo,
-incluido crear otros usuarios y borrar la cartera completa. Si algún día hace
-falta un tercer perfil —por ejemplo alguien que cargue archivos pero no pueda
-borrar—, el sitio donde se decide es `API_BACKOFFICE` en `src/middleware.ts`.
+Los perfiles son `superadmin`, `admin` y `backoffice`. Cada fila de la lista
+trae un botón **Cambiar clave** que carga ese usuario en el formulario de abajo;
+guardar reemplaza su clave, que sigue siendo la única forma de recuperarla.
+
+Si algún día hace falta otro perfil —por ejemplo alguien que cargue archivos
+pero no pueda borrar—, el sitio donde se decide qué rutas ve cada uno es
+`API_BACKOFFICE` en `src/middleware.ts`.
 
 ## 6. Carga y duplicados
 

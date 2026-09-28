@@ -1,7 +1,9 @@
 -- =====================================================================
--- Perfiles: administrador y BackOffice
--- Ejecutar DESPUÉS de admins.sql
+-- Perfiles del panel
+-- Ejecutar DESPUÉS de admins.sql. Se puede volver a ejecutar sin problema.
 --
+-- superadmin → todo lo del admin y, además, es el único que puede
+--              desactivar, cambiarle la clave o el perfil a otro superadmin
 -- admin      → panel completo: cargar, editar, borrar, mantenimiento, usuarios
 -- backoffice → solo consultar la cartera de un vendedor y descargarla
 -- =====================================================================
@@ -9,17 +11,13 @@
 alter table public.admins
     add column if not exists rol text not null default 'admin';
 
--- Postgres no tiene "add constraint if not exists", así que se comprueba.
-do $$
-begin
-    if not exists (
-        select 1 from pg_constraint where conname = 'admins_rol_valido'
-    ) then
-        alter table public.admins
-            add constraint admins_rol_valido
-            check (rol in ('admin', 'backoffice'));
-    end if;
-end $$;
+-- Se borra y se vuelve a crear para que al reejecutar el archivo quede con
+-- los tres perfiles, y no con los dos de la primera versión.
+alter table public.admins drop constraint if exists admins_rol_valido;
+
+alter table public.admins
+    add constraint admins_rol_valido
+    check (rol in ('admin', 'backoffice', 'superadmin'));
 
 -- ---------------------------------------------------------------------
 -- crear_admin ahora recibe el rol.
@@ -45,7 +43,7 @@ begin
         raise exception 'La clave debe tener al menos 10 caracteres.';
     end if;
 
-    if p_rol not in ('admin', 'backoffice') then
+    if p_rol not in ('admin', 'backoffice', 'superadmin') then
         raise exception 'Rol no válido: %', p_rol;
     end if;
 
@@ -90,6 +88,16 @@ end $$;
 
 revoke execute on function public.crear_admin(text, text, text, text) from anon, authenticated;
 revoke execute on function public.verificar_admin(text, text) from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- El superadministrador de la instalación.
+-- Es la única línea de este archivo con un usuario escrito a mano: alguien
+-- tiene que serlo de entrada, y desde el panel ese perfil solo lo puede
+-- asignar otro superadministrador.
+-- ---------------------------------------------------------------------
+update public.admins
+   set rol = 'superadmin'
+ where usuario = 'jsrodriguez@overall.com.co';
 
 -- Consultas útiles:
 -- select usuario, nombre, rol, activo from public.admins order by rol, usuario;

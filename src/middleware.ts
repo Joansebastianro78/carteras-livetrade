@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 
 /**
  * Rutas de API que un perfil BackOffice sí puede usar. Todo lo demás bajo
@@ -46,7 +46,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // ------------------------------------------------------------ con sesión
-  if (sesion.rol !== "admin") {
+  if (!mandaEnElPanel(sesion.rol)) {
     if (pathname.startsWith("/admin")) {
       // Un BackOffice que llegue al panel completo se va a lo suyo.
       const url = req.nextUrl.clone();

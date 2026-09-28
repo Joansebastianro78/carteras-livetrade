@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import IlustracionRastreo from "@/components/IlustracionRastreo";
 
 type Props = {
@@ -24,6 +24,7 @@ export default function LoginAdmin({
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
+  const [verClave, setVerClave] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(
     expirada ? "Tu sesión expiró. Vuelve a entrar." : null
@@ -121,15 +122,30 @@ export default function LoginAdmin({
                 <label htmlFor="clave" className="campo-etiqueta">
                   Clave
                 </label>
-                <input
-                  id="clave"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={clave}
-                  onChange={(e) => setClave(e.target.value)}
-                  className="campo"
-                />
+                <div className="relative">
+                  <input
+                    id="clave"
+                    type={verClave ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={clave}
+                    onChange={(e) => setClave(e.target.value)}
+                    className="campo pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerClave((v) => !v)}
+                    aria-label={verClave ? "Ocultar la clave" : "Ver la clave"}
+                    title={verClave ? "Ocultar la clave" : "Ver la clave"}
+                    className="absolute inset-y-0 right-0 grid w-11 place-items-center text-[var(--color-tinta-suave)] hover:text-[var(--color-tinta)]"
+                  >
+                    {verClave ? (
+                      <EyeOff size={17} aria-hidden />
+                    ) : (
+                      <Eye size={17} aria-hidden />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, KeyRound, Loader2, ShieldAlert, UserPlus } from "lucide-react";
 
-type Rol = "admin" | "backoffice";
+type Rol = "admin" | "backoffice" | "superadmin";
 
 type Admin = {
   id: number;
@@ -17,7 +17,26 @@ type Admin = {
 
 const LARGO_MINIMO = 10;
 
+const NOMBRE_PERFIL: Record<Rol, string> = {
+  superadmin: "superadministrador",
+  admin: "administrador",
+  backoffice: "BackOffice",
+};
+
+/** Lo que diga la base; si viene vacío o raro, administrador. */
+function perfilDe(a: { rol: string | null }): Rol {
+  if (a.rol === "backoffice") return "backoffice";
+  if (a.rol === "superadmin") return "superadmin";
+  return "admin";
+}
+
 const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
+  {
+    id: "superadmin",
+    titulo: "Superadministrador",
+    detalle:
+      "Todo lo del administrador y, además, el único que puede desactivar o cambiarle la clave a otro superadministrador.",
+  },
   {
     id: "admin",
     titulo: "Administrador",
@@ -35,13 +54,17 @@ const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
 export default function AdminUsuarios() {
   const [lista, setLista] = useState<Admin[] | null>(null);
   const [yo, setYo] = useState<string | null>(null);
+  const [miRol, setMiRol] = useState<Rol>("admin");
   const [aviso, setAviso] = useState<{ tipo: "ok" | "mal"; texto: string } | null>(null);
 
   const [usuario, setUsuario] = useState("");
   const [nombre, setNombre] = useState("");
   const [clave, setClave] = useState("");
   const [rol, setRol] = useState<Rol>("admin");
+  const [verClave, setVerClave] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  const campoClave = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     cargar();
@@ -53,6 +76,7 @@ export default function AdminUsuarios() {
     if (res.ok) {
       setLista(json.usuarios ?? []);
       setYo(json.yo ?? null);
+      setMiRol((json.miRol as Rol) ?? "admin");
     } else {
       setAviso({ tipo: "mal", texto: json.error ?? "No se pudo leer la lista." });
     }
@@ -64,8 +88,28 @@ export default function AdminUsuarios() {
   // Al escribir un usuario que ya existe se precarga SU perfil: así cambiarle
   // la clave no lo asciende ni lo degrada sin querer.
   useEffect(() => {
-    if (existente) setRol(existente.rol === "backoffice" ? "backoffice" : "admin");
+    if (existente) setRol(perfilDe(existente));
   }, [existente]);
+
+  /**
+   * Un superadministrador solo lo toca otro superadministrador. La API lo
+   * vuelve a validar; esto es solo para no ofrecer botones que van a fallar.
+   */
+  function puedoTocar(a: Admin): boolean {
+    return perfilDe(a) !== "superadmin" || miRol === "superadmin";
+  }
+
+  /** Carga a ese usuario en el formulario de abajo para cambiarle la clave. */
+  function cambiarClave(a: Admin) {
+    setAviso(null);
+    setUsuario(a.usuario);
+    setNombre(a.nombre ?? "");
+    setRol(perfilDe(a));
+    setClave("");
+    setVerClave(false);
+    campoClave.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    campoClave.current?.focus({ preventScroll: true });
+  }
 
   async function crear(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +129,7 @@ export default function AdminUsuarios() {
       return;
     }
 
-    const comoRol = json.rol === "backoffice" ? "BackOffice" : "administrador";
+    const comoRol = NOMBRE_PERFIL[(json.rol as Rol) ?? "admin"];
 
     setAviso({
       tipo: "ok",
@@ -96,6 +140,7 @@ export default function AdminUsuarios() {
     setUsuario("");
     setNombre("");
     setClave("");
+    setVerClave(false);
     setRol("admin");
     cargar();
   }
@@ -130,8 +175,9 @@ export default function AdminUsuarios() {
       <section>
         <h2 className="text-sm font-semibold">Usuarios del panel</h2>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
-          Los administradores manejan toda la cartera. Los perfiles BackOffice
-          solo consultan vendedores y descargan su cartera.
+          Los administradores manejan toda la cartera y los perfiles BackOffice
+          solo consultan vendedores. Al superadministrador únicamente lo puede
+          tocar otro superadministrador.
         </p>
 
         {aviso && (
@@ -157,7 +203,7 @@ export default function AdminUsuarios() {
             {lista.map((a) => (
               <li
                 key={a.id}
-                className="flex items-center gap-3 px-4 py-3 text-sm"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">
@@ -175,12 +221,14 @@ export default function AdminUsuarios() {
 
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                    a.rol === "backoffice"
+                    perfilDe(a) === "backoffice"
                       ? "bg-[#e8eef5] text-[#2b4c6f]"
-                      : "bg-[#f0ebf7] text-[#4b3a6b]"
+                      : perfilDe(a) === "superadmin"
+                        ? "bg-[#fdf1dd] text-[#7a5410]"
+                        : "bg-[#f0ebf7] text-[#4b3a6b]"
                   }`}
                 >
-                  {a.rol === "backoffice" ? "BackOffice" : "administrador"}
+                  {NOMBRE_PERFIL[perfilDe(a)]}
                 </span>
 
                 <span
@@ -195,8 +243,28 @@ export default function AdminUsuarios() {
 
                 <button
                   type="button"
+                  onClick={() => cambiarClave(a)}
+                  disabled={!puedoTocar(a)}
+                  title={
+                    puedoTocar(a)
+                      ? "Cargar este usuario abajo para ponerle una clave nueva"
+                      : "Solo el superadministrador puede cambiar esta clave"
+                  }
+                  className="flex shrink-0 items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                >
+                  <KeyRound size={13} aria-hidden />
+                  Cambiar clave
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => alternar(a)}
-                  disabled={a.usuario === yo && a.activo}
+                  disabled={(a.usuario === yo && a.activo) || !puedoTocar(a)}
+                  title={
+                    puedoTocar(a)
+                      ? undefined
+                      : "Solo el superadministrador puede desactivar esta cuenta"
+                  }
                   className="shrink-0 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
                 >
                   {a.activo ? "Desactivar" : "Reactivar"}
@@ -255,7 +323,9 @@ export default function AdminUsuarios() {
           <fieldset className="mt-4">
             <legend className="campo-etiqueta">Perfil</legend>
             <div className="mt-1 space-y-2">
-              {PERFILES.map((p) => (
+              {PERFILES.filter(
+                (p) => p.id !== "superadmin" || miRol === "superadmin"
+              ).map((p) => (
                 <label
                   key={p.id}
                   className={`flex cursor-pointer gap-3 rounded-[4px] border p-3 ${
@@ -287,15 +357,27 @@ export default function AdminUsuarios() {
             <label htmlFor="nueva-clave" className="campo-etiqueta">
               Clave
             </label>
-            <input
-              id="nueva-clave"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={clave}
-              onChange={(e) => setClave(e.target.value)}
-              className="campo"
-            />
+            <div className="relative">
+              <input
+                id="nueva-clave"
+                ref={campoClave}
+                type={verClave ? "text" : "password"}
+                required
+                autoComplete="new-password"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                className="campo pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setVerClave((v) => !v)}
+                aria-label={verClave ? "Ocultar la clave" : "Ver la clave"}
+                title={verClave ? "Ocultar la clave" : "Ver la clave"}
+                className="absolute inset-y-0 right-0 grid w-11 place-items-center text-[var(--color-tinta-suave)] hover:text-[var(--color-tinta)]"
+              >
+                {verClave ? <EyeOff size={17} aria-hidden /> : <Eye size={17} aria-hidden />}
+              </button>
+            </div>
             <p
               className={`mt-1.5 text-xs ${
                 clave && clave.length < LARGO_MINIMO
@@ -314,9 +396,22 @@ export default function AdminUsuarios() {
             </p>
           )}
 
+          {existente && !puedoTocar(existente) && (
+            <p className="mt-3 flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]">
+              <ShieldAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
+              Esa cuenta es de un superadministrador. Solo él puede cambiarle la
+              clave o el perfil.
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={guardando || !usuario || clave.length < LARGO_MINIMO}
+            disabled={
+              guardando ||
+              !usuario ||
+              clave.length < LARGO_MINIMO ||
+              (existente !== undefined && !puedoTocar(existente))
+            }
             className="mt-5 flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
           >
             {guardando ? (
@@ -324,11 +419,7 @@ export default function AdminUsuarios() {
             ) : (
               <UserPlus size={15} aria-hidden />
             )}
-            {yaExiste
-              ? "Cambiar la clave"
-              : rol === "backoffice"
-                ? "Crear perfil BackOffice"
-                : "Crear administrador"}
+            {yaExiste ? "Cambiar la clave" : `Crear ${NOMBRE_PERFIL[rol]}`}
           </button>
         </form>
       </section>

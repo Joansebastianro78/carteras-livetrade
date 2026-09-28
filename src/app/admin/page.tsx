@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 import LoginAdmin from "@/components/LoginAdmin";
 import PanelAdmin from "@/components/PanelAdmin";
 import CerrarSesion from "@/components/CerrarSesion";
@@ -26,7 +26,7 @@ export default async function Admin({
 
   // El middleware ya desvía a los perfiles BackOffice, pero la página no se
   // fía de eso: quien no sea admin no llega a ver el panel completo.
-  if (activa.rol !== "admin") redirect("/backoffice");
+  if (!mandaEnElPanel(activa.rol)) redirect("/backoffice");
 
   return (
     <main className="flex-1">

@@ -1,17 +1,40 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { COOKIE_ADMIN, esRol, leerSesion, type Rol } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const LARGO_MINIMO_CLAVE = 10;
 
-async function quien(): Promise<string | null> {
+const PERFILES: Rol[] = ["admin", "backoffice", "superadmin"];
+
+async function quien(): Promise<{ usuario: string | null; rol: Rol }> {
   const store = await cookies();
   const s = await leerSesion(store.get(COOKIE_ADMIN)?.value, process.env.ADMIN_SECRET);
-  return s?.usuario ?? null;
+  return { usuario: s?.usuario ?? null, rol: s?.rol ?? "admin" };
+}
+
+/** El perfil que tiene hoy ese usuario en la base, o null si no existe. */
+async function perfilDe(usuario: string): Promise<Rol | null> {
+  const { data } = await supabaseAdmin
+    .from("admins")
+    .select("rol")
+    .eq("usuario", usuario)
+    .maybeSingle();
+
+  return data ? esRol(data.rol) : null;
+}
+
+/**
+ * Un superadministrador solo lo toca otro superadministrador. Sin esta regla
+ * cualquier admin podría desactivarlo, cambiarle la clave o ascenderse a sí
+ * mismo, y la jerarquía no serviría de nada.
+ */
+function puedeTocar(quienManda: Rol, perfilDelOtro: Rol | null): boolean {
+  if (perfilDelOtro !== "superadmin") return true;
+  return quienManda === "superadmin";
 }
 
 // ------------------------------------------------- listar
@@ -27,7 +50,12 @@ export async function GET() {
     return NextResponse.json({ error: "No se pudo leer la lista." }, { status: 500 });
   }
 
-  return NextResponse.json({ usuarios: data ?? [], yo: await quien() });
+  const sesion = await quien();
+  return NextResponse.json({
+    usuarios: data ?? [],
+    yo: sesion.usuario,
+    miRol: sesion.rol,
+  });
 }
 
 // ------------------------------------------------- crear o cambiar clave
@@ -39,17 +67,33 @@ export async function POST(req: Request) {
     rol?: string;
   };
 
-  const perfil = rol === "backoffice" ? "backoffice" : "admin";
-
+  const perfil: Rol = PERFILES.includes(rol as Rol) ? (rol as Rol) : "admin";
   const limpio = (usuario ?? "").trim().toLowerCase();
 
-  if (!/^[a-z0-9._-]{3,40}$/.test(limpio)) {
+  // Los usuarios del panel son correos corporativos, así que la arroba entra.
+  if (!/^[a-z0-9._@-]{3,60}$/.test(limpio)) {
     return NextResponse.json(
       {
         error:
-          "El usuario debe tener entre 3 y 40 caracteres: letras, números, punto, guion o guion bajo.",
+          "El usuario debe tener entre 3 y 60 caracteres: letras, números, punto, arroba, guion o guion bajo.",
       },
       { status: 400 }
+    );
+  }
+
+  const sesion = await quien();
+
+  if (perfil === "superadmin" && sesion.rol !== "superadmin") {
+    return NextResponse.json(
+      { error: "Solo un superadministrador puede crear otro superadministrador." },
+      { status: 403 }
+    );
+  }
+
+  if (!puedeTocar(sesion.rol, await perfilDe(limpio))) {
+    return NextResponse.json(
+      { error: "Esa cuenta es de un superadministrador. Solo él puede cambiarla." },
+      { status: 403 }
     );
   }
 
@@ -96,30 +140,36 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Faltan datos." }, { status: 400 });
   }
 
-  const yo = await quien();
-  if (limpio === yo && activo === false) {
+  const sesion = await quien();
+  if (limpio === sesion.usuario && activo === false) {
     return NextResponse.json(
       { error: "No puedes desactivar tu propia cuenta." },
       { status: 400 }
     );
   }
 
-  if (!activo) {
+  const objetivo = await perfilDe(limpio);
+
+  if (!puedeTocar(sesion.rol, objetivo)) {
+    return NextResponse.json(
+      {
+        error:
+          "No puedes desactivar al superadministrador. Solo él puede hacerlo.",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (!activo && objetivo !== "backoffice") {
     // Los perfiles BackOffice no cuentan: desactivarlos a todos no deja el
     // panel sin dueño, pero quedarse sin administradores sí.
     const { count } = await supabaseAdmin
       .from("admins")
       .select("id", { count: "exact", head: true })
       .eq("activo", true)
-      .eq("rol", "admin");
+      .in("rol", ["admin", "superadmin"]);
 
-    const { data: objetivo } = await supabaseAdmin
-      .from("admins")
-      .select("rol")
-      .eq("usuario", limpio)
-      .maybeSingle();
-
-    if (objetivo?.rol !== "backoffice" && (count ?? 0) <= 1) {
+    if ((count ?? 0) <= 1) {
       return NextResponse.json(
         { error: "Debe quedar al menos un administrador activo." },
         { status: 400 }

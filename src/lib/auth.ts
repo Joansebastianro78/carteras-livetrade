@@ -10,13 +10,25 @@
 export const COOKIE_ADMIN = "cartera_admin";
 const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
 
-/** admin ve el panel completo; backoffice solo consulta carteras. */
-export type Rol = "admin" | "backoffice";
+/**
+ * superadmin: panel completo y, además, el único que puede tocar a otro
+ *             superadministrador (desactivarlo, cambiarle clave o perfil).
+ * admin:      panel completo sobre la cartera y sobre los demás usuarios.
+ * backoffice: solo consulta la cartera de un vendedor.
+ */
+export type Rol = "admin" | "backoffice" | "superadmin";
 
 export type Sesion = { usuario: string; rol: Rol; expira: number };
 
 export function esRol(valor: string | null | undefined): Rol {
-  return valor === "backoffice" ? "backoffice" : "admin";
+  if (valor === "backoffice") return "backoffice";
+  if (valor === "superadmin") return "superadmin";
+  return "admin";
+}
+
+/** Los dos perfiles que entran al panel de administración. */
+export function mandaEnElPanel(rol: Rol): boolean {
+  return rol === "admin" || rol === "superadmin";
 }
 
 function b64urlDesdeBytes(bytes: ArrayBuffer | Uint8Array): string {

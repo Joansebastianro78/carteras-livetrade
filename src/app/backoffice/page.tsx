@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 import LoginAdmin from "@/components/LoginAdmin";
 import BackOffice from "@/components/BackOffice";
 import CerrarSesion from "@/components/CerrarSesion";
@@ -32,7 +32,7 @@ export default async function PaginaBackOffice({
 
   // Un administrador también puede entrar aquí; solo que él además tiene el
   // panel completo a un clic.
-  const esAdmin = activa.rol === "admin";
+  const esAdmin = mandaEnElPanel(activa.rol);
 
   return (
     <main className="flex-1">
