@@ -7,11 +7,11 @@ import { textoHasta, type EstadoMantenimiento } from "@/lib/mantenimiento";
  * Va en SVG dentro del componente para que no dependa de ningún archivo ni
  * de una conexión que el vendedor puede no tener en la calle.
  */
-function Ilustracion() {
+function Ilustracion({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 560 300"
-      className="h-auto w-full"
+      className={className}
       role="img"
       aria-label="Una grúa colocando un marcador sobre un mapa"
     >
@@ -167,51 +167,55 @@ export default function AvisoMantenimiento({
   const hasta = textoHasta(estado.hasta);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-5 py-10">
-      <div className="rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] px-6 pb-7 pt-5 text-center">
-        <Ilustracion />
+    <main className="fondo-acceso flex w-full flex-1 flex-col justify-center px-5 py-6 sm:py-8">
+      <div className="mx-auto w-full max-w-lg">
+        <div className="tarjeta-acceso rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] px-6 pb-6 pt-4 text-center">
+          {/* La ilustración se recorta en alto con vh para que la tarjeta quepa
+              en pantalla y el pie de página no quede debajo del doblez. */}
+          <Ilustracion className="mx-auto h-auto w-full max-w-[400px] max-h-[30vh]" />
 
-        <h1 className="mt-2 text-[26px] leading-[1.15] font-semibold tracking-tight text-[var(--color-tinta)]">
-          Estamos actualizando la cartera
-        </h1>
+          <h1 className="mt-1 text-[24px] leading-[1.15] font-semibold tracking-tight text-[var(--color-tinta)] sm:text-[26px]">
+            Estamos actualizando la cartera
+          </h1>
 
-        <p className="mx-auto mt-3 max-w-[42ch] text-[15px] leading-relaxed text-[var(--color-tinta-suave)]">
-          {estado.mensaje}
-        </p>
-
-        {hasta && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#fdf4e3] px-3 py-1.5 text-[13px] font-medium text-[#7a5410]">
-            <Clock size={14} aria-hidden />
-            Volvemos el {hasta}
+          <p className="mx-auto mt-2.5 max-w-[42ch] text-[14px] leading-relaxed text-[var(--color-tinta-suave)] sm:text-[15px]">
+            {estado.mensaje}
           </p>
-        )}
 
-        {/* Enlace normal, no <Link>: recarga de verdad y vuelve a preguntarle
-            al servidor si la ventana sigue abierta. */}
-        <a
-          href="/"
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-3 text-[15px] font-medium text-white"
-        >
-          <RefreshCw size={16} aria-hidden />
-          Volver a intentar
-        </a>
+          {hasta && (
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#fdf4e3] px-3 py-1.5 text-[13px] font-medium text-[#7a5410]">
+              <Clock size={14} aria-hidden />
+              Volvemos el {hasta}
+            </p>
+          )}
 
-        <p className="mx-auto mt-5 max-w-[42ch] text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Tu cartera no se pierde. Apenas terminemos, entras con tu usuario y tu
-          contraseña Livetrade como siempre. Si es urgente, comunícate con
-          Soporte BackOffice.
+          {/* Enlace normal, no <Link>: recarga de verdad y vuelve a preguntarle
+              al servidor si la ventana sigue abierta. */}
+          <a
+            href="/"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[6px] bg-[#1F6F8B] px-4 py-3 text-[15px] font-medium text-white transition-colors hover:bg-[#195b73]"
+          >
+            <RefreshCw size={16} aria-hidden />
+            Volver a intentar
+          </a>
+
+          <p className="mx-auto mt-4 max-w-[42ch] text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
+            Tu cartera no se pierde. Apenas terminemos, entras con tu usuario y tu
+            contraseña Livetrade como siempre. Si es urgente, comunícate con
+            Soporte BackOffice.
+          </p>
+        </div>
+
+        <p className="mt-5 flex items-center justify-center gap-3 text-center text-[13px] text-[var(--color-tinta-suave)]">
+          <Link href="/backoffice" className="underline underline-offset-2">
+            Acceso BackOffice
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/admin" className="underline underline-offset-2">
+            Acceso administrador
+          </Link>
         </p>
       </div>
-
-      <p className="mt-6 flex items-center justify-center gap-3 text-center text-[13px] text-[var(--color-tinta-suave)]">
-        <Link href="/backoffice" className="underline underline-offset-2">
-          Acceso BackOffice
-        </Link>
-        <span aria-hidden>·</span>
-        <Link href="/admin" className="underline underline-offset-2">
-          Acceso administrador
-        </Link>
-      </p>
     </main>
   );
 }

@@ -88,7 +88,7 @@ export default function Consulta() {
   // ---------------------------------------------------------------- formulario
   if (!datos) {
     return (
-      <main className="fondo-acceso flex-1 px-4 py-8 md:py-14">
+      <main className="fondo-acceso flex-1 px-4 py-6 md:py-10">
         <div className="tarjeta-acceso mx-auto w-full max-w-4xl overflow-hidden rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] md:grid md:grid-cols-[1.05fr_1fr]">
           {/* Panel de bienvenida. Se esconde en celular: en pantalla chica lo
               que importa es que el formulario quede de una, sin hacer scroll. */}
@@ -103,7 +103,7 @@ export default function Consulta() {
               </h2>
             </div>
 
-            <IlustracionRastreo className="my-6 h-auto w-full max-w-[300px] self-center" />
+            <IlustracionRastreo className="my-5 h-auto max-h-[34vh] w-full max-w-[290px] self-center" />
 
             <ul className="space-y-3 text-[14px] leading-snug text-[#d7e3e7]">
               <li className="flex items-start gap-3">

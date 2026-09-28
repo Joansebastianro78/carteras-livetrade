@@ -64,7 +64,7 @@ export default function LoginAdmin({
   }
 
   return (
-    <main className="fondo-acceso flex-1 px-4 py-8 md:py-14">
+    <main className="fondo-acceso flex-1 px-4 py-6 md:py-10">
       <div className="tarjeta-acceso mx-auto w-full max-w-3xl overflow-hidden rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] md:grid md:grid-cols-[1fr_1fr]">
         <aside className="panel-acceso hidden flex-col justify-between p-7 text-white md:flex">
           <div>
@@ -76,7 +76,7 @@ export default function LoginAdmin({
             </h2>
           </div>
 
-          <IlustracionRastreo className="my-5 h-auto w-full max-w-[260px] self-center" />
+          <IlustracionRastreo className="my-4 h-auto max-h-[30vh] w-full max-w-[240px] self-center" />
 
           <p className="flex items-start gap-3 text-[13px] leading-snug text-[#d7e3e7]">
             <span
