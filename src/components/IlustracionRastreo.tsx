@@ -2,7 +2,7 @@
  * Ilustración de los accesos: un celular con la cartera del día en el mapa,
  * la ruta trazada y el punto que se está rastreando.
  *
- * Va en SVG dentro del componente y no como imagen: el vendedor entra desde
+ * Va en SVG dentro del componente y no como imagen: el consultor entra desde
  * la calle, muchas veces con señal mala, y esto no cuesta una descarga más.
  * Pensada sobre fondo oscuro (--color-tinta).
  */

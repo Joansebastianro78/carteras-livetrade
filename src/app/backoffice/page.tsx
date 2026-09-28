@@ -25,7 +25,7 @@ export default async function PaginaBackOffice({
         expirada={sesion === "expirada"}
         titulo="BackOffice"
         rotulo="Soporte · Cartera LiveTrade"
-        descripcion="Consulta la cartera de cualquier vendedor para resolverle por teléfono: su ruta, sus puntos en el mapa y las descargas."
+        descripcion="Consulta la cartera de cualquier consultor para resolverle por teléfono: su ruta, sus puntos en el mapa y las descargas."
       />
     );
   }

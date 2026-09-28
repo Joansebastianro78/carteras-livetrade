@@ -82,11 +82,11 @@ const DEFINICIONES: {
   { campo: "ruta", columnas: ["RUTA"], tipo: "entero", etiqueta: "Ruta (color en el mapa)" },
   { campo: "latitud", columnas: ["LATITUD"], tipo: "latitud", etiqueta: "Latitud" },
   { campo: "longitud", columnas: ["LONGITUD"], tipo: "longitud", etiqueta: "Longitud" },
-  { campo: "num_de_ruta", columnas: ["num de ruta", "NUM DE RUTA"], tipo: "entero", etiqueta: "Ruta del vendedor" },
+  { campo: "num_de_ruta", columnas: ["num de ruta", "NUM DE RUTA"], tipo: "entero", etiqueta: "Ruta del consultor" },
   { campo: "persona", columnas: ["persona", "PERSONA"], tipo: "texto", etiqueta: "Persona" },
   { campo: "ccuser", columnas: ["ccuser", "CCUSER"], tipo: "cedula", etiqueta: "Cédula asignada" },
   { campo: "usuario", columnas: ["user", "USER", "USUARIO"], tipo: "usuario", etiqueta: "Usuario asignado" },
-  { campo: "nom", columnas: ["nom", "NOM"], tipo: "texto", etiqueta: "Nombre del vendedor" },
+  { campo: "nom", columnas: ["nom", "NOM"], tipo: "texto", etiqueta: "Nombre del consultor" },
 ];
 
 const COLS_ID = ["ID"];
@@ -304,7 +304,7 @@ export function leerPlantilla(buffer: ArrayBuffer): ResultadoLectura {
 }
 
 /**
- * Descarga de la cartera del vendedor: exclusivamente las columnas A-G,
+ * Descarga de la cartera del consultor: exclusivamente las columnas A-G,
  * en el mismo orden y con los mismos encabezados de la plantilla original.
  */
 export function exportarCartera(puntos: PuntoCartera[], usuario: string) {

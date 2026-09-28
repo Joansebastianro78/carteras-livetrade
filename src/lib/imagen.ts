@@ -206,7 +206,7 @@ async function dibujarMapa(
 // --------------------------------------------------------- imagen completa
 export async function exportarCarteraImagen(
   puntos: PuntoCartera[],
-  vendedor: { usuario: string; nombre: string | null }
+  consultor: { usuario: string; nombre: string | null }
 ): Promise<void> {
   const visibles = puntos.slice(0, MAX_FILAS);
   const sobrantes = puntos.length - visibles.length;
@@ -235,7 +235,7 @@ export async function exportarCarteraImagen(
   ctx.fillStyle = "#ffffff";
   ctx.font = `600 40px ${TIPOGRAFIA}`;
   ctx.fillText(
-    textoCortado(ctx, vendedor.nombre ?? vendedor.usuario, ANCHO - MARGEN * 2),
+    textoCortado(ctx, consultor.nombre ?? consultor.usuario, ANCHO - MARGEN * 2),
     MARGEN,
     68
   );
@@ -250,7 +250,7 @@ export async function exportarCarteraImagen(
   ctx.fillStyle = "#a8b8bd";
   ctx.font = `400 24px ${TIPOGRAFIA}`;
   ctx.fillText(
-    `${vendedor.usuario} · ${puntos.length} ${
+    `${consultor.usuario} · ${puntos.length} ${
       puntos.length === 1 ? "punto" : "puntos"
     } · ${fecha}`,
     MARGEN,
@@ -334,7 +334,7 @@ export async function exportarCarteraImagen(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Cartera_${vendedor.usuario}_${new Date()
+  a.download = `Cartera_${consultor.usuario}_${new Date()
     .toISOString()
     .slice(0, 10)}.png`;
   document.body.appendChild(a);

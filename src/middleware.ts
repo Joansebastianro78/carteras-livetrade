@@ -6,7 +6,7 @@ import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
  * /api/admin (cargar, editar, borrar, mantenimiento, usuarios) queda solo
  * para el rol admin.
  */
-const API_BACKOFFICE = ["/api/admin/vendedores", "/api/admin/logout"];
+const API_BACKOFFICE = ["/api/admin/consultores", "/api/admin/logout"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

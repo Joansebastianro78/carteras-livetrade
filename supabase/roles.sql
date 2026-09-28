@@ -5,7 +5,7 @@
 -- superadmin → todo lo del admin y, además, es el único que puede
 --              desactivar, cambiarle la clave o el perfil a otro superadmin
 -- admin      → panel completo: cargar, editar, borrar, mantenimiento, usuarios
--- backoffice → solo consultar la cartera de un vendedor y descargarla
+-- backoffice → solo consultar la cartera de un consultor y descargarla
 -- =====================================================================
 
 alter table public.admins

@@ -33,7 +33,7 @@ export async function leerMantenimiento(): Promise<EstadoMantenimiento> {
     .maybeSingle();
 
   // Si la tabla todavía no existe o la lectura falla, la página se queda
-  // ABIERTA. Cerrarla ante un error dejaría a todos los vendedores sin
+  // ABIERTA. Cerrarla ante un error dejaría a todos los consultores sin
   // cartera por un problema que nadie pidió.
   if (error || !data) {
     if (error) console.error("[mantenimiento]", error.message);

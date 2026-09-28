@@ -6,7 +6,7 @@
 create table if not exists public.puntos_cartera (
     id_registro      bigint primary key generated always as identity,
 
-    -- Columnas A-G: lo que ve y descarga el vendedor
+    -- Columnas A-G: lo que ve y descarga el consultor
     id_pdv           text not null,              -- A: ID
     bavaria          text,                       -- B: BAVARIA
     pdv              text,                       -- C: PDV

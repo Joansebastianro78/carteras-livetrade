@@ -138,7 +138,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No hay cambios que guardar." }, { status: 400 });
   }
 
-  // usuario y ccuser son la llave con la que el vendedor entra: si uno queda
+  // usuario y ccuser son la llave con la que el consultor entra: si uno queda
   // vacío, el punto se vuelve inalcanzable sin que nadie se entere.
   if ("usuario" in cambios && !cambios.usuario) {
     return NextResponse.json({ error: "El usuario no puede quedar vacío." }, { status: 400 });

@@ -43,12 +43,12 @@ export type PuntoCartera = {
 
 export type RespuestaCartera = {
   puntos: PuntoCartera[];
-  vendedor: { usuario: string; nombre: string | null; numDeRuta: number | null };
+  consultor: { usuario: string; nombre: string | null; numDeRuta: number | null };
   sinCoordenadas: number;
 };
 
 /**
- * El número de ruta que se le muestra al vendedor sale de la columna
+ * El número de ruta que se le muestra al consultor sale de la columna
  * "num de ruta" de la plantilla, no de "RUTA". Pasa por esta función para
  * que el día que cambie de columna se cambie en un solo lugar.
  */

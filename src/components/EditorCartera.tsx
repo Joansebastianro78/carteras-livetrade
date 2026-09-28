@@ -27,7 +27,7 @@ type Punto = {
 type Ciclo = {
   ciclo: string;
   puntos: number;
-  vendedores: number;
+  consultores: number;
   sin_ubicacion: number;
   ultima_actualizacion: string | null;
 };
@@ -47,10 +47,10 @@ const CAMPOS: { clave: keyof Punto; etiqueta: string; tipo?: string }[] = [
   { clave: "celular", etiqueta: "Celular" },
   { clave: "que_hacer", etiqueta: "Tarea" },
   { clave: "ruta", etiqueta: "Ruta (color en el mapa)", tipo: "number" },
-  { clave: "num_de_ruta", etiqueta: "Ruta del vendedor", tipo: "number" },
+  { clave: "num_de_ruta", etiqueta: "Ruta del consultor", tipo: "number" },
   { clave: "usuario", etiqueta: "Usuario asignado" },
   { clave: "ccuser", etiqueta: "Cédula asignada" },
-  { clave: "nom", etiqueta: "Nombre del vendedor" },
+  { clave: "nom", etiqueta: "Nombre del consultor" },
   { clave: "latitud", etiqueta: "Latitud" },
   { clave: "longitud", etiqueta: "Longitud" },
 ];
@@ -365,7 +365,7 @@ export default function EditorCartera() {
               <tr className="border-b border-[var(--color-linea)]">
                 <th className="py-1.5 font-medium">Ciclo</th>
                 <th className="py-1.5 text-right font-medium">Puntos</th>
-                <th className="py-1.5 text-right font-medium">Vendedores</th>
+                <th className="py-1.5 text-right font-medium">Consultores</th>
               </tr>
             </thead>
             <tbody className="cifras">
@@ -373,7 +373,7 @@ export default function EditorCartera() {
                 <tr key={c.ciclo} className="border-b border-[var(--color-linea)]">
                   <td className="py-1.5">{c.ciclo || "sin ciclo"}</td>
                   <td className="py-1.5 text-right">{c.puntos}</td>
-                  <td className="py-1.5 text-right">{c.vendedores}</td>
+                  <td className="py-1.5 text-right">{c.consultores}</td>
                 </tr>
               ))}
               <tr className="font-medium">

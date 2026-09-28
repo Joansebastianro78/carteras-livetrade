@@ -136,7 +136,7 @@ export async function POST(req: Request) {
         {
           error: `Para reemplazar, el archivo debe traer las columnas ${faltan
             .map((c) => (c === "usuario" ? "user" : c))
-            .join(" y ")}. Sin ellas los puntos nuevos quedarían sin vendedor asignado.`,
+            .join(" y ")}. Sin ellas los puntos nuevos quedarían sin consultor asignado.`,
         },
         { status: 400 }
       );

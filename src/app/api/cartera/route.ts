@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // 'LIBRE' marca los puntos sin vendedor asignado: no es una credencial.
+  // 'LIBRE' marca los puntos sin consultor asignado: no es una credencial.
   if (usuario === "LIBRE" || cedula === "LIBRE") {
     return NextResponse.json(
       {
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
 
   const respuesta: RespuestaCartera = {
     puntos,
-    vendedor: {
+    consultor: {
       usuario,
       nombre: puntos[0].nom ?? null,
       numDeRuta: puntos[0].num_de_ruta ?? null,

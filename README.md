@@ -47,14 +47,14 @@ directo con la base.
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
 | `/admin` | Login y panel completo: cargar, editar, BackOffice, mantenimiento y usuarios. |
-| `/backoffice` | Acceso de consulta: buscar un vendedor y ver o descargar su cartera. |
+| `/backoffice` | Acceso de consulta: buscar un consultor y ver o descargar su cartera. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
 | `POST /api/admin/upload` | UPSERT de un lote de hasta 1000 filas. |
 | `GET/PATCH/DELETE /api/admin/puntos` | Buscar, editar o borrar un punto. |
 | `GET/POST /api/admin/purgar` | Resumen por ciclo y borrado masivo. |
 | `GET/POST/PATCH /api/admin/usuarios` | Listar, crear y activar usuarios del panel. |
-| `GET /api/admin/vendedores` | Buscar un vendedor o traer su cartera completa. |
+| `GET /api/admin/consultores` | Buscar un consultor o traer su cartera completa. |
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
 
@@ -89,7 +89,7 @@ Hay tres perfiles, en la columna `admins.rol`:
   También es el único que puede crear superadministradores; si no, cualquier
   admin se ascendería y la jerarquía no serviría de nada.
 - `admin`: el panel completo, incluido crear usuarios y borrar cartera.
-- `backoffice`: solo `/backoffice`, para consultar la cartera de un vendedor y
+- `backoffice`: solo `/backoffice`, para consultar la cartera de un consultor y
   descargarla. El middleware le responde 403 en cualquier otra ruta de
   `/api/admin`, así que la restricción no depende de que la interfaz esconda
   botones.
@@ -134,12 +134,12 @@ en Francia. Por eso `normalizar.ts` usa los límites de Colombia. Si la
 operación sale del país, hay que ajustar `LIMITE_LAT` y `LIMITE_LNG`.
 
 **`RUTA` y `num de ruta` no son lo mismo.** `num de ruta` es la ruta asignada a
-la persona (1 valor por vendedor); `RUTA` es la agrupación de visita dentro de
+la persona (1 valor por consultor); `RUTA` es la agrupación de visita dentro de
 la cartera, con valores de 0 a 17. Los marcadores se colorean por `RUTA`, que es
 la que tiene poca cardinalidad y sí distingue algo en pantalla. Colorear por
 `num de ruta` daría 125 colores indistinguibles.
 
-**96 filas tienen `ccuser = 'LIBRE'`.** Son puntos sin vendedor asignado. Se
+**96 filas tienen `ccuser = 'LIBRE'`.** Son puntos sin consultor asignado. Se
 guardan, pero `/api/cartera` rechaza explícitamente `LIBRE` como credencial.
 
 **Tipos.** `CELULAR` y `BAVARIA` se guardan como texto: si van a `bigint` o se
@@ -160,7 +160,7 @@ Tres pestañas.
 | Modo | Qué hace | Cuándo |
 |---|---|---|
 | Cargar la plantilla completa | UPSERT: crea lo nuevo y reescribe la fila entera de lo existente. Requiere CICLO. | El archivo maestro del ciclo. |
-| Actualizar solo lo que traiga el archivo | Escribe únicamente las columnas presentes en el Excel, sobre puntos que ya existen. No crea nada. | Reasignar vendedores, corregir direcciones o coordenadas en bloque. |
+| Actualizar solo lo que traiga el archivo | Escribe únicamente las columnas presentes en el Excel, sobre puntos que ya existen. No crea nada. | Reasignar consultores, corregir direcciones o coordenadas en bloque. |
 | Agregar únicamente los nuevos | INSERT de lo que no exista; deja intacto lo demás. | Sumar puntos a un ciclo en curso. |
 
 El modo actualizar es el que resuelve la corrección masiva: basta un Excel con
@@ -224,7 +224,7 @@ falla, la pantalla dice cuántas filas alcanzaron a guardarse.
 
 ## 7. Descarga en imagen
 
-Además del Excel, el vendedor puede bajar su cartera como un PNG: encabezado,
+Además del Excel, el consultor puede bajar su cartera como un PNG: encabezado,
 mapa con los puntos numerados y la lista con dirección, tarea y celular. Está
 pensado para mandar por WhatsApp o tener a mano sin datos.
 

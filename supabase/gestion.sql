@@ -8,7 +8,7 @@ create or replace view public.resumen_ciclos as
 select
     ciclo,
     count(*)                                   as puntos,
-    count(distinct usuario)                    as vendedores,
+    count(distinct usuario)                    as consultores,
     count(*) filter (where latitud is null)    as sin_ubicacion,
     max(updated_at)                            as ultima_actualizacion
 from public.puntos_cartera
@@ -40,9 +40,12 @@ revoke all on public.resumen_archivos from anon, authenticated;
 alter table public.cargas_cartera
     add column if not exists modo text;
 
--- Resumen por vendedor: alimenta el buscador del BackOffice. Un vendedor es
--- la pareja usuario + cédula, que es justo con lo que entra a la página.
-create or replace view public.resumen_vendedores as
+-- Resumen por consultor: alimenta el buscador del BackOffice. Un consultor
+-- es la pareja usuario + cédula, que es justo con lo que entra a la página.
+-- La vista se llamaba resumen_vendedores: se borra la vieja para no dejar
+-- dos copias de lo mismo en la base.
+drop view if exists public.resumen_vendedores;
+create or replace view public.resumen_consultores as
 select
     usuario,
     ccuser,
@@ -58,7 +61,7 @@ where usuario <> 'LIBRE' and ccuser <> 'LIBRE'
 group by usuario, ccuser
 order by max(nom);
 
-revoke all on public.resumen_vendedores from anon, authenticated;
+revoke all on public.resumen_consultores from anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- Ventana de mantenimiento

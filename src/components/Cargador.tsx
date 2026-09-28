@@ -31,7 +31,7 @@ const MODOS: { id: ModoCarga; titulo: string; detalle: string }[] = [
     id: "actualizar",
     titulo: "Actualizar solo lo que traiga el archivo",
     detalle:
-      "Para correcciones masivas: reasignar vendedores, arreglar direcciones, mover coordenadas. Solo toca las columnas presentes en el Excel y no crea puntos nuevos.",
+      "Para correcciones masivas: reasignar consultores, arreglar direcciones, mover coordenadas. Solo toca las columnas presentes en el Excel y no crea puntos nuevos.",
   },
   {
     id: "agregar",

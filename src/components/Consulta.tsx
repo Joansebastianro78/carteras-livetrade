@@ -59,7 +59,7 @@ export default function Consulta() {
     setGenerandoImagen(true);
     setError(null);
     try {
-      await exportarCarteraImagen(datos.puntos, datos.vendedor);
+      await exportarCarteraImagen(datos.puntos, datos.consultor);
     } catch {
       setError("No se pudo crear la imagen. Descarga el Excel mientras tanto.");
     } finally {
@@ -242,11 +242,11 @@ export default function Consulta() {
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[15px] font-semibold text-[var(--color-tinta)]">
-              {datos.vendedor.nombre ?? datos.vendedor.usuario}
+              {datos.consultor.nombre ?? datos.consultor.usuario}
             </h1>
             <p className="cifras truncate text-xs text-[var(--color-tinta-suave)]">
-              {datos.vendedor.usuario}
-              {datos.vendedor.numDeRuta !== null && ` · ruta ${datos.vendedor.numDeRuta}`}
+              {datos.consultor.usuario}
+              {datos.consultor.numDeRuta !== null && ` · ruta ${datos.consultor.numDeRuta}`}
               {` · ${datos.puntos.length} ${
                 datos.puntos.length === 1 ? "punto" : "puntos"
               }`}
@@ -255,7 +255,7 @@ export default function Consulta() {
 
           <button
             type="button"
-            onClick={() => exportarCartera(datos.puntos, datos.vendedor.usuario)}
+            onClick={() => exportarCartera(datos.puntos, datos.consultor.usuario)}
             className="flex items-center gap-2 rounded-[4px] bg-[var(--color-ambar)] px-3 py-2 text-[13px] font-medium text-white hover:bg-[var(--color-ambar-oscuro)]"
           >
             <Sheet size={15} aria-hidden />

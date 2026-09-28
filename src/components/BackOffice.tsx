@@ -17,7 +17,7 @@ import { exportarCartera } from "@/lib/excel";
 import { exportarCarteraImagen } from "@/lib/imagen";
 import { colorDeRuta, numeroDeRuta, type PuntoCartera } from "@/lib/tipos";
 
-type Vendedor = {
+type Consultor = {
   usuario: string;
   ccuser: string;
   nom: string | null;
@@ -31,7 +31,7 @@ type Vendedor = {
 
 type Detalle = {
   puntos: PuntoCartera[];
-  vendedor: {
+  consultor: {
     usuario: string;
     nombre: string | null;
     numDeRuta: number | null;
@@ -43,7 +43,7 @@ type Detalle = {
 export default function BackOffice() {
   const [q, setQ] = useState("");
   const [buscando, setBuscando] = useState(false);
-  const [vendedores, setVendedores] = useState<Vendedor[] | null>(null);
+  const [consultores, setConsultores] = useState<Consultor[] | null>(null);
 
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [abriendo, setAbriendo] = useState<string | null>(null);
@@ -59,24 +59,24 @@ export default function BackOffice() {
     setError(null);
     setDetalle(null);
 
-    const res = await fetch(`/api/admin/vendedores?q=${encodeURIComponent(q)}`);
+    const res = await fetch(`/api/admin/consultores?q=${encodeURIComponent(q)}`);
     const json = await res.json().catch(() => ({}));
     setBuscando(false);
 
     if (!res.ok) {
-      setVendedores(null);
+      setConsultores(null);
       setError(json.error ?? "Falló la búsqueda.");
       return;
     }
-    setVendedores(json.vendedores ?? []);
+    setConsultores(json.consultores ?? []);
   }
 
-  async function abrir(v: Vendedor) {
+  async function abrir(v: Consultor) {
     setAbriendo(`${v.usuario}|${v.ccuser}`);
     setError(null);
 
     const res = await fetch(
-      `/api/admin/vendedores?usuario=${encodeURIComponent(
+      `/api/admin/consultores?usuario=${encodeURIComponent(
         v.usuario
       )}&ccuser=${encodeURIComponent(v.ccuser)}`
     );
@@ -91,13 +91,13 @@ export default function BackOffice() {
     setDetalle(json as Detalle);
     setSeleccionado(null);
 
-    // Siempre abre con todo lo que tiene asignado el vendedor. El filtro por
+    // Siempre abre con todo lo que tiene asignado el consultor. El filtro por
     // ciclo queda ahí para quien lo necesite, pero nadie debería tener que
     // acordarse de cambiarlo para ver la cartera completa.
     setCicloElegido("");
   }
 
-  // Un vendedor puede tener puntos de varios ciclos a la vez. El filtro deja
+  // Un consultor puede tener puntos de varios ciclos a la vez. El filtro deja
   // ver solo el que interesa sin volver a consultar la base.
   const ciclos = useMemo(() => {
     if (!detalle) return [];
@@ -129,8 +129,8 @@ export default function BackOffice() {
     setError(null);
     try {
       await exportarCarteraImagen(puntos, {
-        usuario: detalle.vendedor.usuario,
-        nombre: detalle.vendedor.nombre,
+        usuario: detalle.consultor.usuario,
+        nombre: detalle.consultor.nombre,
       });
     } catch {
       setError("No se pudo crear la imagen. Descarga el Excel mientras tanto.");
@@ -141,7 +141,7 @@ export default function BackOffice() {
 
   // ------------------------------------------------------------- detalle
   if (detalle) {
-    const v = detalle.vendedor;
+    const v = detalle.consultor;
 
     return (
       <div className="space-y-4">
@@ -281,7 +281,7 @@ export default function BackOffice() {
   return (
     <div className="space-y-4">
       <section>
-        <h2 className="text-sm font-semibold">Consultar la cartera de un vendedor</h2>
+        <h2 className="text-sm font-semibold">Consultar la cartera de un consultor</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           Por usuario, cédula o nombre. Sirve para resolver por teléfono: ves lo
           mismo que ve él y puedes mandarle el Excel o la imagen.
@@ -293,7 +293,7 @@ export default function BackOffice() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="BAV006, 1013... o JOHN JAIRO"
             className="campo"
-            aria-label="Usuario, cédula o nombre del vendedor"
+            aria-label="Usuario, cédula o nombre del consultor"
           />
           <button
             type="submit"
@@ -320,15 +320,15 @@ export default function BackOffice() {
         </p>
       )}
 
-      {vendedores !== null && vendedores.length === 0 && (
+      {consultores !== null && consultores.length === 0 && (
         <p className="rounded-[4px] border border-dashed border-[var(--color-linea)] px-4 py-6 text-center text-[13px] text-[var(--color-tinta-suave)]">
-          Ningún vendedor coincide con esa búsqueda.
+          Ningún consultor coincide con esa búsqueda.
         </p>
       )}
 
-      {vendedores && vendedores.length > 0 && (
+      {consultores && consultores.length > 0 && (
         <ul className="divide-y divide-[var(--color-linea)] rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)]">
-          {vendedores.map((v) => {
+          {consultores.map((v) => {
             const clave = `${v.usuario}|${v.ccuser}`;
             return (
               <li key={clave}>

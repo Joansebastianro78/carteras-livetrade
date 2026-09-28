@@ -3,7 +3,7 @@ import AvisoMantenimiento from "@/components/AvisoMantenimiento";
 import { leerMantenimiento } from "@/lib/mantenimiento";
 
 // El estado de mantenimiento se decide en el servidor, en cada visita: así el
-// vendedor nunca alcanza a ver el formulario para que se lo quiten encima.
+// consultor nunca alcanza a ver el formulario para que se lo quiten encima.
 export const dynamic = "force-dynamic";
 
 export default async function Inicio() {

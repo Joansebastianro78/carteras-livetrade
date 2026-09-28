@@ -5,7 +5,7 @@ import { textoHasta, type EstadoMantenimiento } from "@/lib/mantenimiento";
 /**
  * Ilustración: una grúa colgando un marcador sobre el mapa de la cartera.
  * Va en SVG dentro del componente para que no dependa de ningún archivo ni
- * de una conexión que el vendedor puede no tener en la calle.
+ * de una conexión que el consultor puede no tener en la calle.
  */
 function Ilustracion({ className = "" }: { className?: string }) {
   return (

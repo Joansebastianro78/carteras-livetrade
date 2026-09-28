@@ -14,7 +14,7 @@ const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
  * superadmin: panel completo y, además, el único que puede tocar a otro
  *             superadministrador (desactivarlo, cambiarle clave o perfil).
  * admin:      panel completo sobre la cartera y sobre los demás usuarios.
- * backoffice: solo consulta la cartera de un vendedor.
+ * backoffice: solo consulta la cartera de un consultor.
  */
 export type Rol = "admin" | "backoffice" | "superadmin";
 

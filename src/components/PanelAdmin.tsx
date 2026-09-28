@@ -63,7 +63,7 @@ export default function PanelAdmin() {
                 <li>
                   Las coordenadas a las que el origen les perdió el punto decimal se
                   corrigen automáticamente. Las que quedan fuera de Colombia se
-                  guardan sin ubicación y el vendedor las ve en la lista con una marca.
+                  guardan sin ubicación y el consultor las ve en la lista con una marca.
                 </li>
                 <li>
                   Las filas con ccuser en LIBRE se guardan igual, pero nadie puede

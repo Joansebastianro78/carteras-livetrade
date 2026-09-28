@@ -78,7 +78,7 @@ export default function Mantenimiento() {
       tipo: "ok",
       texto: activo
         ? "Ventana abierta: la página pública ya muestra el aviso."
-        : "Ventana cerrada: los vendedores vuelven a consultar.",
+        : "Ventana cerrada: los consultores vuelven a consultar.",
     });
   }
 
@@ -126,7 +126,7 @@ export default function Mantenimiento() {
         <div className="mt-5 space-y-4">
           <div>
             <label htmlFor="mensaje-mantenimiento" className="campo-etiqueta">
-              Mensaje que ve el vendedor
+              Mensaje que ve el consultor
             </label>
             <textarea
               id="mensaje-mantenimiento"

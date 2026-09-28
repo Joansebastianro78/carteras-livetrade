@@ -47,7 +47,7 @@ const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
     id: "backoffice",
     titulo: "BackOffice",
     detalle:
-      "Solo consulta: busca un vendedor, ve su mapa y sus puntos, y descarga el Excel o la imagen.",
+      "Solo consulta: busca un consultor, ve su mapa y sus puntos, y descarga el Excel o la imagen.",
   },
 ];
 
@@ -176,7 +176,7 @@ export default function AdminUsuarios() {
         <h2 className="text-sm font-semibold">Usuarios del panel</h2>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
           Los administradores manejan toda la cartera y los perfiles BackOffice
-          solo consultan vendedores. Al superadministrador únicamente lo puede
+          solo consultan consultores. Al superadministrador únicamente lo puede
           tocar otro superadministrador.
         </p>
 
