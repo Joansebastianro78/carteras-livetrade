@@ -57,6 +57,25 @@ directo con la base.
 | `GET /api/admin/consultores` | Buscar un consultor o traer su cartera completa. |
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
+| `GET/POST/PATCH/DELETE /api/admin/tableros` | Tableros de Power BI. El GET lo puede llamar también el perfil BackOffice; el resto, no. |
+
+### Tableros de Power BI
+
+Un administrador pega el enlace del informe en su pestaña **Tableros** y el
+perfil BackOffice lo ve en la suya. Solo se guarda el enlace: el informe vive
+en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo ve
+acá, y esta app nunca toca los datos del informe.
+
+Se aceptan únicamente direcciones de `powerbi.com`. Un `<iframe>` corre dentro
+de nuestra página, así que aceptar cualquier dominio sería dejar que alguien
+monte ahí una pantalla falsa de inicio de sesión. Al pegar, sirve tanto la URL
+pelada como el bloque `<iframe>` que entrega el botón Insertar de Power BI: se
+le extrae el `src`.
+
+Con enlaces `autoAuth=true` cada persona ve el informe con su propia cuenta de
+Microsoft y necesita sesión abierta en ese mismo navegador. Si el informe no
+carga dentro de la página —tenant que bloquea la incrustación, cookies de
+terceros deshabilitadas— el visor tiene el botón **Abrir en Power BI**.
 
 ### Temas de temporada
 

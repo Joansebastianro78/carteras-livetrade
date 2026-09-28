@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 import LoginAdmin from "@/components/LoginAdmin";
-import BackOffice from "@/components/BackOffice";
+import PanelBackOffice from "@/components/PanelBackOffice";
 import CerrarSesion from "@/components/CerrarSesion";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +63,7 @@ export default async function PaginaBackOffice({
       </header>
 
       <div className="mx-auto max-w-3xl px-5 py-8">
-        <BackOffice />
+        <PanelBackOffice />
       </div>
     </main>
   );

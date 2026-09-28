@@ -8,6 +8,12 @@ import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
  */
 const API_BACKOFFICE = ["/api/admin/consultores", "/api/admin/logout"];
 
+/**
+ * Rutas que el perfil BackOffice puede LEER pero no cambiar. Los tableros de
+ * Power BI los agrega un administrador; el BackOffice solo los consulta.
+ */
+const API_BACKOFFICE_LECTURA = ["/api/admin/tableros"];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -55,10 +61,12 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (
-      pathname.startsWith("/api/admin") &&
-      !API_BACKOFFICE.some((ruta) => pathname.startsWith(ruta))
-    ) {
+    const permitida =
+      API_BACKOFFICE.some((ruta) => pathname.startsWith(ruta)) ||
+      (req.method === "GET" &&
+        API_BACKOFFICE_LECTURA.some((ruta) => pathname.startsWith(ruta)));
+
+    if (pathname.startsWith("/api/admin") && !permitida) {
       return NextResponse.json(
         { error: "Tu perfil BackOffice no tiene permiso para esta acción." },
         { status: 403 }

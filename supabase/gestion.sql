@@ -88,6 +88,30 @@ alter table public.mantenimiento force row level security;
 revoke all on public.mantenimiento from anon, authenticated;
 
 -- ---------------------------------------------------------------------
+-- Tableros de Power BI
+-- Los agrega un administrador y los consulta también el perfil BackOffice.
+-- Solo se guarda el enlace: el informe sigue viviendo en Power BI, con sus
+-- permisos. Aquí no hay datos del informe.
+-- ---------------------------------------------------------------------
+create table if not exists public.tableros (
+    id           uuid primary key default gen_random_uuid(),
+    nombre       text not null,
+    descripcion  text,
+    url          text not null,
+    orden        integer not null default 0,
+    activo       boolean not null default true,
+    creado_por   text,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now()
+);
+
+create index if not exists tableros_orden_idx on public.tableros (orden, created_at);
+
+alter table public.tableros enable row level security;
+alter table public.tableros force row level security;
+revoke all on public.tableros from anon, authenticated;
+
+-- ---------------------------------------------------------------------
 -- Temas de temporada
 -- Una sola fila. Los rangos de fechas viven en el código (src/lib/temas.ts);
 -- acá solo queda qué decidió el administrador.
