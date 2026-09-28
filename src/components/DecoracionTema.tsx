@@ -251,8 +251,8 @@ export default function DecoracionTema({ tema }: { tema: IdTema }) {
       {tema === "velitas" && (
         <>
           <LucesQueSuben />
-          <Farolito className="absolute bottom-3 left-2 h-16 w-auto opacity-90 sm:bottom-6 sm:left-6 sm:h-24" />
-          <Farolito className="absolute bottom-3 right-2 h-14 w-auto opacity-80 sm:bottom-6 sm:right-6 sm:h-20" />
+          <Farolito className="absolute bottom-[calc(var(--alto-pie)+8px)] left-2 h-16 w-auto opacity-90 sm:bottom-[calc(var(--alto-pie)+16px)] sm:left-6 sm:h-24" />
+          <Farolito className="absolute bottom-[calc(var(--alto-pie)+8px)] right-2 h-14 w-auto opacity-80 sm:bottom-[calc(var(--alto-pie)+16px)] sm:right-6 sm:h-20" />
         </>
       )}
 
@@ -261,7 +261,7 @@ export default function DecoracionTema({ tema }: { tema: IdTema }) {
           <Telarana className="absolute left-0 top-0 h-20 w-20 sm:h-32 sm:w-32" />
           <Telarana className="absolute right-0 top-0 h-20 w-20 -scale-x-100 sm:h-32 sm:w-32" />
           <Arana className="tema-cuelga absolute left-[62%] top-0 h-28 w-auto sm:left-[72%] sm:h-40" />
-          <Calabaza className="absolute bottom-2 left-2 h-14 w-auto sm:bottom-5 sm:left-6 sm:h-20" />
+          <Calabaza className="absolute bottom-[calc(var(--alto-pie)+6px)] left-2 h-14 w-auto sm:bottom-[calc(var(--alto-pie)+14px)] sm:left-6 sm:h-20" />
         </>
       )}
     </div>

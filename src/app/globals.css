@@ -214,6 +214,15 @@ body {
   }
 }
 
+/*
+  Alto del pie de página. Los adornos de abajo se apoyan en esta medida para
+  quedar POR ENCIMA del pie y no taparle el texto, y el pie a su vez se pinta
+  sobre la capa de adornos, así que la nieve le pasa por detrás.
+*/
+:root {
+  --alto-pie: 44px;
+}
+
 .tema-capa {
   position: fixed;
   inset: 0;
