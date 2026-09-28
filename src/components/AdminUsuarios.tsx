@@ -165,7 +165,7 @@ export default function AdminUsuarios() {
     if (!iso) return "nunca";
     return new Date(iso).toLocaleDateString("es-CO", {
       day: "2-digit",
-      month: "short",
+      month: "2-digit",
       year: "numeric",
     });
   }
@@ -205,7 +205,7 @@ export default function AdminUsuarios() {
                 key={a.id}
                 className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm"
               >
-                <span className="min-w-0 flex-1">
+                <span className="min-w-[15rem] flex-1">
                   <span className="block truncate font-medium">
                     {a.nombre ?? a.usuario}
                     {a.usuario === yo && (
@@ -214,61 +214,67 @@ export default function AdminUsuarios() {
                       </span>
                     )}
                   </span>
-                  <span className="cifras mt-0.5 block truncate text-xs text-[var(--color-tinta-suave)]">
-                    {a.usuario} · último ingreso {fecha(a.ultimo_login)}
+                  <span className="cifras mt-0.5 block text-xs leading-snug break-words text-[var(--color-tinta-suave)]">
+                    {a.usuario}
+                    <span className="whitespace-nowrap">
+                      {" · último ingreso "}
+                      {fecha(a.ultimo_login)}
+                    </span>
                   </span>
                 </span>
 
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                    perfilDe(a) === "backoffice"
-                      ? "bg-[#e8eef5] text-[#2b4c6f]"
-                      : perfilDe(a) === "superadmin"
-                        ? "bg-[#fdf1dd] text-[#7a5410]"
-                        : "bg-[#f0ebf7] text-[#4b3a6b]"
-                  }`}
-                >
-                  {NOMBRE_PERFIL[perfilDe(a)]}
+                <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                      perfilDe(a) === "backoffice"
+                        ? "bg-[#e8eef5] text-[#2b4c6f]"
+                        : perfilDe(a) === "superadmin"
+                          ? "bg-[#fdf1dd] text-[#7a5410]"
+                          : "bg-[#f0ebf7] text-[#4b3a6b]"
+                    }`}
+                  >
+                    {NOMBRE_PERFIL[perfilDe(a)]}
+                  </span>
+
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                      a.activo
+                        ? "bg-[#e7f2ec] text-[var(--color-exito)]"
+                        : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
+                    }`}
+                  >
+                    {a.activo ? "activo" : "inactivo"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => cambiarClave(a)}
+                    disabled={!puedoTocar(a)}
+                    title={
+                      puedoTocar(a)
+                        ? "Cargar este usuario abajo para ponerle una clave nueva"
+                        : "Solo el superadministrador puede cambiar esta clave"
+                    }
+                    className="flex shrink-0 items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                  >
+                    <KeyRound size={13} aria-hidden />
+                    Cambiar clave
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alternar(a)}
+                    disabled={(a.usuario === yo && a.activo) || !puedoTocar(a)}
+                    title={
+                      puedoTocar(a)
+                        ? undefined
+                        : "Solo el superadministrador puede desactivar esta cuenta"
+                    }
+                    className="shrink-0 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                  >
+                    {a.activo ? "Desactivar" : "Reactivar"}
+                  </button>
                 </span>
-
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                    a.activo
-                      ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                      : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
-                  }`}
-                >
-                  {a.activo ? "activo" : "inactivo"}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => cambiarClave(a)}
-                  disabled={!puedoTocar(a)}
-                  title={
-                    puedoTocar(a)
-                      ? "Cargar este usuario abajo para ponerle una clave nueva"
-                      : "Solo el superadministrador puede cambiar esta clave"
-                  }
-                  className="flex shrink-0 items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
-                >
-                  <KeyRound size={13} aria-hidden />
-                  Cambiar clave
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => alternar(a)}
-                  disabled={(a.usuario === yo && a.activo) || !puedoTocar(a)}
-                  title={
-                    puedoTocar(a)
-                      ? undefined
-                      : "Solo el superadministrador puede desactivar esta cuenta"
-                  }
-                  className="shrink-0 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
-                >
-                  {a.activo ? "Desactivar" : "Reactivar"}
-                </button>
               </li>
             ))}
           </ul>
