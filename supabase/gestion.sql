@@ -4,7 +4,11 @@
 -- =====================================================================
 
 -- Resumen por ciclo: alimenta el selector de "eliminar cartera".
-create or replace view public.resumen_ciclos as
+-- Se borra antes de crearla porque "create or replace view" no permite
+-- cambiarle el nombre a una columna, y esta vista tenía "vendedores".
+drop view if exists public.resumen_ciclos;
+
+create view public.resumen_ciclos as
 select
     ciclo,
     count(*)                                   as puntos,
