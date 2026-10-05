@@ -10,9 +10,10 @@ const API_BACKOFFICE = ["/api/admin/consultores", "/api/admin/logout"];
 
 /**
  * Rutas que el perfil BackOffice puede LEER pero no cambiar. Los tableros de
- * Power BI los agrega un administrador; el BackOffice solo los consulta.
+ * Power BI los agrega un administrador; el BackOffice solo los consulta. El
+ * filtro por departamento y ciudad solo tiene GET.
  */
-const API_BACKOFFICE_LECTURA = ["/api/admin/tableros"];
+const API_BACKOFFICE_LECTURA = ["/api/admin/tableros", "/api/admin/territorio"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

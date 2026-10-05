@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import BackOffice from "./BackOffice";
+import FiltroTerritorio from "./FiltroTerritorio";
 import VisorTableros from "./VisorTableros";
 
 const SECCIONES = [
   { id: "consultores", titulo: "Consultores" },
+  { id: "territorio", titulo: "Departamento y ciudad" },
   { id: "tableros", titulo: "Tableros" },
 ] as const;
 
@@ -39,6 +41,7 @@ export default function PanelBackOffice() {
 
       <div className="pt-7">
         {activa === "consultores" && <BackOffice />}
+        {activa === "territorio" && <FiltroTerritorio />}
         {activa === "tableros" && <VisorTableros />}
       </div>
     </>

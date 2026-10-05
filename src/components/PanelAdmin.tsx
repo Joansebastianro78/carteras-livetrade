@@ -5,6 +5,7 @@ import Cargador from "./Cargador";
 import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
 import BackOffice from "./BackOffice";
+import FiltroTerritorio from "./FiltroTerritorio";
 import Mantenimiento from "./Mantenimiento";
 import PanelTemas from "./PanelTemas";
 import PanelTableros from "./PanelTableros";
@@ -13,6 +14,7 @@ const SECCIONES = [
   { id: "cargar", titulo: "Cargar plantilla" },
   { id: "editar", titulo: "Editar cartera" },
   { id: "backoffice", titulo: "BackOffice" },
+  { id: "territorio", titulo: "Departamento y ciudad" },
   { id: "tableros", titulo: "Tableros" },
   { id: "mantenimiento", titulo: "Mantenimiento" },
   { id: "temas", titulo: "Temas" },
@@ -48,44 +50,10 @@ export default function PanelAdmin() {
       </nav>
 
       <div className="pt-7">
-        {activa === "cargar" && (
-          <>
-            <Cargador />
-
-            <section className="mt-10 border-t border-[var(--color-linea)] pt-6">
-              <h2 className="text-sm font-semibold text-[var(--color-tinta)]">
-                Qué pasa cuando cargas un archivo
-              </h2>
-              <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-                <li>
-                  Cada punto se identifica por ID de PDV más ciclo. Si el punto ya
-                  existe en ese ciclo se actualiza; si no, se crea. Cargar dos veces
-                  el mismo archivo no duplica registros.
-                </li>
-                <li>
-                  Las coordenadas a las que el origen les perdió el punto decimal se
-                  corrigen automáticamente. Las que quedan fuera de Colombia se
-                  guardan sin ubicación y el consultor las ve en la lista con una marca.
-                </li>
-                <li>
-                  Las filas con ccuser en LIBRE se guardan igual, pero nadie puede
-                  consultarlas desde la página pública.
-                </li>
-                <li>
-                  El archivo se envía en lotes de 500 filas. Si un lote falla, el
-                  proceso se detiene y se informa cuántas filas alcanzaron a guardarse.
-                </li>
-                <li>
-                  Una carga nunca borra lo que ya está: solo agrega y actualiza. Para
-                  sacar puntos viejos usa la pestaña de editar cartera.
-                </li>
-              </ul>
-            </section>
-          </>
-        )}
-
+        {activa === "cargar" && <Cargador />}
         {activa === "editar" && <EditorCartera />}
         {activa === "backoffice" && <BackOffice />}
+        {activa === "territorio" && <FiltroTerritorio />}
         {activa === "tableros" && <PanelTableros />}
         {activa === "mantenimiento" && <Mantenimiento />}
         {activa === "temas" && <PanelTemas />}

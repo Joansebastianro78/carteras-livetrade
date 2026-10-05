@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { PuntoCartera } from "./tipos";
+import { COLUMNAS_EXCEL_TERRITORIO, type PuntoTerritorio } from "./territorio";
 import {
   aEntero,
   aFecha,
@@ -337,4 +338,71 @@ export function exportarCartera(puntos: PuntoCartera[], usuario: string) {
 
   const fecha = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(libro, `Cartera_${usuario}_${fecha}.xlsx`);
+}
+
+/**
+ * 'YYYY-MM-DD' → número de serie de Excel. Se calcula en UTC a propósito:
+ * pasar por new Date('2026-09-12') y dejar que la librería convierta corre la
+ * fecha un día hacia atrás en Colombia (UTC-5).
+ */
+function serialExcel(iso: string): number | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return (ms - Date.UTC(1899, 11, 30)) / 86_400_000;
+}
+
+/** Nombre de archivo sin tildes, espacios ni símbolos. */
+function paraArchivo(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+}
+
+/**
+ * Descarga del filtro por departamento y ciudad (BackOffice): solo las
+ * columnas que están en azul en la plantilla maestra, en su mismo orden y con
+ * su mismo encabezado. La lista vive en COLUMNAS_EXCEL_TERRITORIO.
+ */
+export function exportarTerritorio(puntos: PuntoTerritorio[], partesNombre: string[]) {
+  const columnas = COLUMNAS_EXCEL_TERRITORIO;
+
+  const filas = puntos.map((p) =>
+    columnas.map((c) => {
+      const valor = p[c.campo];
+      if (valor === null || valor === undefined || valor === "") return null;
+      if (c.tipo === "fecha") return serialExcel(String(valor)) ?? String(valor);
+      return String(valor);
+    })
+  );
+
+  const hoja = XLSX.utils.aoa_to_sheet([columnas.map((c) => c.encabezado), ...filas]);
+
+  // Las fechas quedan como fecha real de Excel: se pueden filtrar y ordenar.
+  columnas.forEach((c, j) => {
+    if (c.tipo !== "fecha") return;
+    for (let i = 1; i <= filas.length; i++) {
+      const celda = hoja[XLSX.utils.encode_cell({ r: i, c: j })];
+      if (celda && celda.t === "n") celda.z = "dd/mm/yyyy";
+    }
+  });
+
+  hoja["!cols"] = columnas.map((c) => ({ wch: c.ancho }));
+  hoja["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: filas.length, c: columnas.length - 1 },
+    }),
+  };
+
+  const libro = XLSX.utils.book_new();
+  // Mismo nombre de hoja que la plantilla.
+  XLSX.utils.book_append_sheet(libro, hoja, "Hoja1");
+
+  const fecha = new Date().toISOString().slice(0, 10);
+  const nombre = ["Cartera", ...partesNombre.map(paraArchivo).filter(Boolean), fecha].join("_");
+  XLSX.writeFile(libro, `${nombre}.xlsx`);
 }

@@ -24,7 +24,8 @@ autorizarlo o hospedar el tarball internamente.
 
 1. Crear el proyecto en supabase.com.
 2. Abrir **SQL Editor** y ejecutar, en orden: `supabase/schema.sql`,
-   `supabase/admins.sql`, `supabase/roles.sql` y `supabase/gestion.sql`.
+   `supabase/admins.sql`, `supabase/roles.sql`, `supabase/gestion.sql` y
+   `supabase/territorio.sql`.
 3. En **Project Settings → API**, copiar la *Project URL* y la **service_role**
    key hacia `.env.local`.
 
@@ -47,7 +48,7 @@ directo con la base.
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
 | `/admin` | Login y panel completo: cargar, editar, BackOffice, mantenimiento y usuarios. |
-| `/backoffice` | Acceso de consulta: buscar un consultor y ver o descargar su cartera. |
+| `/backoffice` | Acceso de consulta: buscar un consultor, filtrar por departamento o ciudad, y ver o descargar la cartera. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
 | `POST /api/admin/upload` | UPSERT de un lote de hasta 1000 filas. |
@@ -58,6 +59,33 @@ directo con la base.
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
 | `GET/POST/PATCH/DELETE /api/admin/tableros` | Tableros de Power BI. El GET lo puede llamar también el perfil BackOffice; el resto, no. |
+| `GET /api/admin/territorio` | Departamentos y ciudades con su conteo, o una página de puntos de una región. Lo usa el BackOffice. |
+
+### Filtro por departamento y ciudad
+
+Pestaña **Departamento y ciudad**, en `/backoffice` y en el panel `/admin`:
+la ven los tres perfiles (BackOffice, administrador y superadministrador). Se elige un departamento, o una
+ciudad directamente, y opcionalmente un ciclo; salen todos los puntos de esa
+región en el mapa y en una lista con buscador, con un desglose por ciudad que
+además sirve de leyenda de colores.
+
+El Excel de este módulo trae **solo las columnas que tienen el encabezado en
+azul en la plantilla maestra**, en el mismo orden y con el mismo nombre: 26
+columnas, sin ID, HORA V1, USUARIO V1, HORA V2, USUSARIO V2, DURACION V1, RUTA,
+LATITUD, LONGITUD, num de ruta ni persona. La lista vive en
+`COLUMNAS_EXCEL_TERRITORIO` (`src/lib/territorio.ts`): si cambian los colores
+de la plantilla, se cambia ahí y nada más. Las fechas salen como fecha de Excel.
+
+`supabase/territorio.sql` agrega dos columnas calculadas,
+`departamento_clave` y `ciudad_clave`, que quitan tildes, puntos y espacios
+repetidos: así "Bogotá", "BOGOTA" y "bogota " caen en la misma opción del
+filtro. Las calcula la base sola en cada carga y cada edición. Ojo: "BOGOTA" y
+"BOGOTA D.C." siguen siendo dos opciones distintas, porque son textos distintos.
+
+Los puntos se piden en páginas de 1000 (Supabase no devuelve más por
+consulta, y una sola respuesta grande pasaría del límite de Vercel). Por
+encima de 30.000 puntos el filtro pide acotar por ciudad o ciclo, y el Excel
+solo se habilita cuando llegaron todas las páginas.
 
 ### Tableros de Power BI
 
