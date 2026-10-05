@@ -5,16 +5,18 @@ import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
+  claveGrupo,
   nombreCiudad,
-  SIN_DATO,
+  type Agrupacion,
   type PuntoTerritorio,
   type SeleccionPunto,
 } from "@/lib/territorio";
 
 type Props = {
   puntos: PuntoTerritorio[];
-  /** Color por ciudad_clave. */
+  /** Color por departamento o por ciudad, según agruparPor. */
   colores: Map<string, string>;
+  agruparPor: Agrupacion;
   seleccionado: SeleccionPunto | null;
   onSeleccionar: (idRegistro: number) => void;
 };
@@ -33,7 +35,9 @@ function contenidoGlobo(p: PuntoTerritorio): HTMLElement {
 
   const ciudad = document.createElement("p");
   ciudad.className = "text-xs text-[var(--color-tinta-suave)]";
-  ciudad.textContent = nombreCiudad(p.ciudad);
+  ciudad.textContent = [nombreCiudad(p.ciudad), p.departamento?.trim()]
+    .filter(Boolean)
+    .join(", ");
   raiz.appendChild(ciudad);
 
   const titulo = document.createElement("h3");
@@ -76,7 +80,7 @@ function contenidoGlobo(p: PuntoTerritorio): HTMLElement {
  * tener miles de puntos, y un marcador HTML por cada uno vuelve lento el mapa
  * en un computador de oficina.
  */
-function CapaPuntos({ puntos, colores, seleccionado, onSeleccionar }: Props) {
+function CapaPuntos({ puntos, colores, agruparPor, seleccionado, onSeleccionar }: Props) {
   const mapa = useMap();
   const marcadores = useRef(new Map<number, L.CircleMarker>());
   const anterior = useRef<number | null>(null);
@@ -102,7 +106,7 @@ function CapaPuntos({ puntos, colores, seleccionado, onSeleccionar }: Props) {
         radius: 6,
         color: "#ffffff",
         weight: 1.5,
-        fillColor: colores.get(p.ciudad_clave ?? SIN_DATO) ?? COLOR_POR_DEFECTO,
+        fillColor: colores.get(claveGrupo(p, agruparPor)) ?? COLOR_POR_DEFECTO,
         fillOpacity: 0.92,
       });
 
@@ -125,7 +129,7 @@ function CapaPuntos({ puntos, colores, seleccionado, onSeleccionar }: Props) {
     return () => {
       capa.remove();
     };
-  }, [puntos, colores, mapa]);
+  }, [puntos, colores, agruparPor, mapa]);
 
   // Al elegir un punto: se agranda y, si vino de la lista, el mapa va hasta él.
   useEffect(() => {

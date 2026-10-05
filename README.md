@@ -64,10 +64,10 @@ directo con la base.
 ### Filtro por departamento y ciudad
 
 Pestaña **Departamento y ciudad**, en `/backoffice` y en el panel `/admin`:
-la ven los tres perfiles (BackOffice, administrador y superadministrador). Se elige un departamento, o una
-ciudad directamente, y opcionalmente un ciclo; salen todos los puntos de esa
-región en el mapa y en una lista con buscador, con un desglose por ciudad que
-además sirve de leyenda de colores.
+la ven los tres perfiles (BackOffice, administrador y superadministrador). Se elige un departamento,
+todos los departamentos, o una ciudad directamente, y opcionalmente un ciclo; salen todos los puntos de esa
+región en el mapa y en una lista con buscador, con un desglose por ciudad (o
+por departamento, cuando se piden todos) que además sirve de leyenda de colores.
 
 El Excel de este módulo trae **solo las columnas que tienen el encabezado en
 azul en la plantilla maestra**, en el mismo orden y con el mismo nombre: 26

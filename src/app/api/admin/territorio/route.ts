@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   CAMPOS_TERRITORIO,
   SIN_DATO,
+  TODOS_LOS_DEPARTAMENTOS,
   nombreCiudad,
   nombreDepartamento,
   type CiudadResumen,
@@ -22,7 +23,8 @@ export const dynamic = "force-dynamic";
  *   GET ?departamento=K[&ciudad=K][&ciclo=X]&desde=N → una página de puntos
  *
  * Las claves (K) son las de clave_territorio() en supabase/territorio.sql.
- * "~" significa sin departamento, sin ciudad o ciclo vacío.
+ * "~" significa sin departamento, sin ciudad o ciclo vacío, y
+ * departamento=* trae todos los departamentos.
  *
  * Los puntos van por páginas de 1000: Supabase no devuelve más de eso por
  * consulta, y una sola respuesta con toda una región pasaría del límite de
@@ -164,7 +166,7 @@ async function puntos(
     .from("puntos_cartera")
     .select(CAMPOS_TERRITORIO, { count: "exact" });
 
-  if (departamento) {
+  if (departamento && departamento !== TODOS_LOS_DEPARTAMENTOS) {
     consulta =
       departamento === SIN_DATO
         ? consulta.is("departamento_clave", null)
@@ -182,6 +184,7 @@ async function puntos(
 
   // id_registro va de último para que el orden sea estable entre páginas.
   const { data, error, count } = await consulta
+    .order("departamento_clave", { ascending: true, nullsFirst: false })
     .order("ciudad_clave", { ascending: true, nullsFirst: false })
     .order("usuario", { ascending: true })
     .order("ciclo", { ascending: true })

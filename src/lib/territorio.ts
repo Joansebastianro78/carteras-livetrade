@@ -11,6 +11,15 @@
  */
 export const SIN_DATO = "~";
 
+/** Valor del filtro para traer los puntos de todos los departamentos. */
+export const TODOS_LOS_DEPARTAMENTOS = "*";
+
+/**
+ * Cómo se agrupan los puntos en el desglose y en los colores del mapa: por
+ * departamento cuando se piden todos, por ciudad cuando se pide uno.
+ */
+export type Agrupacion = "departamento" | "ciudad";
+
 /** Lo que trae cada punto en este módulo: las columnas azules y lo que pide el mapa. */
 export type PuntoTerritorio = {
   id_registro: number;
@@ -135,6 +144,10 @@ export type RespuestaPuntosTerritorio = {
  * mapa tiene que ir hasta el punto y abrirlo.
  */
 export type SeleccionPunto = { id: number; desde: "lista" | "mapa" };
+
+export function claveGrupo(p: PuntoTerritorio, por: Agrupacion): string {
+  return (por === "departamento" ? p.departamento_clave : p.ciudad_clave) ?? SIN_DATO;
+}
 
 export function nombreDepartamento(nombre: string | null | undefined): string {
   return nombre?.trim() || "Sin departamento";

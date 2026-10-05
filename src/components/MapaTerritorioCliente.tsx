@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { PuntoTerritorio, SeleccionPunto } from "@/lib/territorio";
+import type { Agrupacion, PuntoTerritorio, SeleccionPunto } from "@/lib/territorio";
 
 /** Igual que MapaCliente: Leaflet toca window al importarse, así que va sin SSR. */
 const MapaTerritorio = dynamic(() => import("./MapaTerritorio"), {
@@ -16,6 +16,7 @@ const MapaTerritorio = dynamic(() => import("./MapaTerritorio"), {
 export default function MapaTerritorioCliente(props: {
   puntos: PuntoTerritorio[];
   colores: Map<string, string>;
+  agruparPor: Agrupacion;
   seleccionado: SeleccionPunto | null;
   onSeleccionar: (idRegistro: number) => void;
 }) {

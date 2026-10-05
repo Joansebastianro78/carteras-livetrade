@@ -8,7 +8,11 @@ import { COLORES_RUTA } from "@/lib/tipos";
 import {
   COLUMNAS_EXCEL_TERRITORIO,
   SIN_DATO,
+  TODOS_LOS_DEPARTAMENTOS,
+  claveGrupo,
   nombreCiudad,
+  nombreDepartamento,
+  type Agrupacion,
   type DepartamentoResumen,
   type PuntoTerritorio,
   type RespuestaResumenTerritorio,
@@ -107,15 +111,28 @@ export default function FiltroTerritorio() {
   // Si el ciclo nuevo no tiene el departamento o la ciudad que estaban
   // elegidos, el filtro vuelve a "sin elegir" en vez de quedar apuntando a
   // algo que ya no aparece en la lista.
+  const todosLosDeptos =
+    departamento === TODOS_LOS_DEPARTAMENTOS && (resumen?.departamentos.length ?? 0) > 0;
   const deptoElegido: DepartamentoResumen | null =
-    (departamento && resumen?.departamentos.find((d) => d.clave === departamento)) || null;
+    (!todosLosDeptos &&
+      departamento &&
+      resumen?.departamentos.find((d) => d.clave === departamento)) ||
+    null;
   const ciudadElegida =
     (deptoElegido && ciudad && deptoElegido.ciudades.find((c) => c.clave === ciudad)) || null;
-  const departamentoValido = deptoElegido ? departamento : TODOS;
+  const departamentoValido = todosLosDeptos
+    ? TODOS_LOS_DEPARTAMENTOS
+    : deptoElegido
+      ? departamento
+      : TODOS;
   const ciudadValida = ciudadElegida ? ciudad : TODOS;
+  const totalPuntos = resumen?.departamentos.reduce((n, d) => n + d.puntos, 0) ?? 0;
 
   // ------------------------------------------------------------ consulta
   function nombres(f: Filtro): { titulo: string; subtitulo: string | null } {
+    if (f.departamento === TODOS_LOS_DEPARTAMENTOS) {
+      return { titulo: "Todos los departamentos", subtitulo: null };
+    }
     const d = resumen?.departamentos.find((x) => x.clave === f.departamento);
     const nombreDepto = d?.nombre ?? "Departamento";
     if (!f.ciudad) return { titulo: nombreDepto, subtitulo: null };
@@ -197,7 +214,7 @@ export default function FiltroTerritorio() {
             total,
             cargados: acumulado.length,
             cargando: false,
-            aviso: `Esta selección tiene ${cifra(total ?? 0)} puntos. Se muestran los primeros ${cifra(acumulado.length)}; para verlos todos y descargarlos, elige una ciudad o un ciclo.`,
+            aviso: `Esta selección tiene ${cifra(total ?? 0)} puntos. Se muestran los primeros ${cifra(acumulado.length)}; para verlos todos y descargarlos, acota por ${filtro.departamento === TODOS_LOS_DEPARTAMENTOS ? "departamento, ciudad" : "ciudad"} o ciclo.`,
           }
         );
         return;
@@ -226,8 +243,15 @@ export default function FiltroTerritorio() {
     verPuntos({ departamento: departamentoValido, ciudad: ciudadValida, ciclo });
   }
 
-  function abrirCiudad(clave: string) {
+  /** Tocar un departamento o una ciudad del desglose acota la consulta a él. */
+  function abrirGrupo(clave: string) {
     if (!resultado) return;
+    if (agruparPor === "departamento") {
+      setDepartamento(clave);
+      setCiudad(TODOS);
+      verPuntos({ ...resultado.filtro, departamento: clave, ciudad: TODOS });
+      return;
+    }
     setDepartamento(resultado.filtro.departamento);
     setCiudad(clave);
     verPuntos({ ...resultado.filtro, ciudad: clave });
@@ -254,38 +278,61 @@ export default function FiltroTerritorio() {
   // ------------------------------------------------------------ derivados
   const puntos = resultado?.puntos;
 
-  const ciudades = useMemo(() => {
+  // Con todos los departamentos, el desglose y los colores van por
+  // departamento; con uno solo, por ciudad.
+  const agruparPor: Agrupacion =
+    resultado?.filtro.departamento === TODOS_LOS_DEPARTAMENTOS ? "departamento" : "ciudad";
+
+  const grupos = useMemo(() => {
     const mapa = new Map<string, { clave: string; nombre: string; puntos: number }>();
     for (const p of puntos ?? []) {
-      const clave = p.ciudad_clave ?? SIN_DATO;
-      const c = mapa.get(clave);
-      if (c) c.puntos++;
-      else mapa.set(clave, { clave, nombre: nombreCiudad(p.ciudad), puntos: 1 });
+      const clave = claveGrupo(p, agruparPor);
+      const g = mapa.get(clave);
+      if (g) g.puntos++;
+      else {
+        const nombre =
+          agruparPor === "departamento"
+            ? nombreDepartamento(p.departamento)
+            : nombreCiudad(p.ciudad);
+        mapa.set(clave, { clave, nombre, puntos: 1 });
+      }
     }
     return [...mapa.values()].sort((a, b) => b.puntos - a.puntos);
-  }, [puntos]);
+  }, [puntos, agruparPor]);
 
-  // Un color por ciudad, de la misma paleta de las rutas. Si hay más ciudades
-  // que colores, las más pequeñas comparten el gris: repetir colores haría
-  // creer que dos ciudades distintas son la misma.
+  // Un color por grupo, de la misma paleta de las rutas. Si hay más grupos
+  // que colores, los más pequeños comparten el gris: repetir colores haría
+  // creer que dos lugares distintos son el mismo.
   const colores = useMemo(() => {
     const mapa = new Map<string, string>();
-    ciudades.forEach((c, i) =>
-      mapa.set(c.clave, i < COLORES_RUTA.length ? COLORES_RUTA[i] : COLOR_OTRAS)
+    grupos.forEach((g, i) =>
+      mapa.set(g.clave, i < COLORES_RUTA.length ? COLORES_RUTA[i] : COLOR_OTRAS)
     );
     return mapa;
-  }, [ciudades]);
+  }, [grupos]);
 
   const cifras = useMemo(() => {
     const consultores = new Set<string>();
+    const departamentos = new Set<string>();
+    const ciudades = new Set<string>();
     let sinUbicacion = 0;
     let libres = 0;
     for (const p of puntos ?? []) {
       if (esLibre(p)) libres++;
       else if (p.usuario) consultores.add(p.usuario);
       if (p.latitud === null || p.longitud === null) sinUbicacion++;
+      const d = p.departamento_clave ?? SIN_DATO;
+      departamentos.add(d);
+      // La misma ciudad puede existir en dos departamentos (La Unión, por ejemplo).
+      ciudades.add(`${d}${SEP}${p.ciudad_clave ?? SIN_DATO}`);
     }
-    return { consultores: consultores.size, sinUbicacion, libres };
+    return {
+      consultores: consultores.size,
+      departamentos: departamentos.size,
+      ciudades: ciudades.size,
+      sinUbicacion,
+      libres,
+    };
   }, [puntos]);
 
   // Texto de búsqueda de cada punto, armado una sola vez por consulta.
@@ -308,7 +355,7 @@ export default function FiltroTerritorio() {
     return lista.filter((_, i) => indice[i].includes(q));
   }, [puntos, indice, busqueda]);
 
-  const varias = ciudades.length > 1;
+  const varias = grupos.length > 1;
 
   // ------------------------------------------------------------ pantalla
   return (
@@ -361,6 +408,11 @@ export default function FiltroTerritorio() {
                 className="campo"
               >
                 <option value={TODOS}>Elige un departamento</option>
+                {resumen.departamentos.length > 0 && (
+                  <option value={TODOS_LOS_DEPARTAMENTOS}>
+                    Todos los departamentos ({cifra(totalPuntos)} puntos)
+                  </option>
+                )}
                 {resumen.departamentos.map((d) => (
                   <option key={d.clave} value={d.clave}>
                     {d.nombre} ({cifra(d.puntos)} puntos)
@@ -403,7 +455,11 @@ export default function FiltroTerritorio() {
                   </>
                 ) : (
                   <>
-                    <option value={TODOS}>Elige una ciudad</option>
+                    <option value={TODOS}>
+                      {todosLosDeptos
+                        ? `Todas las ciudades (${cifra(totalPuntos)} puntos)`
+                        : "Elige una ciudad"}
+                    </option>
                     {resumen.departamentos.map((d) => (
                       <optgroup key={d.clave} label={d.nombre}>
                         {d.ciudades.map((c) => (
@@ -489,7 +545,9 @@ export default function FiltroTerritorio() {
               {resultado.puntos.length === 1 ? "punto" : "puntos"} ·{" "}
               {cifra(cifras.consultores)}{" "}
               {cifras.consultores === 1 ? "consultor" : "consultores"}
-              {varias && ` · ${cifra(ciudades.length)} ciudades`}
+              {agruparPor === "departamento" &&
+                ` · ${cifra(cifras.departamentos)} ${cifras.departamentos === 1 ? "departamento" : "departamentos"}`}
+              {cifras.ciudades > 1 && ` · ${cifra(cifras.ciudades)} ciudades`}
               {resultado.filtro.ciclo !== TODOS
                 ? ` · ${etiquetaCiclo(resultado.filtro.ciclo).toLowerCase()}`
                 : " · todos los ciclos"}
@@ -515,18 +573,20 @@ export default function FiltroTerritorio() {
             </div>
           )}
 
-          {/* Desglose por ciudad: también es la leyenda de colores del mapa. */}
+          {/* Desglose por departamento o ciudad: también es la leyenda de colores del mapa. */}
           {!resultado.cargando && varias && !resultado.filtro.ciudad && (
             <div className="mt-4 border-t border-[var(--color-linea)] pt-3">
               <p className="text-xs text-[var(--color-tinta-suave)]">
-                Toca una ciudad para ver solo sus puntos.
+                {agruparPor === "departamento"
+                  ? "Toca un departamento para ver solo sus puntos."
+                  : "Toca una ciudad para ver solo sus puntos."}
               </p>
               <ul className="mt-2 flex flex-wrap gap-1.5">
-                {ciudades.map((c) => (
+                {grupos.map((c) => (
                   <li key={c.clave}>
                     <button
                       type="button"
-                      onClick={() => abrirCiudad(c.clave)}
+                      onClick={() => abrirGrupo(c.clave)}
                       className="flex items-center gap-1.5 rounded-full border border-[var(--color-linea)] px-2.5 py-1 text-xs text-[var(--color-tinta)] hover:border-[var(--color-tinta)]"
                     >
                       <span
@@ -602,6 +662,7 @@ export default function FiltroTerritorio() {
                   <MapaTerritorioCliente
                     puntos={resultado.puntos}
                     colores={colores}
+                    agruparPor={agruparPor}
                     seleccionado={seleccionado}
                     onSeleccionar={(id) => setSeleccionado({ id, desde: "mapa" })}
                   />
@@ -647,7 +708,7 @@ export default function FiltroTerritorio() {
                           aria-hidden
                           className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{
-                            background: colores.get(p.ciudad_clave ?? SIN_DATO) ?? COLOR_OTRAS,
+                            background: colores.get(claveGrupo(p, agruparPor)) ?? COLOR_OTRAS,
                           }}
                         />
                         <span className="min-w-0 flex-1">
@@ -658,7 +719,13 @@ export default function FiltroTerritorio() {
                             {p.direccion ?? "Sin dirección registrada"}
                           </span>
                           <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
-                            {varias && <span>{nombreCiudad(p.ciudad)}</span>}
+                            {agruparPor === "departamento" ? (
+                              <span>
+                                {nombreCiudad(p.ciudad)}, {nombreDepartamento(p.departamento)}
+                              </span>
+                            ) : (
+                              cifras.ciudades > 1 && <span>{nombreCiudad(p.ciudad)}</span>
+                            )}
                             <span className="text-[var(--color-tinta)]">
                               {esLibre(p) ? "Sin consultor (LIBRE)" : (p.nom ?? p.usuario)}
                               {!esLibre(p) && p.nom && (
