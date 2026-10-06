@@ -285,10 +285,38 @@ La imagen lista hasta 40 puntos; más allá de eso remite al Excel.
 
 ## 8. Mapa
 
-El basemap es OpenStreetMap, sin llave. La captura que compartiste usa un estilo
-de CARTO que exige API key, y por eso sale el marcado de agua "API KEY REQUIRED"
-sobre todo el mapa. Si prefieres el gris claro de CARTO, hay que registrar una
-cuenta y cambiar la URL del `TileLayer` en `src/components/Mapa.tsx`.
+Todos los mapas (el del consultor, el del filtro por departamento y ciudad, y
+la imagen que se descarga) tienen un botón **Capas** abajo a la izquierda,
+como el de Google Maps. Cualquier perfil, consultores incluidos, elige ahí cómo
+ver el mapa; la elección queda guardada en su navegador y se aplica a todos los
+mapas y a la imagen PNG. El catálogo vive en `src/lib/mapaBase.ts` y el botón
+en `src/components/CapasMapa.tsx`.
+
+| Capa | Fuente | Llave |
+|---|---|---|
+| Calles | Mapbox `streets-v12` | `NEXT_PUBLIC_MAPBOX_TOKEN` |
+| Satélite | Mapbox `satellite-streets-v12` | `NEXT_PUBLIC_MAPBOX_TOKEN` |
+| Claro | Mapbox `light-v11` | `NEXT_PUBLIC_MAPBOX_TOKEN` |
+| MapLibre | MapLibre GL con el estilo Liberty de OpenFreeMap | ninguna |
+| OpenStreetMap | tiles de OSM; solo aparece si no hay token de Mapbox | ninguna |
+
+- **Mapbox** se activa con `NEXT_PUBLIC_MAPBOX_TOKEN` en el entorno (en Vercel
+  también, y volviendo a desplegar: las variables `NEXT_PUBLIC_` se escriben en
+  el código al compilar). El token es público (`pk.`) y se ve en el navegador:
+  se protege restringiéndolo por dominio en account.mapbox.com. Los mapas usan
+  la Static Tiles API con tiles de 512 px, y la imagen descargada la Static
+  Images API (una petición por imagen). Las dos tienen cupo gratis mensual y
+  luego se cobran.
+- **MapLibre GL** dibuja un mapa vectorial en el navegador con WebGL, usando el
+  servicio público de OpenFreeMap: sin llave ni límite de vistas, pero sin
+  garantía de disponibilidad. La librería (`maplibre-gl` 5 y
+  `@maplibre/maplibre-gl-leaflet`) solo se descarga cuando alguien elige esa
+  capa. Va en la versión 5 a propósito: la 6 carga su worker desde un archivo
+  aparte con una ruta que el bundler de Next no sigue. Si el equipo no tiene
+  WebGL, el mapa vuelve a la capa por defecto y lo avisa. La imagen PNG no
+  tiene equivalente en MapLibre: con esa capa elegida sale con Calles.
+- Para agregar o quitar capas se edita `CAPAS` en `mapaBase.ts`; el botón las
+  recoge solo.
 
 Leaflet toca `window` al importarse, así que el mapa se carga con
 `dynamic(..., { ssr: false })` desde `MapaCliente.tsx`. En el App Router esa

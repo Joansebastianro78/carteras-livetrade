@@ -1,4 +1,5 @@
 import { colorDeRuta, numeroDeRuta, type PuntoCartera } from "./tipos";
+import { capaGuardada, estiloImagenMapbox, urlImagenMapbox } from "./mapaBase";
 
 /**
  * Arma la cartera como una sola imagen PNG, pensada para mandar por WhatsApp
@@ -30,7 +31,17 @@ function latAy(lat: number, z: number): number {
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z;
 }
 
-function cargarTile(url: string): Promise<HTMLImageElement | null> {
+/** Inversas de las dos de arriba: de la cuadrícula a longitud y latitud. */
+function axLon(x: number, z: number): number {
+  return (x / 2 ** z) * 360 - 180;
+}
+
+function ayLat(y: number, z: number): number {
+  const n = Math.PI * (1 - (2 * y) / 2 ** z);
+  return (Math.atan(Math.sinh(n)) * 180) / Math.PI;
+}
+
+function cargarImagen(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
     // Sin crossOrigin el canvas queda contaminado y toBlob falla. Si el
@@ -109,42 +120,68 @@ async function dibujarMapa(
   const offsetX = MARGEN + (anchoMapa - (xMax - xMin) * TAM_TILE) / 2 - xMin * TAM_TILE;
   const offsetY = y0 + (ALTO_MAPA - (yMax - yMin) * TAM_TILE) / 2 - yMin * TAM_TILE;
 
-  const tx0 = Math.floor(xMin - relleno / TAM_TILE);
-  const tx1 = Math.floor(xMax + relleno / TAM_TILE);
-  const ty0 = Math.floor(yMin - relleno / TAM_TILE);
-  const ty1 = Math.floor(yMax + relleno / TAM_TILE);
-
-  const pedidos: { img: Promise<HTMLImageElement | null>; x: number; y: number }[] = [];
-  for (let tx = tx0; tx <= tx1 && pedidos.length < MAX_TILES; tx++) {
-    for (let ty = ty0; ty <= ty1 && pedidos.length < MAX_TILES; ty++) {
-      pedidos.push({
-        img: cargarTile(`https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`),
-        x: tx,
-        y: ty,
-      });
-    }
-  }
-
   ctx.save();
   ctx.beginPath();
   ctx.rect(MARGEN, y0, anchoMapa, ALTO_MAPA);
   ctx.clip();
 
-  let dibujados = 0;
-  for (const t of pedidos) {
-    const img = await t.img;
-    if (!img) continue;
-    ctx.drawImage(
-      img,
-      offsetX + t.x * TAM_TILE,
-      offsetY + t.y * TAM_TILE,
-      TAM_TILE,
-      TAM_TILE
+  // ---------------------------------------------------------- fondo
+  // La imagen sale con la capa que la persona eligió en el mapa (calles,
+  // satélite o claro). Con Mapbox es una sola imagen fija centrada en el mismo
+  // punto y con el mismo zoom que usan los marcadores, así que caen exactos.
+  let fondo: "mapbox" | "osm" | null = null;
+
+  const estilo = estiloImagenMapbox(capaGuardada());
+
+  if (estilo) {
+    const urlMapbox = urlImagenMapbox(
+      estilo,
+      ayLat((yMin + yMax) / 2, zoom),
+      axLon((xMin + xMax) / 2, zoom),
+      zoom,
+      anchoMapa,
+      ALTO_MAPA
     );
-    dibujados++;
+    const img = await cargarImagen(urlMapbox);
+    if (img) {
+      ctx.drawImage(img, MARGEN, y0, anchoMapa, ALTO_MAPA);
+      fondo = "mapbox";
+    }
   }
 
-  if (dibujados === 0) {
+  // Sin token, con OpenStreetMap elegido, o si Mapbox no respondió.
+  if (!fondo) {
+    const tx0 = Math.floor(xMin - relleno / TAM_TILE);
+    const tx1 = Math.floor(xMax + relleno / TAM_TILE);
+    const ty0 = Math.floor(yMin - relleno / TAM_TILE);
+    const ty1 = Math.floor(yMax + relleno / TAM_TILE);
+
+    const pedidos: { img: Promise<HTMLImageElement | null>; x: number; y: number }[] = [];
+    for (let tx = tx0; tx <= tx1 && pedidos.length < MAX_TILES; tx++) {
+      for (let ty = ty0; ty <= ty1 && pedidos.length < MAX_TILES; ty++) {
+        pedidos.push({
+          img: cargarImagen(`https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`),
+          x: tx,
+          y: ty,
+        });
+      }
+    }
+
+    for (const t of pedidos) {
+      const img = await t.img;
+      if (!img) continue;
+      ctx.drawImage(
+        img,
+        offsetX + t.x * TAM_TILE,
+        offsetY + t.y * TAM_TILE,
+        TAM_TILE,
+        TAM_TILE
+      );
+      fondo = "osm";
+    }
+  }
+
+  if (!fondo) {
     // Sin tiles queda al menos una retícula para dar sentido de escala.
     ctx.strokeStyle = "#d7dbd6";
     ctx.lineWidth = 1;
@@ -187,8 +224,9 @@ async function dibujarMapa(
 
   ctx.restore();
 
-  // Atribución: obligatoria al reutilizar los tiles de OpenStreetMap.
-  if (dibujados > 0) {
+  // Atribución obligatoria de los tiles de OpenStreetMap. La imagen de Mapbox
+  // ya trae la suya dentro.
+  if (fondo === "osm") {
     const credito = "© OpenStreetMap";
     ctx.font = `400 17px ${TIPOGRAFIA}`;
     const w = ctx.measureText(credito).width + 16;

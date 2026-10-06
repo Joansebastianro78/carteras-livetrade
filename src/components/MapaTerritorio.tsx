@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import CapasMapa from "./CapasMapa";
 import {
   claveGrupo,
   nombreCiudad,
@@ -167,12 +168,14 @@ function CapaPuntos({ puntos, colores, agruparPor, seleccionado, onSeleccionar }
 
 export default function MapaTerritorio(props: Props) {
   return (
-    <MapContainer center={CENTRO_COLOMBIA} zoom={6} scrollWheelZoom className="h-full w-full">
-      <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={19}
-      />
+    <MapContainer
+      center={CENTRO_COLOMBIA}
+      zoom={6}
+      maxZoom={19}
+      scrollWheelZoom
+      className="h-full w-full"
+    >
+      <CapasMapa />
       <CapaPuntos {...props} />
     </MapContainer>
   );

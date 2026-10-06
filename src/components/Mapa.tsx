@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, useMap } from "react-leaflet";
+import CapasMapa from "./CapasMapa";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CENTRO_BOGOTA, colorDeRuta, numeroDeRuta, type PuntoCartera } from "@/lib/tipos";
@@ -56,17 +57,15 @@ export default function Mapa({ puntos, seleccionado, onSeleccionar }: Props) {
     <MapContainer
       center={CENTRO_BOGOTA}
       zoom={12}
+      // La capa base cambia según lo que elija cada quien; el tope de zoom
+      // queda fijo para que no dependa de cuál esté puesta.
+      maxZoom={19}
       scrollWheelZoom
       className="h-full w-full"
-      // El basemap de CARTO exige API key. OpenStreetMap no, y aguanta
-      // el volumen de un equipo de campo sin registro previo.
       attributionControl
     >
-      <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={19}
-      />
+      {/* Capa base elegida por la persona (Mapbox, MapLibre u OpenStreetMap) y botón "Capas". */}
+      <CapasMapa />
 
       <Encuadrar puntos={conCoords} />
 
