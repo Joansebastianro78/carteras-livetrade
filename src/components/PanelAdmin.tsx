@@ -4,6 +4,8 @@ import { useState } from "react";
 import Cargador from "./Cargador";
 import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
+import Auditoria from "./Auditoria";
+import AuditoriaImagenes from "./AuditoriaImagenes";
 import BackOffice from "./BackOffice";
 import FiltroTerritorio from "./FiltroTerritorio";
 import Mantenimiento from "./Mantenimiento";
@@ -15,6 +17,8 @@ const SECCIONES = [
   { id: "editar", titulo: "Editar cartera" },
   { id: "backoffice", titulo: "BackOffice" },
   { id: "territorio", titulo: "Departamento y ciudad" },
+  { id: "auditoria", titulo: "Auditoría" },
+  { id: "imagenes", titulo: "Auditoría de imágenes" },
   { id: "tableros", titulo: "Tableros" },
   { id: "mantenimiento", titulo: "Mantenimiento" },
   { id: "temas", titulo: "Temas" },
@@ -54,6 +58,8 @@ export default function PanelAdmin() {
         {activa === "editar" && <EditorCartera />}
         {activa === "backoffice" && <BackOffice />}
         {activa === "territorio" && <FiltroTerritorio />}
+        {activa === "auditoria" && <Auditoria />}
+        {activa === "imagenes" && <AuditoriaImagenes />}
         {activa === "tableros" && <PanelTableros />}
         {activa === "mantenimiento" && <Mantenimiento />}
         {activa === "temas" && <PanelTemas />}

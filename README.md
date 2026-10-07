@@ -60,6 +60,8 @@ directo con la base.
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
 | `GET/POST/PATCH/DELETE /api/admin/tableros` | Tableros de Power BI. El GET lo puede llamar también el perfil BackOffice; el resto, no. |
 | `GET /api/admin/territorio` | Departamentos y ciudades con su conteo, o una página de puntos de una región. Lo usa el BackOffice. |
+| `POST/GET /api/admin/auditoria` | Lanza la consulta de auditoría en Athena, informa su estado y entrega los resultados en páginas de 1000. La usan los tres perfiles. |
+| `POST/GET /api/admin/auditoria-imagenes` | Lo mismo, con la consulta de las fotos de inicio de visita. La usan los tres perfiles. |
 
 ### Filtro por departamento y ciudad
 
@@ -322,7 +324,135 @@ Leaflet toca `window` al importarse, así que el mapa se carga con
 `dynamic(..., { ssr: false })` desde `MapaCliente.tsx`. En el App Router esa
 opción solo se permite dentro de un componente de cliente; de ahí la envoltura.
 
-## 9. Pendientes conocidos
+## 9. Auditoría (Athena)
+
+Pestaña **Auditoría**, en `/backoffice` y en `/admin`, para los tres perfiles.
+Al abrirla ejecuta en Athena la consulta de `src/lib/consultaAuditoria.ts`
+(validaciones de cédula, fechas de nacimiento, «Select» sin responder, rangos
+de costos, ventas, porcentajes y años) y muestra los hallazgos con un desglose
+por motivo y un buscador. La consulta trae además `actividad_id` y
+`tipo_linea`: a qué línea pertenece cada respuesta (Linea base, Inscripcion
+avanza, Linea de seguimiento o Sin clasificar), que sale del `CASE` sobre la
+actividad. Si se agrega una actividad nueva, se agrega ahí.
+
+Dos descargas:
+
+- **Excel limpio** (`auditoria_bavaria_puntos_limpia_<fecha>.xlsx`): los
+  resultados de Athena pasan por el limpiador de auditoría Bavaria (tildes
+  dañadas, espacios, la misma pregunta escrita de varias formas, el tipo de
+  línea de cada respuesta) y salen sus ocho hojas: Resumen_Usuarios,
+  Usuario_x_Pregunta, Usuario_x_Codigo, Resumen_Preguntas, Resumen_Tipo_Linea,
+  Preguntas_Horizontal, Detalle_por_Codigo y Notas, con su mismo formato. Se
+  arma en el navegador; con decenas de miles de filas tarda unos segundos.
+- **Datos sin limpiar**: las diez columnas de la consulta tal cual, más
+  `motivo_auditoria`. La columna `fila_excel` del Excel limpio apunta a la
+  fila de este archivo si se descargan de la misma consulta.
+
+**El limpiador.** La app no corre Python: `src/lib/limpiadorAuditoria.ts` es
+`herramientas/limpiador_auditoria_bavaria.py` traducido función por función,
+incluidos los detalles de pandas que cambian el resultado (orden de empates,
+formato de fechas, redondeo, corte de textos largos). Se comparó celda por
+celda contra el script con datos de prueba de hasta 40.000 filas, con pandas 3
+y 2.2, y salen iguales; el procedimiento está en `herramientas/paridad/`.
+**Si se cambia el script, hay que cambiar el port igual** y volver a comparar.
+La configuración (`UNIR_PREGUNTAS_SIN_NUMERO`, `RENOMBRAR_PREGUNTAS`,
+`SEPARADOR`, `PATRON_USUARIO`, `ORDEN_TIPO_LINEA`) está arriba de ese archivo,
+con los mismos nombres. La hoja horizontal va por código y tipo de línea (la
+opción `--horizontal-por visita` del script no está en la app).
+
+El Excel limpio usa ExcelJS, que se descarga solo al pedirlo: la edición
+gratuita de SheetJS no escribe estilos ni paneles congelados.
+
+**Configuración.** En `.env.local` y en Vercel (y volver a desplegar):
+
+```
+ATHENA_ACCESS_KEY_ID=...
+ATHENA_SECRET_ACCESS_KEY=...
+```
+
+Región, workgroup, base de datos y carpeta de resultados ya vienen con los de
+la conexión de DBeaver (`us-east-1`, `workgroup647`, `livetradebi`,
+`s3://mkt-bi-athena-read-cliente-id-647/athena/`); se cambian con
+`ATHENA_REGION`, `ATHENA_WORKGROUP`, `ATHENA_DATABASE` y `ATHENA_OUTPUT`. Las
+variables van con `ATHENA_` y no con `AWS_` porque Vercel reserva esos nombres.
+
+**Cómo funciona.**
+
+- La consulta corre en Athena por su cuenta: la ruta la lanza y responde de
+  una vez, y el navegador pregunta el estado cada 1 a 3 segundos. Así ninguna
+  llamada choca con el límite de tiempo de las funciones de Vercel.
+- Los resultados llegan en páginas de 1000 filas (lo máximo de Athena por
+  llamada). Por encima de 200.000 filas la pantalla pide usar DBeaver.
+- El navegador nunca manda SQL. La ruta solo corre esta consulta, y el id
+  que le entrega al navegador va firmado con `ADMIN_SECRET` (HMAC), junto
+  con el nombre de la consulta: solo se
+  leen las ejecuciones que lanzó la propia ruta, así que quien tenga sesión no
+  puede leer otras consultas del workgroup pasando su id. No se compara el
+  texto de la consulta que devuelve Athena con el enviado, porque no hay
+  garantía de que lo devuelva idéntico.
+- Si Athena rechaza algo, la pantalla muestra su mensaje y el detalle queda en
+  el log del servidor con la etiqueta `[athena ...]`.
+- **Costo.** Athena cobra por datos leídos. Si la misma consulta corrió hace
+  menos de 10 minutos, Athena reutiliza ese resultado sin volver a leer las
+  tablas (`ATHENA_REUSO_MINUTOS`; 0 lo apaga). «Volver a consultar» siempre
+  pide datos nuevos. Si el workgroup no admite reutilización, se ejecuta
+  normal.
+- **Permisos de AWS.** El usuario necesita `athena:StartQueryExecution`,
+  `athena:GetQueryExecution` y `athena:GetQueryResults` en el workgroup;
+  lectura del catálogo de Glue de `livetradebi`; lectura de los buckets de las
+  tablas; y lectura y escritura en la carpeta de resultados. Lo recomendable
+  es un usuario de IAM solo para esta app, con exactamente eso, y no las llaves
+  de una persona.
+- Si se cambia la consulta, revisar `motivoAuditoria()` en
+  `src/lib/auditoria.ts`, que explica en pantalla qué regla hizo salir cada
+  fila.
+
+### Auditoría de imágenes
+
+Pestaña **Auditoría de imágenes**, en `/backoffice` y en `/admin`, para los
+tres perfiles. Corre en Athena la consulta de `src/lib/consultaImagenes.ts`:
+la foto con la que cada consultor inició la visita (`foto_visita_inicio`),
+con el PDV, su código, el consultor y la fecha de la visita (`fecha_inicio`).
+**La campaña está fija en la consulta (`campana_id = 2423`)**: para auditar
+otra se cambia en ese archivo.
+
+- **Rango de fechas** («Desde» y «Hasta», los dos opcionales): delimita toda
+  la pestaña —la galería, los conteos y el Excel— a las visitas de esos días,
+  ambos incluidos. El calendario ofrece los días entre la primera y la última
+  visita. Una visita sin fecha, o con una fecha que no se entiende, queda
+  fuera de cualquier rango y la pantalla dice cuántas son.
+- La fecha se toma **tal como la entrega Athena, sin convertir zona horaria**.
+  Si `fecha_inicio` está guardada en UTC, una visita de las 8 p. m. en Colombia
+  aparece con fecha del día siguiente; en ese caso la conversión va en la
+  consulta (`fecha_inicio AT TIME ZONE 'America/Bogota'`).
+- Las visitas salen de la más reciente a la más antigua; las que no traen
+  fecha, al final.
+- Galería de fotos con filtro por consultor, buscador por PDV o código, y
+  filtros «Con foto», «Sin foto» y, si aparecen, «Sin enlace válido». Estos
+  filtros afinan lo que se ve dentro de las fechas elegidas. Al tocar una foto
+  se abre en grande; se pasa a la anterior o la siguiente con las flechas
+  (también las del teclado) y se cierra con Esc.
+- **Descargar en Excel**: las cinco columnas de la consulta, con la foto como
+  enlace para abrirla con un clic y `fecha_inicio` como fecha de Excel. Trae
+  las visitas del rango de fechas (sin rango, todas); el consultor, el
+  buscador y los filtros de foto no lo recortan. El nombre del archivo lleva
+  el rango: `Auditoria_imagenes_2026-09-05_a_2026-09-10.xlsx`.
+- Las fotos se cargan directamente desde la dirección que trae
+  `foto_visita_inicio`, en su tamaño original; por eso la galería muestra de a
+  24 y solo descarga las que van quedando a la vista. Si el servidor de fotos
+  no permite verlas desde otra página, o el enlace venció, la tarjeta dice «La
+  foto no cargó» y arriba sale cuántas fallaron.
+- Solo se muestran direcciones `http` y `https`. Si la celda trae otra cosa
+  (un nombre de archivo, una ruta interna), la visita sale como «Sin enlace
+  válido» con el valor tal cual. Varias fotos en una celda van separadas por
+  espacios o `|`.
+
+Las dos auditorías comparten la conexión: `src/lib/rutaAthena.ts` arma la ruta
+de API para una consulta fija, y `src/components/ConsultaAthena.tsx` lanza la
+consulta, espera y trae las páginas. Agregar otra consulta es un archivo con
+el SQL, una ruta de cuatro líneas y su pantalla.
+
+## 10. Pendientes conocidos
 
 - El limitador de intentos vive en memoria del proceso. Con varias instancias en
   Vercel, cada una lleva su propia cuenta. Para algo serio, Upstash Redis.

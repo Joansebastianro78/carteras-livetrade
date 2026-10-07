@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { PuntoCartera } from "./tipos";
 import { COLUMNAS_EXCEL_TERRITORIO, type PuntoTerritorio } from "./territorio";
+import { COLUMNAS_AUDITORIA, type FilaAuditoria } from "./auditoria";
 import {
   aEntero,
   aFecha,
@@ -405,4 +406,87 @@ export function exportarTerritorio(puntos: PuntoTerritorio[], partesNombre: stri
   const fecha = new Date().toISOString().slice(0, 10);
   const nombre = ["Cartera", ...partesNombre.map(paraArchivo).filter(Boolean), fecha].join("_");
   XLSX.writeFile(libro, `${nombre}.xlsx`);
+}
+
+/**
+ * Fecha de Athena ('2026-09-12' o '2026-09-12 14:05:33.000') → serial de
+ * Excel con la hora como fracción del día. Otra cosa se deja como texto.
+ */
+function fechaHoraExcel(texto: string): { valor: number; formato: string } | null {
+  const m = texto.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return null;
+  const dia = serialExcel(m[1]);
+  if (dia === null) return null;
+  if (m[2] === undefined) return { valor: dia, formato: "dd/mm/yyyy" };
+  const fraccion = (Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4] ?? 0)) / 86_400;
+  return { valor: dia + fraccion, formato: "dd/mm/yyyy hh:mm" };
+}
+
+/** Anchos de columna del Excel de auditoría. */
+const ANCHOS_AUDITORIA: Record<string, number> = {
+  codigo_bavaria: 14,
+  nombre_personalizado: 34,
+  nombre_usuario: 18,
+  departamento: 18,
+  provincia: 18,
+  componente_etiqueta: 56,
+  componente_valor: 32,
+  fecha: 17,
+  actividad_id: 13,
+  tipo_linea: 22,
+  motivo_auditoria: 36,
+};
+
+/**
+ * Descarga de la auditoría: las columnas de la consulta de Athena con sus
+ * mismos nombres y en su orden, más motivo_auditoria al final, que dice qué
+ * regla hizo salir cada fila.
+ */
+export function exportarAuditoria(filas: FilaAuditoria[]) {
+  const encabezados = [...COLUMNAS_AUDITORIA, "motivo_auditoria"];
+  const formatos: (string | null)[][] = [];
+
+  const datos = filas.map((f) => {
+    const formatoFila: (string | null)[] = [];
+    const valores = COLUMNAS_AUDITORIA.map((c) => {
+      const v = f[c];
+      formatoFila.push(null);
+      if (v === null || v === "") return null;
+      if (c === "fecha") {
+        const fecha = fechaHoraExcel(v);
+        if (fecha) {
+          formatoFila[formatoFila.length - 1] = fecha.formato;
+          return fecha.valor;
+        }
+      }
+      // Todo lo demás como texto: códigos y cédulas conservan sus ceros.
+      return v;
+    });
+    formatos.push(formatoFila);
+    return [...valores, f.motivo];
+  });
+
+  const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...datos]);
+
+  formatos.forEach((fila, i) =>
+    fila.forEach((formato, j) => {
+      if (!formato) return;
+      const celda = hoja[XLSX.utils.encode_cell({ r: i + 1, c: j })];
+      if (celda && celda.t === "n") celda.z = formato;
+    })
+  );
+
+  hoja["!cols"] = encabezados.map((c) => ({ wch: ANCHOS_AUDITORIA[c] ?? 16 }));
+  hoja["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: datos.length, c: encabezados.length - 1 },
+    }),
+  };
+
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Auditoria");
+
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(libro, `Auditoria_${fecha}.xlsx`);
 }

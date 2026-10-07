@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Auditoria from "./Auditoria";
+import AuditoriaImagenes from "./AuditoriaImagenes";
 import BackOffice from "./BackOffice";
 import FiltroTerritorio from "./FiltroTerritorio";
 import VisorTableros from "./VisorTableros";
@@ -8,6 +10,8 @@ import VisorTableros from "./VisorTableros";
 const SECCIONES = [
   { id: "consultores", titulo: "Consultores" },
   { id: "territorio", titulo: "Departamento y ciudad" },
+  { id: "auditoria", titulo: "Auditoría" },
+  { id: "imagenes", titulo: "Auditoría de imágenes" },
   { id: "tableros", titulo: "Tableros" },
 ] as const;
 
@@ -42,6 +46,8 @@ export default function PanelBackOffice() {
       <div className="pt-7">
         {activa === "consultores" && <BackOffice />}
         {activa === "territorio" && <FiltroTerritorio />}
+        {activa === "auditoria" && <Auditoria />}
+        {activa === "imagenes" && <AuditoriaImagenes />}
         {activa === "tableros" && <VisorTableros />}
       </div>
     </>

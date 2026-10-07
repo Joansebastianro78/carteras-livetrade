@@ -4,9 +4,15 @@ import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 /**
  * Rutas de API que un perfil BackOffice sí puede usar. Todo lo demás bajo
  * /api/admin (cargar, editar, borrar, mantenimiento, usuarios) queda solo
- * para el rol admin.
+ * para el rol admin. Las dos auditorías necesitan POST para lanzar la consulta
+ * en Athena, pero no cambian nada de la cartera.
  */
-const API_BACKOFFICE = ["/api/admin/consultores", "/api/admin/logout"];
+const API_BACKOFFICE = [
+  "/api/admin/consultores",
+  "/api/admin/logout",
+  "/api/admin/auditoria",
+  "/api/admin/auditoria-imagenes",
+];
 
 /**
  * Rutas que el perfil BackOffice puede LEER pero no cambiar. Los tableros de
