@@ -441,8 +441,10 @@ const ANCHOS_AUDITORIA: Record<string, number> = {
  * Descarga de la auditoría: las columnas de la consulta de Athena con sus
  * mismos nombres y en su orden, más motivo_auditoria al final, que dice qué
  * regla hizo salir cada fila.
+ *
+ * `sufijo` va en el nombre del archivo: el rango de fechas, o el día de hoy.
  */
-export function exportarAuditoria(filas: FilaAuditoria[]) {
+export function exportarAuditoria(filas: FilaAuditoria[], sufijo: string) {
   const encabezados = [...COLUMNAS_AUDITORIA, "motivo_auditoria"];
   const formatos: (string | null)[][] = [];
 
@@ -486,7 +488,5 @@ export function exportarAuditoria(filas: FilaAuditoria[]) {
 
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Auditoria");
-
-  const fecha = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(libro, `Auditoria_${fecha}.xlsx`);
+  XLSX.writeFile(libro, `Auditoria_${sufijo}.xlsx`);
 }

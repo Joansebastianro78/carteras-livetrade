@@ -335,7 +335,17 @@ por motivo y un buscador. La consulta trae además `actividad_id` y
 avanza, Linea de seguimiento o Sin clasificar), que sale del `CASE` sobre la
 actividad. Si se agrega una actividad nueva, se agrega ahí.
 
-Dos descargas:
+**Rango de fechas** («Desde» y «Hasta», los dos opcionales): delimita toda la
+pestaña —los hallazgos, los conteos por motivo y las dos descargas— a los
+hallazgos cuya `fecha` cae en esos días, ambos incluidos. Un hallazgo sin
+fecha queda fuera de cualquier rango y la pantalla dice cuántos son. El motivo
+y el buscador solo afinan lo que se ve; no recortan los Excel. Sin rango, todo
+funciona como siempre. La fecha se toma tal como la entrega la consulta, sin
+convertir zona horaria (igual que en la auditoría de imágenes, más abajo).
+
+Dos descargas, las dos con los hallazgos del rango de fechas (sin rango,
+todos). Con rango, el nombre del archivo lo lleva en lugar del día de hoy:
+`..._2026-09-05_a_2026-09-10.xlsx`.
 
 - **Excel limpio** (`auditoria_bavaria_puntos_limpia_<fecha>.xlsx`): los
   resultados de Athena pasan por el limpiador de auditoría Bavaria (tildes
@@ -343,10 +353,12 @@ Dos descargas:
   línea de cada respuesta) y salen sus ocho hojas: Resumen_Usuarios,
   Usuario_x_Pregunta, Usuario_x_Codigo, Resumen_Preguntas, Resumen_Tipo_Linea,
   Preguntas_Horizontal, Detalle_por_Codigo y Notas, con su mismo formato. Se
-  arma en el navegador; con decenas de miles de filas tarda unos segundos.
+  arma en el navegador; con decenas de miles de filas tarda unos segundos. Si
+  hay rango de fechas, queda escrito en «Notas», en «Archivo de origen».
 - **Datos sin limpiar**: las diez columnas de la consulta tal cual, más
   `motivo_auditoria`. La columna `fila_excel` del Excel limpio apunta a la
-  fila de este archivo si se descargan de la misma consulta.
+  fila de este archivo si se descargan de la misma consulta y con las mismas
+  fechas.
 
 **El limpiador.** La app no corre Python: `src/lib/limpiadorAuditoria.ts` es
 `herramientas/limpiador_auditoria_bavaria.py` traducido función por función,
@@ -450,7 +462,9 @@ otra se cambia en ese archivo.
 Las dos auditorías comparten la conexión: `src/lib/rutaAthena.ts` arma la ruta
 de API para una consulta fija, y `src/components/ConsultaAthena.tsx` lanza la
 consulta, espera y trae las páginas. Agregar otra consulta es un archivo con
-el SQL, una ruta de cuatro líneas y su pantalla.
+el SQL, una ruta de cuatro líneas y su pantalla. También comparten el filtro
+de fechas: `src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
+`src/components/RangoFechas.tsx` son los campos «Desde» y «Hasta».
 
 ## 10. Pendientes conocidos
 

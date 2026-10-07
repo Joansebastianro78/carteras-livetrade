@@ -4,6 +4,7 @@
  * el navegador; la consulta está en lib/consultaImagenes.ts.
  */
 import * as XLSX from "xlsx";
+import { leerFecha } from "./fechas";
 
 /** Columnas de la consulta, en su orden y con su nombre en Athena. */
 export const COLUMNAS_IMAGENES = [
@@ -61,54 +62,6 @@ export function fotosDe(valor: string | null | undefined): string[] {
     if (!enlaces.includes(parte)) enlaces.push(parte);
   }
   return enlaces;
-}
-
-// ------------------------------------------------------------------ fechas
-const FECHA_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
-const FECHA_DMA = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
-
-export type FechaLeida = { dia: string; hora: string | null; segundos: number };
-
-/**
- * Lee fecha_inicio. Athena la entrega como '2026-09-12 14:05:33.000' si la
- * columna es de fecha y hora, o '2026-09-12' si es solo fecha; también se
- * acepta día/mes/año por si viene como texto.
- *
- * La fecha se toma tal como está escrita, sin convertir zona horaria: no hay
- * cómo saber desde aquí en qué zona la guardó el origen.
- */
-export function leerFecha(valor: string | null | undefined): FechaLeida | null {
-  const texto = (valor ?? "").trim();
-  let a: number, m: number, d: number;
-  let partes = texto.match(FECHA_ISO);
-  if (partes) {
-    [a, m, d] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
-  } else if ((partes = texto.match(FECHA_DMA))) {
-    [d, m, a] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
-    if (m > 12 && d <= 12) [d, m] = [m, d]; // venía mes/día
-  } else {
-    return null;
-  }
-
-  // 30 de febrero y similares no son fechas.
-  const real = new Date(Date.UTC(a, m - 1, d));
-  if (real.getUTCFullYear() !== a || real.getUTCMonth() !== m - 1 || real.getUTCDate() !== d) {
-    return null;
-  }
-
-  const dos = (n: number) => String(n).padStart(2, "0");
-  const dia = `${String(a).padStart(4, "0")}-${dos(m)}-${dos(d)}`;
-  if (partes[4] === undefined) return { dia, hora: null, segundos: 0 };
-
-  const [h, min, s] = [Number(partes[4]), Number(partes[5]), Number(partes[6] ?? 0)];
-  if (h > 23 || min > 59 || s > 59) return { dia, hora: null, segundos: 0 };
-  return { dia, hora: `${dos(h)}:${dos(min)}`, segundos: h * 3600 + min * 60 + s };
-}
-
-/** '2026-09-12' → '12/09/2026' */
-export function diaCorto(dia: string): string {
-  const [a, m, d] = dia.split("-");
-  return `${d}/${m}/${a}`;
 }
 
 /** Arma las filas a partir de lo que entrega Athena, buscando cada columna por nombre. */

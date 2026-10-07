@@ -10,9 +10,19 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import {
+  SIN_RANGO,
+  dentroDelRango,
+  diaCorto,
+  hayRango,
+  rangoAlReves,
+  resumirFechas,
+  sufijoRango,
+  textoRango,
+  type Rango,
+} from "@/lib/fechas";
 import { limpiarTexto } from "@/lib/limpiadorAuditoria";
 import {
-  diaCorto,
   exportarImagenes,
   filasDeImagenes,
   ordenarPorFecha,
@@ -26,6 +36,7 @@ import {
   sinTildes,
   useConsultaAthena,
 } from "./ConsultaAthena";
+import RangoFechas from "./RangoFechas";
 
 /** Las fotos llegan en su tamaño original, así que se muestran de a pocas. */
 const POR_PAGINA = 24;
@@ -54,9 +65,8 @@ export default function AuditoriaImagenes() {
   /** De la visita más reciente a la más antigua: así salen en la galería y en el Excel. */
   const filas = useMemo(() => ordenarPorFecha(sinOrdenar), [sinOrdenar]);
 
-  /** Rango de fechas, 'AAAA-MM-DD' o vacío. Delimita la galería, los conteos y el Excel. */
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
+  /** Rango de fechas: delimita la galería, los conteos y el Excel. */
+  const [rango, setRango] = useState<Rango>(SIN_RANGO);
   const [consultor, setConsultor] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [busqueda, setBusqueda] = useState("");
@@ -67,8 +77,7 @@ export default function AuditoriaImagenes() {
 
   /** Nueva consulta: se limpian los filtros de la anterior. */
   function reconsultar(fresca: boolean) {
-    setDesde("");
-    setHasta("");
+    setRango(SIN_RANGO);
     setConsultor("");
     setFiltro("todas");
     setBusqueda("");
@@ -84,37 +93,20 @@ export default function AuditoriaImagenes() {
   }, []);
 
   // ------------------------------------------------------------ derivados
-  /**
-   * Primer y último día con visitas, cuántas no traen fecha y, si alguna trae
-   * algo que no se entiende como fecha, un ejemplo de cómo llega.
-   */
-  const fechas = useMemo(() => {
-    let primera = "";
-    let ultima = "";
-    let sinFecha = 0;
-    let ilegible = "";
-    for (const f of filas) {
-      if (!f.dia) {
-        sinFecha++;
-        if (!ilegible) ilegible = (f.fecha_inicio ?? "").trim();
-      } else {
-        if (!primera || f.dia < primera) primera = f.dia;
-        if (!ultima || f.dia > ultima) ultima = f.dia;
-      }
-    }
-    return { primera, ultima, sinFecha, ilegible };
-  }, [filas]);
+  /** Entre qué días hay visitas y cuántas no traen fecha. */
+  const fechas = useMemo(
+    () => resumirFechas(filas, (f) => f.dia, (f) => f.fecha_inicio),
+    [filas]
+  );
 
-  const hayRango = desde !== "" || hasta !== "";
-  const rangoAlReves = desde !== "" && hasta !== "" && desde > hasta;
+  const conRango = hayRango(rango);
+  const alReves = rangoAlReves(rango);
 
   /** Las visitas del rango de fechas. Una visita sin fecha no entra en ningún rango. */
-  const enRango = useMemo(() => {
-    if (!hayRango) return filas;
-    return filas.filter(
-      (f) => f.dia !== null && (desde === "" || f.dia >= desde) && (hasta === "" || f.dia <= hasta)
-    );
-  }, [filas, hayRango, desde, hasta]);
+  const enRango = useMemo(
+    () => (conRango ? filas.filter((f) => dentroDelRango(f.dia, rango)) : filas),
+    [filas, conRango, rango]
+  );
 
   // Los conteos son de las fechas elegidas; la lista de consultores, de toda la consulta.
   const cuentas = useMemo(() => {
@@ -144,7 +136,7 @@ export default function AuditoriaImagenes() {
 
   const filtradas = useMemo(() => {
     const q = sinTildes(busqueda.trim());
-    const delRango = hayRango ? new Set(enRango) : null;
+    const delRango = conRango ? new Set(enRango) : null;
     return filas.filter(
       (f, i) =>
         (!delRango || delRango.has(f)) &&
@@ -152,7 +144,7 @@ export default function AuditoriaImagenes() {
         (filtro === "todas" || f.estado === filtro) &&
         (!q || indice[i].includes(q))
     );
-  }, [filas, enRango, hayRango, indice, consultor, filtro, busqueda]);
+  }, [filas, enRango, conRango, indice, consultor, filtro, busqueda]);
 
   /** Posición de cada visita en la lista: llave estable para la galería. */
   const numero = useMemo(() => new Map(filas.map((f, i) => [f, i])), [filas]);
@@ -178,32 +170,12 @@ export default function AuditoriaImagenes() {
 
   /** El Excel trae las visitas del rango de fechas; sin rango, todas. */
   function descargar() {
-    const sufijo =
-      desde && hasta
-        ? `${desde}_a_${hasta}`
-        : desde
-          ? `desde_${desde}`
-          : hasta
-            ? `hasta_${hasta}`
-            : new Date().toISOString().slice(0, 10);
     try {
-      exportarImagenes(enRango, sufijo);
+      exportarImagenes(enRango, sufijoRango(rango));
     } catch {
       setAviso("No se pudo armar el Excel. Intenta de nuevo.");
     }
   }
-
-  /** "entre el 01/09/2026 y el 15/09/2026", "desde el…" o "hasta el…". */
-  const textoRango =
-    desde && hasta
-      ? desde === hasta
-        ? `el ${diaCorto(desde)}`
-        : `entre el ${diaCorto(desde)} y el ${diaCorto(hasta)}`
-      : desde
-        ? `desde el ${diaCorto(desde)}`
-        : hasta
-          ? `hasta el ${diaCorto(hasta)}`
-          : "";
 
   const chips: { id: Filtro; nombre: string; n: number }[] = [
     { id: "todas", nombre: "Todas", n: enRango.length },
@@ -248,86 +220,20 @@ export default function AuditoriaImagenes() {
               <span className="font-normal text-[var(--color-tinta-suave)]">
                 {" "}
                 · {cifra(cuentas.conNombre)} {cuentas.conNombre === 1 ? "consultor" : "consultores"}
-                {hayRango && !rangoAlReves && ` · ${textoRango}`}
+                {conRango && !alReves && ` · ${textoRango(rango)}`}
               </span>
             </p>
 
-            {/* Rango de fechas: delimita la galería, los conteos y el Excel. El
-                calendario solo ofrece los días en que hay visitas; un campo no
-                limita al otro, para poder mover el rango sin pelear con él. */}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="imagenes-desde" className="campo-etiqueta">
-                  Desde
-                </label>
-                <input
-                  id="imagenes-desde"
-                  type="date"
-                  value={desde}
-                  min={fechas.primera || undefined}
-                  max={fechas.ultima || undefined}
-                  onChange={(e) => alFiltrar(setDesde)(e.target.value)}
-                  className="campo cifras"
-                />
-              </div>
-              <div>
-                <label htmlFor="imagenes-hasta" className="campo-etiqueta">
-                  Hasta
-                </label>
-                <input
-                  id="imagenes-hasta"
-                  type="date"
-                  value={hasta}
-                  min={fechas.primera || undefined}
-                  max={fechas.ultima || undefined}
-                  onChange={(e) => alFiltrar(setHasta)(e.target.value)}
-                  className="campo cifras"
-                />
-              </div>
-            </div>
-
-            <p className="cifras mt-1.5 text-xs leading-relaxed text-[var(--color-tinta-suave)]">
-              {fechas.primera
-                ? fechas.primera === fechas.ultima
-                  ? `Todas las visitas son del ${diaCorto(fechas.primera)}.`
-                  : `Hay visitas del ${diaCorto(fechas.primera)} al ${diaCorto(fechas.ultima)}.`
-                : fechas.ilegible
-                  ? `No se pudo leer la fecha de inicio de las visitas (llega como «${fechas.ilegible.slice(0, 40)}»), así que no se pueden filtrar por fecha.`
-                  : "Las visitas no traen fecha de inicio."}
-              {hayRango && (
-                <>
-                  {" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      alFiltrar(setDesde)("");
-                      setHasta("");
-                    }}
-                    className="text-[var(--color-tinta)] underline underline-offset-2"
-                  >
-                    Quitar fechas
-                  </button>
-                </>
-              )}
-            </p>
-
-            {rangoAlReves && (
-              <p
-                role="alert"
-                className="mt-2 flex items-center gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2 text-[13px] text-[var(--color-alerta)]"
-              >
-                <TriangleAlert size={14} className="shrink-0" aria-hidden />
-                «Desde» es posterior a «Hasta»: así ninguna visita entra en el rango.
-              </p>
-            )}
-
-            {hayRango && fechas.sinFecha > 0 && (
-              <p className="cifras mt-2 text-xs text-[var(--color-tinta-suave)]">
-                {fechas.sinFecha === 1
-                  ? "1 visita no trae fecha y queda fuera de cualquier rango."
-                  : `${cifra(fechas.sinFecha)} visitas no traen fecha y quedan fuera de cualquier rango.`}
-              </p>
-            )}
+            <RangoFechas
+              id="imagenes"
+              rango={rango}
+              onCambiar={alFiltrar(setRango)}
+              fechas={fechas}
+              uno="visita"
+              varios="visitas"
+              femenino
+              columna="fecha de inicio"
+            />
 
             <div className="mt-4">
               <button
@@ -340,7 +246,7 @@ export default function AuditoriaImagenes() {
                 Descargar en Excel
               </button>
               <p className="mt-1.5 text-xs text-[var(--color-tinta-suave)]">
-                {!hayRango
+                {!conRango
                   ? `Trae las ${cifra(filas.length)} visitas con el enlace de cada foto.`
                   : enRango.length === 0
                     ? "No hay visitas en esas fechas para descargar."
@@ -412,7 +318,7 @@ export default function AuditoriaImagenes() {
           {(consultor || busqueda.trim() || filtro !== "todas") && (
             <p className="cifras text-xs text-[var(--color-tinta-suave)]">
               {cifra(filtradas.length)} de {cifra(enRango.length)} visitas
-              {hayRango ? " de esas fechas" : ""}. Al Excel solo lo delimitan las fechas, no
+              {conRango ? " de esas fechas" : ""}. Al Excel solo lo delimitan las fechas, no
               estos filtros.
             </p>
           )}

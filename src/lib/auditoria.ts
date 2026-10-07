@@ -2,6 +2,7 @@
  * Módulo de auditoría: tipos y reglas que usan la ruta /api/admin/auditoria
  * y el navegador. Sin AWS ni Supabase aquí.
  */
+import { leerFecha } from "./fechas";
 import { limpiarTexto } from "./limpiadorAuditoria";
 
 /** Columnas de la consulta, en su orden y con su alias de Athena. */
@@ -23,6 +24,8 @@ export type ColumnaAuditoria = (typeof COLUMNAS_AUDITORIA)[number];
 export type FilaAuditoria = Record<ColumnaAuditoria, string | null> & {
   /** Por qué salió la fila; se calcula en el navegador, no viene de Athena. */
   motivo: string;
+  /** Día de `fecha`, 'AAAA-MM-DD'; null si no trae fecha o no se entiende. */
+  dia: string | null;
 };
 
 // ---------------------------------------------------------------- motivos
@@ -107,6 +110,7 @@ export function filasDesdeAthena(
       limpiarTexto(fila.componente_etiqueta),
       limpiarTexto(fila.componente_valor)
     );
+    fila.dia = leerFecha(fila.fecha)?.dia ?? null;
     return fila;
   });
 }
