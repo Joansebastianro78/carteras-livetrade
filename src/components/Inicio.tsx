@@ -52,6 +52,7 @@ type Resumen = {
   /** Toda la cartera, todos los ciclos. null: no se pudo contar. */
   general: {
     puntos: number;
+    sin_ubicacion: number;
     asignados: number | null;
     libres: number | null;
     consultores: number | null;
@@ -60,13 +61,6 @@ type Resumen = {
   ultimaCarga: Carga | null;
   departamentos: { nombre: string; puntos: number }[] | null;
 };
-
-/** "Ciclo 12", pero "CICLO 0 - PILOTO" tal cual: el nombre ya trae la palabra. */
-function nombreCiclo(ciclo: string | null | undefined): string {
-  const c = (ciclo ?? "").trim();
-  if (!c) return "Sin ciclo";
-  return /^ciclo\b/i.test(c) ? c : `Ciclo ${c}`;
-}
 
 type ItemActividad = {
   momento: string;
@@ -233,7 +227,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       if (!r.ok) throw new Error(j.error);
       exportarTerritorio(j.puntos as PuntoTerritorio[], [
         tipo === "libres" ? "sin_consultor" : "sin_coordenadas",
-        `ciclo_${j.ciclo ?? ""}`,
+        "toda_la_cartera",
       ]);
     } catch {
       setErrorResumen("No se pudo armar el Excel. Intenta de nuevo.");
@@ -242,7 +236,6 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
     }
   }
 
-  const actual = resumen?.actual ?? null;
   const general = resumen?.general ?? null;
   const ultima = resumen?.ultimaCarga ?? null;
   const deptos = resumen?.departamentos ?? null;
@@ -271,12 +264,12 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       ),
     });
   }
-  if (actual && actual.sin_ubicacion > 0) {
+  if (general && general.sin_ubicacion > 0) {
     pendientes.push({
       id: "sin-ubicacion",
       tono: "alerta",
       Icono: MapPin,
-      titulo: `${cifra(actual.sin_ubicacion)} ${actual.sin_ubicacion === 1 ? "punto" : "puntos"} sin coordenadas`,
+      titulo: `${cifra(general.sin_ubicacion)} ${general.sin_ubicacion === 1 ? "punto" : "puntos"} sin coordenadas`,
       detalle: "No aparecen en el mapa del consultor.",
       accion: (
         <button
@@ -309,13 +302,13 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       ),
     });
   }
-  if (resumen?.libres) {
+  if (general?.libres) {
     pendientes.push({
       id: "libres",
       tono: "neutro",
       Icono: UserX,
-      titulo: `${cifra(resumen.libres)} ${resumen.libres === 1 ? "punto" : "puntos"} sin consultor (LIBRE)`,
-      detalle: `${nombreCiclo(resumen.ciclo)}.`,
+      titulo: `${cifra(general.libres)} ${general.libres === 1 ? "punto" : "puntos"} sin consultor (LIBRE)`,
+      detalle: "En toda la cartera.",
       accion: (
         <button
           type="button"
@@ -383,11 +376,9 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
           },
           {
             titulo: "Puntos sin coordenadas",
-            valor: actual ? cifra(actual.sin_ubicacion) : resumen ? "0" : null,
-            nota: actual
-              ? `${nombreCiclo(actual.ciclo)} · no salen en el mapa`
-              : "No salen en el mapa del consultor",
-            alerta: (actual?.sin_ubicacion ?? 0) > 0,
+            valor: general ? cifra(general.sin_ubicacion) : null,
+            nota: "No salen en el mapa del consultor",
+            alerta: (general?.sin_ubicacion ?? 0) > 0,
           },
           {
             titulo: "Último cargue",
@@ -569,10 +560,10 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="departamentos" className="text-[15px] font-semibold">
               Puntos por departamento
-              {resumen?.ciclo !== undefined && resumen?.ciclo !== null && (
-                <span className="font-normal text-[var(--color-tinta-suave)]">
+              {general && general.puntos > 0 && (
+                <span className="cifras font-normal text-[var(--color-tinta-suave)]">
                   {" "}
-                  · {nombreCiclo(resumen.ciclo).replace(/^Ciclo /, "ciclo ")}
+                  · {cifra(general.puntos)} en total
                 </span>
               )}
             </h2>

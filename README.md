@@ -269,11 +269,12 @@ mapas conservan sus capas de siempre.
 **Inicio.** Lo primero al entrar: los puntos asignados (conteo general de
 toda la cartera, todos los ciclos, sin los LIBRE), los consultores con al
 menos un punto (usuario + cédula, como en el buscador del BackOffice), los
-puntos sin coordenadas del ciclo actual y el último cargue; atajos;
+puntos sin coordenadas y el último cargue; atajos;
 el resumen de la última auditoría de datos consultada desde ese navegador; la
 actividad reciente; los puntos por departamento; y «Para revisar», con las
 descargas de los puntos sin coordenadas y de los LIBRE, y las observaciones
-del último cargue. La actividad junta las cargas (`cargas_cartera`), las
+del último cargue. Todas las cifras, los departamentos y esas descargas son de
+toda la cartera, todos los ciclos. La actividad junta las cargas (`cargas_cartera`), las
 ediciones y borrados (`auditoria_cartera`) y, con `supabase/panel.sql`, los
 cambios de usuarios, mantenimiento, tableros y temas (`actividad_panel`).
 

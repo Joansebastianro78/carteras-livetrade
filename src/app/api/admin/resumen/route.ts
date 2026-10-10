@@ -11,12 +11,13 @@ export const dynamic = "force-dynamic";
  *
  *   GET ?corto=1                    → ciclo actual, ciclos y mantenimiento (barra del panel)
  *   GET                             → lo anterior y además: las cifras de toda la
- *                                     cartera (general: puntos, asignados, LIBRE y
- *                                     consultores con puntos), puntos sin consultor
- *                                     del ciclo, las dos últimas cargas y los puntos
- *                                     por departamento
- *   GET ?lista=sin-ubicacion|libres → los puntos del ciclo actual sin coordenadas o
- *                                     sin consultor, para descargarlos
+ *                                     cartera, todos los ciclos (general: puntos,
+ *                                     asignados, LIBRE, consultores con puntos y sin
+ *                                     coordenadas), las dos últimas cargas y los
+ *                                     puntos por departamento, también de toda la
+ *                                     cartera
+ *   GET ?lista=sin-ubicacion|libres → los puntos de toda la cartera sin coordenadas
+ *                                     o sin consultor, para descargarlos
  *
  * El ciclo actual es el que se tocó más recientemente.
  * Solo GET: el BackOffice también lo puede leer.
@@ -122,16 +123,17 @@ async function leerCargas() {
   }));
 }
 
-/** Puntos por departamento del ciclo, del más grande al más chico. */
-async function leerDepartamentos(ciclo: string) {
+/** Puntos por departamento de toda la cartera, del más grande al más chico. */
+async function leerDepartamentos() {
   const suma = new Map<string, { nombre: string; puntos: number }>();
 
   for (let desde = 0; desde < 20_000; desde += 1000) {
     const { data, error } = await supabaseAdmin
       .from("resumen_territorio")
       .select("departamento_clave,departamento,puntos")
-      .eq("ciclo", ciclo)
       .order("departamento_clave", { ascending: true })
+      .order("ciudad_clave", { ascending: true })
+      .order("ciclo", { ascending: true })
       .range(desde, desde + 999);
 
     // Sin territorio.sql no hay vista: el Inicio simplemente no muestra el bloque.
@@ -155,18 +157,16 @@ async function leerDepartamentos(ciclo: string) {
   return [...suma.values()].sort((a, b) => b.puntos - a.puntos);
 }
 
-async function lista(tipo: string, ciclo: string) {
+async function lista(tipo: string) {
   const puntos: PuntoTerritorio[] = [];
 
   for (let desde = 0; desde < TOPE_LISTA; desde += 1000) {
-    let consulta = supabaseAdmin
-      .from("puntos_cartera")
-      .select(CAMPOS_TERRITORIO)
-      .eq("ciclo", ciclo);
+    let consulta = supabaseAdmin.from("puntos_cartera").select(CAMPOS_TERRITORIO);
 
     consulta = tipo === "libres" ? filtroLibres(consulta) : consulta.is("latitud", null);
 
     const { data, error } = await consulta
+      .order("ciclo", { ascending: true })
       .order("id_pdv", { ascending: true })
       .range(desde, desde + 999);
 
@@ -179,7 +179,7 @@ async function lista(tipo: string, ciclo: string) {
     if (!data || data.length < 1000) break;
   }
 
-  return NextResponse.json({ ciclo, puntos });
+  return NextResponse.json({ puntos });
 }
 
 export async function GET(req: Request) {
@@ -194,8 +194,7 @@ export async function GET(req: Request) {
     if (tipoLista !== "sin-ubicacion" && tipoLista !== "libres") {
       return NextResponse.json({ error: "Lista desconocida." }, { status: 400 });
     }
-    if (ciclo === null) return NextResponse.json({ ciclo: null, puntos: [] });
-    return lista(tipoLista, ciclo);
+    return lista(tipoLista);
   }
 
   const base = {
@@ -211,7 +210,7 @@ export async function GET(req: Request) {
       ciclo === null ? Promise.resolve(0) : contarLibres(ciclo),
       ciclo === null ? Promise.resolve(0) : contarUsuarioLibre(ciclo),
       leerCargas(),
-      ciclo === null ? Promise.resolve([]) : leerDepartamentos(ciclo),
+      leerDepartamentos(),
       contarLibresTodos(),
       contarConsultoresTodos(),
     ]);
@@ -220,6 +219,7 @@ export async function GET(req: Request) {
   const puntosTodos = (ciclos ?? []).reduce((a, c) => a + (Number(c.puntos) || 0), 0);
   const general = {
     puntos: puntosTodos,
+    sin_ubicacion: (ciclos ?? []).reduce((a, c) => a + (Number(c.sin_ubicacion) || 0), 0),
     asignados: libresTodos === null ? null : Math.max(0, puntosTodos - libresTodos),
     libres: libresTodos,
     consultores: consultoresTodos,

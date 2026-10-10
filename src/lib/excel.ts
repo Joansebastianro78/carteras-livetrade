@@ -1,4 +1,7 @@
 import * as XLSX from "xlsx";
+// diaDe: la fecha de aquí para el nombre del archivo, no la de Greenwich (desde
+// las 7 p. m. de Colombia, toISOString ya da el día de mañana).
+import { diaDe } from "./fechas";
 import type { PuntoCartera } from "./tipos";
 import { COLUMNAS_EXCEL_TERRITORIO, type PuntoTerritorio } from "./territorio";
 import { COLUMNAS_AUDITORIA, type FilaAuditoria } from "./auditoria";
@@ -337,7 +340,7 @@ export function exportarCartera(puntos: PuntoCartera[], usuario: string) {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Mi cartera");
 
-  const fecha = new Date().toISOString().slice(0, 10);
+  const fecha = diaDe(new Date());
   XLSX.writeFile(libro, `Cartera_${usuario}_${fecha}.xlsx`);
 }
 
@@ -403,7 +406,7 @@ export function exportarTerritorio(puntos: PuntoTerritorio[], partesNombre: stri
   // Mismo nombre de hoja que la plantilla.
   XLSX.utils.book_append_sheet(libro, hoja, "Hoja1");
 
-  const fecha = new Date().toISOString().slice(0, 10);
+  const fecha = diaDe(new Date());
   const nombre = ["Cartera", ...partesNombre.map(paraArchivo).filter(Boolean), fecha].join("_");
   XLSX.writeFile(libro, `${nombre}.xlsx`);
 }
