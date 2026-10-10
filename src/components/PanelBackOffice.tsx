@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartColumn, ClipboardCheck, Image as IconoImagen, MapPin, Users } from "lucide-react";
+import { ChartColumn, ClipboardCheck, Image as IconoImagen, MapPin, Sparkles, Users } from "lucide-react";
 import type { Rol } from "@/lib/auth";
 import type { Modo } from "@/lib/modo";
 import PanelShell, { type SeccionPanel } from "./PanelShell";
@@ -9,6 +9,7 @@ import AuditoriaImagenes from "./AuditoriaImagenes";
 import BackOffice from "./BackOffice";
 import FiltroTerritorio from "./FiltroTerritorio";
 import VisorTableros from "./VisorTableros";
+import AsistenteIA from "./AsistenteIA";
 
 /** Secciones del BackOffice, en el orden del menú. */
 const SECCIONES: SeccionPanel[] = [
@@ -58,6 +59,14 @@ const SECCIONES: SeccionPanel[] = [
     descripcion:
       "Se abren con tu propia cuenta de Power BI. Si un informe te pide iniciar sesión o dice que no tienes acceso, el permiso se pide allá, no aquí.",
     render: () => <VisorTableros />,
+  },
+  {
+    id: "asistente",
+    menu: "Asistente IA",
+    grupo: "Herramientas",
+    Icono: Sparkles,
+    encabezadoPropio: true,
+    render: () => <AsistenteIA />,
   },
 ];
 

@@ -16,6 +16,7 @@ const API_BACKOFFICE = [
   "/api/admin/auditoria",
   "/api/admin/auditoria-imagenes",
   "/api/admin/revision-fotos",
+  "/api/admin/asistente",
 ];
 
 /**

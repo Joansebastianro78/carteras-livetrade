@@ -73,6 +73,8 @@ directo con la base.
 | `GET/POST /api/admin/revision-fotos` | Las marcas «Correcta» y «Para revisar» de la auditoría de imágenes, con quién las puso. La usan los tres perfiles. |
 | `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?lista=sin-ubicacion` o `?lista=libres`, los puntos para las descargas de «Para revisar». El BackOffice solo lee el encabezado. |
 | `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Solo administradores. |
+| `POST /api/admin/asistente` | Asistente IA: responde con Gemini, DeepSeek o las dos combinadas, en vivo (una línea de JSON por evento). Los tres perfiles. |
+| `POST /api/admin/asistente/archivo` | Sube una imagen o un PDF del asistente a la Files API de Gemini. Los tres perfiles. |
 | `POST /api/admin/upload/previa` | Antes de aplicar una carga: cuántas filas del archivo ya existen y cuántas son nuevas. No cambia nada. |
 
 ### Filtro por departamento y ciudad
@@ -562,7 +564,65 @@ el SQL, una ruta de cuatro líneas y su pantalla. También comparten el filtro
 de fechas: `src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
 `src/components/RangoFechas.tsx` son los campos «Desde» y «Hasta».
 
-## 10. Pendientes conocidos
+## 10. Asistente IA
+
+Sección **Herramientas → Asistente IA**, en `/admin` y en `/backoffice`, para
+los tres perfiles. Es un chat: se le pregunta lo que sea y se le pueden
+adjuntar imágenes (también pegadas o arrastradas), PDF, Word (.docx), Excel,
+PowerPoint (.pptx), CSV y texto.
+
+**Cómo usa las dos IA.** En el modo **Gemini + DeepSeek** (el de siempre) las
+dos escriben un borrador al mismo tiempo; después Gemini, que también ve los
+archivos, compara los dos y escribe la respuesta final, corrigiendo lo que no
+cuadre. Debajo de cada respuesta está «Ver lo que respondió cada IA». Si una
+de las dos falla, responde la otra y la pantalla lo avisa. Los modos «Solo
+Gemini» y «Solo DeepSeek» son más rápidos (una sola llamada). La respuesta va
+apareciendo mientras se escribe, y «Detener» la corta.
+
+**Archivos.**
+- Imágenes: se reducen en el navegador (máximo 1600 px) y se suben a la Files
+  API de Gemini; en la pregunta siguiente viajan como referencia. DeepSeek ve
+  las imágenes del mensaje en que se adjuntan.
+- PDF: se suben a Gemini tal cual. DeepSeek no abre PDF; en el modo combinado
+  Gemini es quien los lee.
+- Word, Excel, PowerPoint, CSV y texto: el texto se saca en el navegador y lo
+  reciben las dos IA (hasta 150.000 caracteres por documento).
+- Tope de **4 MB por archivo**: es el límite de Vercel para un envío. Gemini
+  borra los archivos solos a las 48 horas.
+
+**Configuración** (en `.env.local` y en Vercel, y volver a desplegar):
+
+```
+GEMINI_API_KEY=...
+DEEPSEEK_API_KEY=sk-...
+```
+
+Opcionales: `GEMINI_MODELO_CHAT` (por defecto `gemini-3.8-flash`),
+`DEEPSEEK_MODELO` (por defecto `deepseek-flash`, que acepta imágenes) y
+`DEEPSEEK_PENSAR=si` para que DeepSeek razone antes de responder (mejor en
+problemas difíciles, más lento). Con una sola llave el módulo funciona con esa
+IA y lo dice en cada respuesta.
+
+Las llaves nuevas de Google empiezan por «AQ.». La documentación las manda en
+la cabecera `x-goog-api-key`, pero hay cuentas en las que esa vía responde 401
+`ACCESS_TOKEN_TYPE_UNSUPPORTED`: con una llave AQ. el servidor reintenta como
+`Authorization: Bearer` y se queda con la que funcione. Si las dos fallan, la
+pantalla lo explica.
+
+**Seguridad y costo.** Las llaves solo viven en el servidor. El navegador
+nunca manda direcciones de archivos que no sean de la Files API de Gemini.
+Cada usuario tiene un tope de 60 preguntas y 60 archivos por hora, porque cada
+pregunta combinada son tres llamadas que se pagan. La conversación vive en esa
+pestaña del navegador (sobrevive a cambiar de sección o recargar) y no se
+guarda en la base; «Nueva» la borra.
+
+El código está en `src/lib/asistenteIA.ts` (servidor: las dos IA, la
+combinación y la subida a Gemini), `src/lib/archivosAsistente.ts` (navegador:
+reducir imágenes y sacar texto de documentos), las rutas
+`/api/admin/asistente` y `/api/admin/asistente/archivo`, y la pantalla
+`src/components/AsistenteIA.tsx`.
+
+## 11. Pendientes conocidos
 
 - El limitador de intentos vive en memoria del proceso. Con varias instancias en
   Vercel, cada una lleva su propia cuenta. Para algo serio, Upstash Redis.

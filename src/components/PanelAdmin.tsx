@@ -9,6 +9,7 @@ import {
   Palette,
   Pencil,
   ShieldCheck,
+  Sparkles,
   Upload,
   Users,
   Wrench,
@@ -27,6 +28,7 @@ import FiltroTerritorio from "./FiltroTerritorio";
 import Mantenimiento from "./Mantenimiento";
 import PanelTemas from "./PanelTemas";
 import PanelTableros from "./PanelTableros";
+import AsistenteIA from "./AsistenteIA";
 
 /** Secciones del panel de administración, en el orden del menú. */
 const SECCIONES: SeccionPanel[] = [
@@ -103,6 +105,14 @@ const SECCIONES: SeccionPanel[] = [
       "Los enlaces que agregues aquí le aparecen al perfil BackOffice en su sección Tableros. Aquí solo se guarda el enlace: el informe sigue en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo verá acá.",
     ancho: "angosto",
     render: () => <PanelTableros />,
+  },
+  {
+    id: "asistente",
+    menu: "Asistente IA",
+    grupo: "Herramientas",
+    Icono: Sparkles,
+    encabezadoPropio: true,
+    render: () => <AsistenteIA />,
   },
   {
     id: "mantenimiento",
