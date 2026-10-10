@@ -360,14 +360,10 @@ export default function FiltroTerritorio() {
   // ------------------------------------------------------------ pantalla
   return (
     <div className="space-y-4">
-      <section>
-        <h2 className="text-sm font-semibold">Puntos por departamento o ciudad</h2>
-      </section>
-
       {errorResumen && (
         <p
           role="alert"
-          className="flex items-center gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
+          className="flex items-center gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
         >
           <TriangleAlert size={14} className="shrink-0" aria-hidden />
           {errorResumen}
@@ -391,7 +387,7 @@ export default function FiltroTerritorio() {
       {resumen && (resumen.departamentos.length > 0 || ciclo !== TODOS) && (
         <form
           onSubmit={alEnviar}
-          className="rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] p-5"
+          className="tarjeta p-5"
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -505,7 +501,7 @@ export default function FiltroTerritorio() {
           <button
             type="submit"
             disabled={!departamentoValido || cargandoResumen || resultado?.cargando}
-            className="mt-5 flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+            className="boton boton-primario mt-5"
           >
             {resultado?.cargando ? (
               <Loader2 size={15} className="animate-spin" aria-hidden />
@@ -521,7 +517,7 @@ export default function FiltroTerritorio() {
       {resultado && (
         <section
           aria-busy={resultado.cargando}
-          className="rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] p-5"
+          className="tarjeta p-5"
         >
           <h2 className="text-[15px] font-semibold text-[var(--color-tinta)]">
             {resultado.titulo}
@@ -560,7 +556,7 @@ export default function FiltroTerritorio() {
                 type="button"
                 onClick={descargar}
                 disabled={!resultado.completo}
-                className="flex items-center gap-2 rounded-[4px] bg-[var(--color-ambar)] px-3 py-2 text-[13px] font-medium text-white hover:bg-[var(--color-ambar-oscuro)] disabled:opacity-45 disabled:hover:bg-[var(--color-ambar)]"
+                className="boton boton-ambar boton-chico"
               >
                 <Sheet size={15} aria-hidden />
                 Descargar en Excel
@@ -610,7 +606,7 @@ export default function FiltroTerritorio() {
       {resultado?.error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]"
+          className="flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]"
         >
           <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
           {resultado.error}
@@ -618,7 +614,7 @@ export default function FiltroTerritorio() {
       )}
 
       {resultado?.aviso && (
-        <p className="flex items-start gap-2 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] leading-snug text-[#7a5410]">
+        <p className="flex items-start gap-2 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-aviso-tinta)]">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
           {resultado.aviso}
         </p>
@@ -627,7 +623,7 @@ export default function FiltroTerritorio() {
       {resultado && !resultado.cargando && (
         <>
           {cifras.libres > 0 && (
-            <p className="flex items-center gap-2 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] text-[#7a5410]">
+            <p className="flex items-center gap-2 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-aviso-tinta)]">
               <TriangleAlert size={14} className="shrink-0" aria-hidden />
               {cifras.libres === 1
                 ? "1 punto no tiene consultor asignado (LIBRE)."
@@ -636,7 +632,7 @@ export default function FiltroTerritorio() {
           )}
 
           {cifras.sinUbicacion > 0 && (
-            <p className="flex items-center gap-2 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] text-[#7a5410]">
+            <p className="flex items-center gap-2 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-aviso-tinta)]">
               <MapPin size={14} className="shrink-0" aria-hidden />
               {cifras.sinUbicacion === 1
                 ? "1 punto no tiene ubicación y no aparece en el mapa. Sí sale en la lista y en el Excel."
@@ -701,7 +697,7 @@ export default function FiltroTerritorio() {
                         onClick={() => elegir(p)}
                         aria-current={activo || undefined}
                         className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                          activo ? "bg-[#e4e9e6]" : "hover:bg-[#f3f5f2]"
+                          activo ? "bg-[var(--color-seleccion)]" : "hover:bg-[var(--color-hover)]"
                         }`}
                       >
                         <span
@@ -736,7 +732,7 @@ export default function FiltroTerritorio() {
                               )}
                             </span>
                             {p.ciclo && (
-                              <span className="cifras rounded-full bg-[#eceeeb] px-2 py-0.5 text-[var(--color-tinta)]">
+                              <span className="cifras rounded-full bg-[var(--color-relleno)] px-2 py-0.5 text-[var(--color-tinta)]">
                                 Ciclo {p.ciclo}
                               </span>
                             )}

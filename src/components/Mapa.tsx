@@ -129,7 +129,7 @@ export default function Mapa({ puntos, seleccionado, onSeleccionar }: Props) {
                 href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitud},${p.longitud}`}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 block rounded-[4px] bg-[var(--color-tinta)] px-3 py-2 text-center text-[13px] font-medium text-white"
+                className="boton-mapa mt-3 block rounded-[4px] bg-[var(--color-tinta)] px-3 py-2 text-center text-[13px] font-medium"
               >
                 Cómo llegar
               </a>

@@ -11,7 +11,7 @@ import type { PuntoCartera } from "@/lib/tipos";
 const Mapa = dynamic(() => import("./Mapa"), {
   ssr: false,
   loading: () => (
-    <div className="grid h-full w-full place-items-center bg-[#e8eae6]">
+    <div className="grid h-full w-full place-items-center bg-[var(--color-mapa)]">
       <p className="text-sm text-[var(--color-tinta-suave)]">Cargando mapa…</p>
     </div>
   ),

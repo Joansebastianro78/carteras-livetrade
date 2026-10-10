@@ -15,12 +15,148 @@
   --color-linea: #d2d9d4;
   --color-ambar: #c98a12;
   --color-ambar-oscuro: #a06d06;
+  /* Al pasar el mouse el ámbar se aclara: con texto en tinta, oscurecerlo le
+     quitaba contraste. */
+  --color-ambar-hover: #d79b2b;
   --color-alerta: #a32f28;
   --color-exito: #1d7a52;
+  /* El petróleo de las rutas: marca la capa del mapa que está elegida. */
+  --color-petroleo: #1f6f8b;
+
+  /* Texto sobre un fondo de color. Con letra blanca el ámbar daba 2,9:1; con
+     tinta da 5,3:1. */
+  --color-sobre-tinta: #ffffff;
+  --color-sobre-ambar: #16242b;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+
+  /* Rellenos y estados de fila. */
+  --color-relleno: #eceeeb;
+  --color-hover: #f3f5f2;
+  --color-seleccion: #e4e9e6;
+  --color-sutil: #f7f9f7;
+  --color-mapa: #e8eae6;
+  /* Barras de los resúmenes. */
+  --color-barra: #16242b;
+
+  /* Avisos: fondo suave con su texto. */
+  --color-alerta-fondo: #f8ecea;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2ec;
+  --color-info-fondo: #e8eef5;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-pieza: 4px;
+}
+
+:root {
+  --color-foco: rgb(22 36 43 / 0.12);
+  --color-sombra: rgb(22 36 43 / 0.18);
+  --color-velo: rgb(22 36 43 / 0.5);
+}
+
+/*
+  Modo oscuro. Solo lo usan el panel de administración y el BackOffice: el
+  middleware marca esas páginas y el layout pone data-modo en <html> según lo
+  que eligió cada quien (cookie cartera_modo). La consulta de los consultores
+  nunca lo recibe y se queda clara, como pidió el negocio.
+  "auto" sigue lo que diga el sistema operativo.
+*/
+:root[data-modo="claro"] {
+  color-scheme: light;
+}
+
+:root[data-modo="oscuro"] {
+  color-scheme: dark;
+  --color-base: #0f181c;
+  --color-papel: #172328;
+  --color-tinta: #e3eae8;
+  --color-tinta-suave: #a3b2b6;
+  --color-marcador: #8b9ba0;
+  --color-linea: #2c3b41;
+  --color-ambar: #d9992a;
+  --color-ambar-oscuro: #e8ac45;
+  --color-ambar-hover: #e8ac45;
+  --color-alerta: #f2918a;
+  --color-exito: #5fc49a;
+  --color-petroleo: #6cb6d0;
+  --color-sobre-tinta: #0f181c;
+  --color-sobre-ambar: #16242b;
+  --color-sobre-alerta: #16242b;
+  --color-sobre-exito: #0f181c;
+  --color-sobre-aviso: #16242b;
+  --color-relleno: #22313a;
+  --color-hover: #1d2b31;
+  --color-seleccion: #24363e;
+  --color-sutil: #1b282d;
+  --color-mapa: #1b262b;
+  --color-barra: #7f9ea8;
+  --color-alerta-fondo: #3a1f1d;
+  --color-aviso-fondo: #33290f;
+  --color-aviso-tinta: #f1c76d;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #143328;
+  --color-info-fondo: #1b2c3d;
+  --color-info-tinta: #9cc0e6;
+  --color-morado-fondo: #2a2340;
+  --color-morado-tinta: #c9b8ec;
+  --color-foco: rgb(227 234 232 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.5);
+  --color-velo: rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-modo="auto"] {
+    color-scheme: dark;
+    --color-base: #0f181c;
+    --color-papel: #172328;
+    --color-tinta: #e3eae8;
+    --color-tinta-suave: #a3b2b6;
+    --color-marcador: #8b9ba0;
+    --color-linea: #2c3b41;
+    --color-ambar: #d9992a;
+    --color-ambar-oscuro: #e8ac45;
+    --color-ambar-hover: #e8ac45;
+    --color-alerta: #f2918a;
+    --color-exito: #5fc49a;
+    --color-petroleo: #6cb6d0;
+    --color-sobre-tinta: #0f181c;
+    --color-sobre-ambar: #16242b;
+    --color-sobre-alerta: #16242b;
+    --color-sobre-exito: #0f181c;
+    --color-sobre-aviso: #16242b;
+    --color-relleno: #22313a;
+    --color-hover: #1d2b31;
+    --color-seleccion: #24363e;
+    --color-sutil: #1b282d;
+    --color-mapa: #1b262b;
+    --color-barra: #7f9ea8;
+    --color-alerta-fondo: #3a1f1d;
+    --color-aviso-fondo: #33290f;
+    --color-aviso-tinta: #f1c76d;
+    --color-aviso-borde: #6b5320;
+    --color-exito-fondo: #143328;
+    --color-info-fondo: #1b2c3d;
+    --color-info-tinta: #9cc0e6;
+    --color-morado-fondo: #2a2340;
+    --color-morado-tinta: #c9b8ec;
+    --color-foco: rgb(227 234 232 / 0.18);
+    --color-sombra: rgb(0 0 0 / 0.5);
+    --color-velo: rgb(0 0 0 / 0.6);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-modo="auto"] {
+    color-scheme: light;
+  }
 }
 
 html {
@@ -42,7 +178,7 @@ body {
   width: 100%;
   border: 1px solid var(--color-linea);
   border-radius: var(--radius-pieza);
-  background: #fff;
+  background: var(--color-papel);
   padding: 0.625rem 0.75rem;
   font-size: 16px; /* menos de 16px hace que iOS acerque la pantalla al enfocar */
   line-height: 1.4;
@@ -57,11 +193,11 @@ body {
 .campo:focus {
   border-color: var(--color-tinta);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(22 36 43 / 0.12);
+  box-shadow: 0 0 0 3px var(--color-foco);
 }
 
 .campo:disabled {
-  background: #f3f5f2;
+  background: var(--color-hover);
   color: var(--color-tinta-suave);
 }
 
@@ -69,7 +205,7 @@ body {
 .campo:-webkit-autofill,
 .campo:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--color-tinta);
-  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--color-papel) inset;
   caret-color: var(--color-tinta);
 }
 
@@ -79,6 +215,154 @@ body {
   font-weight: 500;
   color: var(--color-tinta);
   margin-bottom: 0.375rem;
+}
+
+/*
+  Piezas del panel. Viven aquí y no como clases sueltas de Tailwind en cada
+  componente para que los botones y tarjetas sean iguales en todas las
+  pestañas, en claro y en oscuro. Van en la capa components para que una
+  clase de Tailwind pueda ajustarlas (márgenes, ancho, un borde distinto).
+*/
+@layer components {
+  .tarjeta {
+    background: var(--color-papel);
+    border: 1px solid var(--color-linea);
+    border-radius: 6px;
+  }
+
+  .boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pieza);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+
+  .boton:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .boton-chico {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .boton-primario {
+    background: var(--color-tinta);
+    color: var(--color-sobre-tinta);
+  }
+
+  .boton-primario:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-tinta) 86%, var(--color-papel));
+  }
+
+  .boton-ambar {
+    background: var(--color-ambar);
+    color: var(--color-sobre-ambar);
+    font-weight: 600;
+  }
+
+  .boton-ambar:hover:not(:disabled) {
+    background: var(--color-ambar-hover);
+  }
+
+  .boton-secundario {
+    background: var(--color-papel);
+    color: var(--color-tinta);
+    border-color: var(--color-linea);
+  }
+
+  .boton-secundario:hover:not(:disabled) {
+    border-color: var(--color-tinta);
+  }
+
+  .boton-peligro {
+    background: var(--color-alerta);
+    color: var(--color-sobre-alerta);
+  }
+
+  /* Pastillas que filtran: una sola elegida, o varias encendidas. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--color-linea);
+    border-radius: 9999px;
+    background: var(--color-papel);
+    color: var(--color-tinta);
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .chip:hover {
+    border-color: var(--color-tinta);
+  }
+
+  .chip[aria-pressed="true"] {
+    border-color: var(--color-tinta);
+    background: var(--color-tinta);
+    color: var(--color-sobre-tinta);
+    font-weight: 500;
+  }
+
+  /* Rótulo pequeño en mayúsculas: grupos del menú, encabezados de tabla. */
+  .rotulo {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-marcador);
+  }
+
+  /* Tablas del panel. */
+  .tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .tabla th {
+    background: var(--color-sutil);
+    color: var(--color-tinta-suave);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .tabla td {
+    padding: 12px;
+    border-top: 1px solid var(--color-linea);
+    vertical-align: top;
+  }
+
+  .tabla th:first-child,
+  .tabla td:first-child {
+    padding-left: 18px;
+  }
+
+  .tabla th:last-child,
+  .tabla td:last-child {
+    padding-right: 18px;
+  }
 }
 
 /* Cifras que se comparan en columna: cédulas, IDs, celulares. */
@@ -92,20 +376,84 @@ body {
   outline-offset: 2px;
 }
 
-/* Leaflet dentro del sistema de tipografía de la app */
-.leaflet-container {
+/* Leaflet dentro del sistema de tipografía de la app. Con "html" delante para
+   ganarle a la hoja de Leaflet, que se carga después (ver abajo). */
+html .leaflet-container {
   font-family: var(--font-sans);
-  background: #e8eae6;
+  background: var(--color-mapa);
+  /* Los controles de Leaflet usan z-index de hasta 1000; así se quedan dentro
+     del mapa y no pasan por encima de la barra fija ni de los menús. */
+  isolation: isolate;
 }
 
-.leaflet-popup-content-wrapper {
+/*
+  La hoja de Leaflet se carga después de esta y con la misma especificidad
+  ganaba ella: el globo quedaba blanco y, en modo oscuro, con el texto claro
+  encima. Por eso estas reglas van con .leaflet-container delante.
+*/
+.leaflet-container .leaflet-popup-content-wrapper {
   border-radius: var(--radius-pieza);
-  box-shadow: 0 8px 24px rgb(22 36 43 / 0.18);
+  box-shadow: 0 8px 24px var(--color-sombra);
+}
+
+.leaflet-container .leaflet-popup-content-wrapper,
+.leaflet-container .leaflet-popup-tip {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+}
+
+.leaflet-container .leaflet-popup a.leaflet-popup-close-button {
+  color: var(--color-tinta-suave);
+}
+
+.leaflet-container .leaflet-popup a.leaflet-popup-close-button:hover {
+  color: var(--color-tinta);
+}
+
+.leaflet-container .leaflet-bar a {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+  border-bottom-color: var(--color-linea);
+}
+
+.leaflet-container .leaflet-bar a:hover,
+.leaflet-container .leaflet-bar a:focus {
+  background: var(--color-hover);
+  color: var(--color-tinta);
+}
+
+.leaflet-container .leaflet-bar a.leaflet-disabled {
+  background: var(--color-sutil);
+  color: var(--color-marcador);
+}
+
+/* El celular del globo: el azul de Leaflet no se lee sobre el fondo oscuro. */
+:root[data-modo="oscuro"] .leaflet-container .leaflet-popup-content a:not(.boton-mapa) {
+  color: var(--color-info-tinta);
+}
+
+:root[data-modo="oscuro"] .leaflet-control-attribution {
+  background: rgb(23 35 40 / 0.85);
+  color: var(--color-tinta-suave);
+}
+
+:root[data-modo="oscuro"] .leaflet-control-attribution a {
+  color: var(--color-tinta);
 }
 
 .leaflet-popup-content {
   margin: 0;
   width: 260px !important;
+}
+
+/*
+  Leaflet pinta de azul todo enlace dentro del mapa y su hoja no va en una
+  capa, así que le gana a cualquier clase de Tailwind: el botón «Cómo llegar»
+  del globo salía azul sobre tinta. Aquí recupera su color.
+*/
+.leaflet-container a.boton-mapa,
+.leaflet-container a.boton-mapa:hover {
+  color: var(--color-sobre-tinta);
 }
 
 .marcador-ruta {
@@ -161,6 +509,35 @@ body {
   box-shadow:
     0 1px 2px rgba(22, 36, 43, 0.06),
     0 12px 32px -12px rgba(22, 36, 43, 0.22);
+}
+
+:root[data-modo="oscuro"] .fondo-acceso {
+  background:
+    radial-gradient(85% 65% at 6% 0%, #12323b 0%, transparent 58%),
+    radial-gradient(70% 60% at 100% 100%, #33270f 0%, transparent 55%),
+    var(--color-base);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-modo="auto"] .fondo-acceso {
+    background:
+      radial-gradient(85% 65% at 6% 0%, #12323b 0%, transparent 58%),
+      radial-gradient(70% 60% at 100% 100%, #33270f 0%, transparent 55%),
+      var(--color-base);
+  }
+
+  :root[data-modo="auto"] .leaflet-control-attribution {
+    background: rgb(23 35 40 / 0.85);
+    color: var(--color-tinta-suave);
+  }
+
+  :root[data-modo="auto"] .leaflet-control-attribution a {
+    color: var(--color-tinta);
+  }
+
+  :root[data-modo="auto"] .leaflet-container .leaflet-popup-content a:not(.boton-mapa) {
+    color: var(--color-info-tinta);
+  }
 }
 
 /*

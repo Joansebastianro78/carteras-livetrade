@@ -5,6 +5,9 @@
  */
 import * as XLSX from "xlsx";
 import { leerFecha } from "./fechas";
+import { huella, type EstadoRevision, type Revision } from "./revisionFotos";
+
+export type { EstadoRevision, Revision } from "./revisionFotos";
 
 /** Columnas de la consulta, en su orden y con su nombre en Athena. */
 export const COLUMNAS_IMAGENES = [
@@ -35,7 +38,14 @@ export type FilaImagen = Record<ColumnaImagen, string | null> & {
   hora: string | null;
   /** Día y segundo de la visita, para ordenar; vacío si no trae fecha. */
   orden: string;
+  /**
+   * Huella del enlace de la foto, para guardar su revisión (tabla
+   * revision_fotos). null si la visita no trae nada en foto_visita_inicio.
+   */
+  clave: string | null;
 };
+
+
 
 // ------------------------------------------------------------------ fotos
 /**
@@ -84,6 +94,8 @@ export function filasDeImagenes(columnas: string[], filas: (string | null)[][]):
     fila.dia = fecha?.dia ?? null;
     fila.hora = fecha?.hora ?? null;
     fila.orden = fecha ? `${fecha.dia} ${String(fecha.segundos).padStart(5, "0")}` : "";
+    const foto = (fila.foto_visita_inicio ?? "").trim();
+    fila.clave = foto ? huella(foto) : null;
     return fila;
   });
 }
@@ -109,14 +121,24 @@ const ANCHOS: Record<ColumnaImagen, number> = {
   fecha_inicio: 17,
 };
 
+const NOMBRE_REVISION: Record<EstadoRevision, string> = {
+  correcta: "Correcta",
+  revisar: "Para revisar",
+};
+
 /**
  * Descarga de la auditoría de imágenes: las columnas de la consulta, con sus
- * mismos nombres. La foto queda como enlace para abrirla con un clic y la
- * fecha como fecha de Excel, para poder filtrarla y ordenarla.
+ * mismos nombres, y al final cómo quedó la revisión de cada foto y quién la
+ * hizo. La foto queda como enlace para abrirla con un clic y la fecha como
+ * fecha de Excel, para poder filtrarla y ordenarla.
  *
  * `sufijo` va en el nombre del archivo: el rango de fechas, o el día de hoy.
  */
-export function exportarImagenes(filas: FilaImagen[], sufijo: string) {
+export function exportarImagenes(
+  filas: FilaImagen[],
+  sufijo: string,
+  revisionDe: (f: FilaImagen) => Revision | null = () => null
+) {
   /** Formato de la celda de fecha de cada fila; null si no quedó como fecha. */
   const formatoFecha: (string | null)[] = filas.map(() => null);
 
@@ -138,7 +160,15 @@ export function exportarImagenes(filas: FilaImagen[], sufijo: string) {
     })
   );
 
-  const hoja = XLSX.utils.aoa_to_sheet([[...COLUMNAS_IMAGENES], ...datos]);
+  const revisiones = filas.map((f) => {
+    const r = revisionDe(f);
+    return r ? [NOMBRE_REVISION[r.estado], r.revisado_por] : [null, null];
+  });
+
+  const hoja = XLSX.utils.aoa_to_sheet([
+    [...COLUMNAS_IMAGENES, "revision", "revisado_por"],
+    ...datos.map((d, i) => [...d, ...revisiones[i]]),
+  ]);
 
   const colFecha = COLUMNAS_IMAGENES.indexOf("fecha_inicio");
   formatoFecha.forEach((formato, i) => {
@@ -157,11 +187,11 @@ export function exportarImagenes(filas: FilaImagen[], sufijo: string) {
     });
   }
 
-  hoja["!cols"] = COLUMNAS_IMAGENES.map((c) => ({ wch: ANCHOS[c] }));
+  hoja["!cols"] = [...COLUMNAS_IMAGENES.map((c) => ({ wch: ANCHOS[c] })), { wch: 14 }, { wch: 26 }];
   hoja["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: 0, c: 0 },
-      e: { r: datos.length, c: COLUMNAS_IMAGENES.length - 1 },
+      e: { r: datos.length, c: COLUMNAS_IMAGENES.length + 1 },
     }),
   };
 

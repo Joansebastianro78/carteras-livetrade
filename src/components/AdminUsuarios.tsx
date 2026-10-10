@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, KeyRound, Loader2, ShieldAlert, UserPlus } from "lucide-react";
+import { cuando } from "@/lib/fechas";
 
 type Rol = "admin" | "backoffice" | "superadmin";
 
@@ -35,7 +36,7 @@ const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
     id: "superadmin",
     titulo: "Superadministrador",
     detalle:
-      "Todo lo del administrador y, además, el único que puede desactivar o cambiarle la clave a otro superadministrador.",
+      "Todo lo del administrador y, además, el único que puede tocar a otro superadministrador y dar o quitar este perfil.",
   },
   {
     id: "admin",
@@ -145,6 +146,47 @@ export default function AdminUsuarios() {
     cargar();
   }
 
+  const [cambiandoPerfil, setCambiandoPerfil] = useState<string | null>(null);
+
+  /** Le cambia el perfil sin tocar su clave. */
+  async function cambiarPerfil(a: Admin, nuevo: Rol) {
+    const antes = perfilDe(a);
+    if (nuevo === antes) return;
+    const aviso =
+      nuevo === "backoffice"
+        ? " Desde ahí solo podrá consultar."
+        : nuevo === "superadmin"
+          ? " Podrá tocar a otros superadministradores."
+          : "";
+    if (
+      !confirm(
+        `¿Cambiar el perfil de ${a.nombre ?? a.usuario} de ${NOMBRE_PERFIL[antes]} a ${NOMBRE_PERFIL[nuevo]}?${aviso} Si tiene una sesión abierta, tendrá que volver a entrar.`
+      )
+    ) {
+      return;
+    }
+
+    setAviso(null);
+    setCambiandoPerfil(a.usuario);
+    const res = await fetch("/api/admin/usuarios", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario: a.usuario, rol: nuevo }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setCambiandoPerfil(null);
+
+    if (!res.ok) {
+      setAviso({ tipo: "mal", texto: json.error ?? "No se pudo cambiar el perfil." });
+      return;
+    }
+    setAviso({
+      tipo: "ok",
+      texto: `${a.nombre ?? a.usuario} ahora es ${NOMBRE_PERFIL[nuevo]}. Si tenía una sesión abierta, tendrá que volver a entrar.`,
+    });
+    cargar();
+  }
+
   async function alternar(a: Admin) {
     setAviso(null);
     const res = await fetch("/api/admin/usuarios", {
@@ -162,22 +204,15 @@ export default function AdminUsuarios() {
   }
 
   function fecha(iso: string | null) {
-    if (!iso) return "nunca";
-    return new Date(iso).toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return iso ? cuando(iso) : "nunca";
   }
 
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="text-sm font-semibold">Usuarios del panel</h2>
+        <h2 className="text-[15px] font-semibold">Usuarios</h2>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
-          Los administradores manejan toda la cartera y los perfiles BackOffice
-          solo consultan consultores. Al superadministrador únicamente lo puede
-          tocar otro superadministrador.
+          Cambia el perfil de alguien desde su fila: no hace falta tocarle la clave.
         </p>
 
         {aviso && (
@@ -185,8 +220,8 @@ export default function AdminUsuarios() {
             role="status"
             className={`mt-3 rounded-[4px] px-3 py-2.5 text-[13px] leading-snug ${
               aviso.tipo === "ok"
-                ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                : "bg-[#f8ecea] text-[var(--color-alerta)]"
+                ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                : "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]"
             }`}
           >
             {aviso.texto}
@@ -199,7 +234,7 @@ export default function AdminUsuarios() {
             Cargando…
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-[var(--color-linea)] rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)]">
+          <ul className="tarjeta mt-4 divide-y divide-[var(--color-linea)]">
             {lista.map((a) => (
               <li
                 key={a.id}
@@ -224,23 +259,46 @@ export default function AdminUsuarios() {
                 </span>
 
                 <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                  <label htmlFor={`perfil-${a.id}`} className="sr-only">
+                    Perfil de {a.nombre ?? a.usuario}
+                  </label>
+                  <select
+                    id={`perfil-${a.id}`}
+                    value={perfilDe(a)}
+                    disabled={a.usuario === yo || !puedoTocar(a) || cambiandoPerfil !== null}
+                    title={
+                      a.usuario === yo
+                        ? "No puedes cambiar tu propio perfil"
+                        : !puedoTocar(a)
+                          ? "Solo un superadministrador puede cambiar este perfil"
+                          : "Cambiar el perfil"
+                    }
+                    onChange={(e) => cambiarPerfil(a, e.target.value as Rol)}
+                    className={`min-h-[32px] shrink-0 rounded-full border-0 py-0 pr-7 pl-2.5 text-xs font-medium disabled:opacity-100 ${
                       perfilDe(a) === "backoffice"
-                        ? "bg-[#e8eef5] text-[#2b4c6f]"
+                        ? "bg-[var(--color-info-fondo)] text-[var(--color-info-tinta)]"
                         : perfilDe(a) === "superadmin"
-                          ? "bg-[#fdf1dd] text-[#7a5410]"
-                          : "bg-[#f0ebf7] text-[#4b3a6b]"
+                          ? "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]"
+                          : "bg-[var(--color-morado-fondo)] text-[var(--color-morado-tinta)]"
                     }`}
                   >
-                    {NOMBRE_PERFIL[perfilDe(a)]}
-                  </span>
+                    {PERFILES.filter(
+                      (p) => p.id !== "superadmin" || miRol === "superadmin" || perfilDe(a) === "superadmin"
+                    ).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {NOMBRE_PERFIL[p.id]}
+                      </option>
+                    ))}
+                  </select>
+                  {cambiandoPerfil === a.usuario && (
+                    <Loader2 size={14} className="animate-spin text-[var(--color-tinta-suave)]" aria-label="Guardando" />
+                  )}
 
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                       a.activo
-                        ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                        : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
+                        ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                        : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
                     }`}
                   >
                     {a.activo ? "activo" : "inactivo"}
@@ -255,7 +313,7 @@ export default function AdminUsuarios() {
                         ? "Cargar este usuario abajo para ponerle una clave nueva"
                         : "Solo el superadministrador puede cambiar esta clave"
                     }
-                    className="flex shrink-0 items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="boton boton-secundario boton-chico shrink-0 text-xs"
                   >
                     <KeyRound size={13} aria-hidden />
                     Cambiar clave
@@ -270,7 +328,7 @@ export default function AdminUsuarios() {
                         ? undefined
                         : "Solo el superadministrador puede desactivar esta cuenta"
                     }
-                    className="shrink-0 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="boton boton-secundario boton-chico shrink-0 text-xs"
                   >
                     {a.activo ? "Desactivar" : "Reactivar"}
                   </button>
@@ -282,7 +340,7 @@ export default function AdminUsuarios() {
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold">
+        <h2 className="text-[15px] font-semibold">
           {yaExiste ? "Cambiar la clave" : "Crear un usuario del panel"}
         </h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
@@ -293,7 +351,7 @@ export default function AdminUsuarios() {
 
         <form
           onSubmit={crear}
-          className="mt-4 rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] p-5"
+          className="tarjeta mt-4 p-5"
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -336,7 +394,7 @@ export default function AdminUsuarios() {
                   key={p.id}
                   className={`flex cursor-pointer gap-3 rounded-[4px] border p-3 ${
                     rol === p.id
-                      ? "border-[var(--color-tinta)] bg-[#f7f9f7]"
+                      ? "border-[var(--color-tinta)] bg-[var(--color-sutil)]"
                       : "border-[var(--color-linea)]"
                   }`}
                 >
@@ -396,14 +454,15 @@ export default function AdminUsuarios() {
           </div>
 
           {yaExiste && (
-            <p className="mt-3 rounded-[4px] bg-[#fdf4e3] px-3 py-2.5 text-[13px] leading-snug text-[#7a5410]">
+            <p className="mt-3 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-aviso-tinta)]">
               Ese usuario ya existe. Al guardar, su clave actual deja de servir y
-              queda con el perfil que esté marcado arriba.
+              queda con el perfil que esté marcado arriba. Para cambiar solo el
+              perfil, usa su fila en la lista.
             </p>
           )}
 
           {existente && !puedoTocar(existente) && (
-            <p className="mt-3 flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]">
+            <p className="mt-3 flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]">
               <ShieldAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
               Esa cuenta es de un superadministrador. Solo él puede cambiarle la
               clave o el perfil.
@@ -418,7 +477,7 @@ export default function AdminUsuarios() {
               clave.length < LARGO_MINIMO ||
               (existente !== undefined && !puedoTocar(existente))
             }
-            className="mt-5 flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+            className="boton boton-primario mt-5"
           >
             {guardando ? (
               <Loader2 size={15} className="animate-spin" aria-hidden />

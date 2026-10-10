@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
 import { MENSAJE_POR_DEFECTO } from "@/lib/mantenimiento";
+import { registrarActividad } from "@/lib/actividad";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,6 +102,12 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+
+  await registrarActividad(
+    sesion?.usuario ?? null,
+    data.activo ? "mantenimiento_abrir" : "mantenimiento_cerrar",
+    data.activo ? { mensaje: data.mensaje, hasta: data.hasta } : {}
+  );
 
   return NextResponse.json({ ok: true, estado: data });
 }

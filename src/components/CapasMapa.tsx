@@ -167,7 +167,7 @@ export default function CapasMapa() {
       {aviso && (
         <p
           role="status"
-          className="absolute bottom-full left-0 mb-2 w-[220px] rounded-[6px] bg-[var(--color-tinta)] px-3 py-2 text-xs leading-snug text-white shadow-[0_4px_16px_rgb(22_36_43/0.25)]"
+          className="absolute bottom-full left-0 mb-2 w-[220px] rounded-[6px] bg-[var(--color-tinta)] px-3 py-2 text-xs leading-snug text-[var(--color-sobre-tinta)] shadow-[0_4px_16px_var(--color-sombra)]"
         >
           {aviso}
         </p>
@@ -177,7 +177,7 @@ export default function CapasMapa() {
         <div
           role="group"
           aria-label="Capas del mapa"
-          className="absolute bottom-full left-0 mb-2 flex w-max max-w-[min(360px,calc(100vw-48px))] flex-wrap gap-1 rounded-[8px] bg-white p-2 shadow-[0_4px_16px_rgb(22_36_43/0.25)]"
+          className="absolute bottom-full left-0 mb-2 flex w-max max-w-[min(360px,calc(100vw-48px))] flex-wrap gap-1 rounded-[8px] bg-[var(--color-papel)] p-2 shadow-[0_4px_16px_var(--color-sombra)]"
         >
           {CAPAS.map((c) => {
             const elegida = c.id === capa;
@@ -187,18 +187,18 @@ export default function CapasMapa() {
                 type="button"
                 aria-pressed={elegida}
                 onClick={() => elegir(c.id)}
-                className="flex w-[66px] flex-col items-center gap-1 rounded-[6px] p-1 hover:bg-[#f3f5f2]"
+                className="flex w-[66px] flex-col items-center gap-1 rounded-[6px] p-1 hover:bg-[var(--color-hover)]"
               >
                 <Miniatura
                   capa={c}
                   className={`h-[52px] w-[52px] rounded-[6px] border-2 ${
-                    elegida ? "border-[#1F6F8B]" : "border-[var(--color-linea)]"
+                    elegida ? "border-[var(--color-petroleo)]" : "border-[var(--color-linea)]"
                   }`}
                 />
                 <span
                   className={`text-center text-[11px] leading-tight ${
                     elegida
-                      ? "font-semibold text-[#1F6F8B]"
+                      ? "font-semibold text-[var(--color-petroleo)]"
                       : "text-[var(--color-tinta)]"
                   }`}
                 >

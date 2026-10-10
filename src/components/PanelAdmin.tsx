@@ -1,6 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import {
+  ChartColumn,
+  ClipboardCheck,
+  House,
+  Image as IconoImagen,
+  MapPin,
+  Palette,
+  Pencil,
+  ShieldCheck,
+  Upload,
+  Users,
+  Wrench,
+} from "lucide-react";
+import type { Rol } from "@/lib/auth";
+import type { Modo } from "@/lib/modo";
+import PanelShell, { type SeccionPanel } from "./PanelShell";
+import Inicio from "./Inicio";
 import Cargador from "./Cargador";
 import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
@@ -12,59 +28,136 @@ import Mantenimiento from "./Mantenimiento";
 import PanelTemas from "./PanelTemas";
 import PanelTableros from "./PanelTableros";
 
-const SECCIONES = [
-  { id: "cargar", titulo: "Cargar plantilla" },
-  { id: "editar", titulo: "Editar cartera" },
-  { id: "backoffice", titulo: "BackOffice" },
-  { id: "territorio", titulo: "Departamento y ciudad" },
-  { id: "auditoria", titulo: "Auditoría" },
-  { id: "imagenes", titulo: "Auditoría de imágenes" },
-  { id: "tableros", titulo: "Tableros" },
-  { id: "mantenimiento", titulo: "Mantenimiento" },
-  { id: "temas", titulo: "Temas" },
-  { id: "usuarios", titulo: "Administradores" },
-] as const;
+/** Secciones del panel de administración, en el orden del menú. */
+const SECCIONES: SeccionPanel[] = [
+  {
+    id: "inicio",
+    menu: "Inicio",
+    grupo: null,
+    Icono: House,
+    encabezadoPropio: true,
+    render: (nav) => <Inicio irA={nav.irA} />,
+  },
+  {
+    id: "cargar",
+    menu: "Cargar plantilla",
+    grupo: "Cartera",
+    Icono: Upload,
+    encabezadoPropio: true,
+    render: () => <Cargador />,
+  },
+  {
+    id: "editar",
+    menu: "Editar cartera",
+    grupo: "Cartera",
+    Icono: Pencil,
+    descripcion:
+      "Busca un punto por ID, código Bavaria, nombre, dirección, usuario o cédula para corregirlo. Más abajo puedes borrar la cartera de un ciclo o de un archivo.",
+    ancho: "angosto",
+    render: () => <EditorCartera />,
+  },
+  {
+    id: "consultores",
+    menu: "Consultores",
+    titulo: "Cartera de un consultor",
+    grupo: "Cartera",
+    Icono: Users,
+    encabezadoPropio: true,
+    render: () => <BackOffice />,
+  },
+  {
+    id: "territorio",
+    menu: "Departamento y ciudad",
+    titulo: "Puntos por departamento y ciudad",
+    grupo: "Cartera",
+    Icono: MapPin,
+    descripcion:
+      "Filtra todos los puntos por departamento o ciudad y descárgalos en Excel con las columnas de la plantilla.",
+    render: () => <FiltroTerritorio />,
+  },
+  {
+    id: "auditoria",
+    menu: "Datos",
+    titulo: "Auditoría de datos",
+    grupo: "Auditorías",
+    Icono: ClipboardCheck,
+    encabezadoPropio: true,
+    render: () => <Auditoria />,
+  },
+  {
+    id: "imagenes",
+    menu: "Imágenes",
+    titulo: "Auditoría de imágenes",
+    grupo: "Auditorías",
+    Icono: IconoImagen,
+    encabezadoPropio: true,
+    render: () => <AuditoriaImagenes />,
+  },
+  {
+    id: "tableros",
+    menu: "Tableros",
+    titulo: "Tableros de Power BI",
+    grupo: "Reportes",
+    Icono: ChartColumn,
+    descripcion:
+      "Los enlaces que agregues aquí le aparecen al perfil BackOffice en su sección Tableros. Aquí solo se guarda el enlace: el informe sigue en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo verá acá.",
+    ancho: "angosto",
+    render: () => <PanelTableros />,
+  },
+  {
+    id: "mantenimiento",
+    menu: "Mantenimiento",
+    grupo: "Configuración",
+    Icono: Wrench,
+    descripcion:
+      "Mientras esté activo, la página de consulta muestra un aviso en vez del formulario y nadie puede consultar su cartera. Este panel sigue funcionando: úsalo para cargar el Excel con calma y ciérralo al terminar.",
+    ancho: "angosto",
+    render: () => <Mantenimiento />,
+  },
+  {
+    id: "temas",
+    menu: "Temas",
+    titulo: "Temas de temporada",
+    grupo: "Configuración",
+    Icono: Palette,
+    descripcion:
+      "Adornos que aparecen solos en las fechas especiales y se retiran al terminar. Son decoración y nada más: no tapan botones ni cambian cómo se usa la página, y en celular salen más pequeños.",
+    ancho: "angosto",
+    render: () => <PanelTemas />,
+  },
+  {
+    id: "usuarios",
+    menu: "Administradores",
+    titulo: "Usuarios del panel",
+    grupo: "Configuración",
+    Icono: ShieldCheck,
+    descripcion:
+      "Los administradores manejan toda la cartera y los perfiles BackOffice solo consultan. Al superadministrador únicamente lo puede tocar otro superadministrador.",
+    ancho: "angosto",
+    render: () => <AdminUsuarios />,
+  },
+];
 
-type Seccion = (typeof SECCIONES)[number]["id"];
-
-export default function PanelAdmin() {
-  const [activa, setActiva] = useState<Seccion>("cargar");
-
+export default function PanelAdmin({
+  usuario,
+  rol,
+  modo,
+  menuOculto,
+}: {
+  usuario: string;
+  rol: Rol;
+  modo: Modo;
+  menuOculto: boolean;
+}) {
   return (
-    <>
-      <nav
-        aria-label="Secciones del panel"
-        className="flex flex-wrap gap-1 border-b border-[var(--color-linea)]"
-      >
-        {SECCIONES.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setActiva(s.id)}
-            aria-current={activa === s.id ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2.5 text-sm ${
-              activa === s.id
-                ? "border-[var(--color-tinta)] font-medium text-[var(--color-tinta)]"
-                : "border-transparent text-[var(--color-tinta-suave)] hover:text-[var(--color-tinta)]"
-            }`}
-          >
-            {s.titulo}
-          </button>
-        ))}
-      </nav>
-
-      <div className="pt-7">
-        {activa === "cargar" && <Cargador />}
-        {activa === "editar" && <EditorCartera />}
-        {activa === "backoffice" && <BackOffice />}
-        {activa === "territorio" && <FiltroTerritorio />}
-        {activa === "auditoria" && <Auditoria />}
-        {activa === "imagenes" && <AuditoriaImagenes />}
-        {activa === "tableros" && <PanelTableros />}
-        {activa === "mantenimiento" && <Mantenimiento />}
-        {activa === "temas" && <PanelTemas />}
-        {activa === "usuarios" && <AdminUsuarios />}
-      </div>
-    </>
+    <PanelShell
+      panel="admin"
+      usuario={usuario}
+      rol={rol}
+      modo={modo}
+      menuOculto={menuOculto}
+      secciones={SECCIONES}
+      inicial="inicio"
+    />
   );
 }

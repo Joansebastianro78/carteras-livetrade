@@ -199,9 +199,9 @@ export default function EditorCartera() {
   const total = ciclos?.reduce((a, c) => a + c.puntos, 0) ?? 0;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* ---------------------------------------------------- buscar y editar */}
-      <section>
+      <section className="tarjeta p-5">
         <h2 className="text-sm font-semibold">Buscar un punto</h2>
         <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
           Por ID, código Bavaria, nombre del PDV, dirección, usuario o cédula.
@@ -218,7 +218,7 @@ export default function EditorCartera() {
           <button
             type="submit"
             disabled={buscando || q.trim().length < 2}
-            className="flex shrink-0 items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 text-sm font-medium text-white disabled:opacity-45"
+            className="boton boton-primario shrink-0"
           >
             {buscando ? (
               <Loader2 size={15} className="animate-spin" aria-hidden />
@@ -234,8 +234,8 @@ export default function EditorCartera() {
             role="status"
             className={`mt-3 rounded-[4px] px-3 py-2.5 text-[13px] ${
               aviso.tipo === "ok"
-                ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                : "bg-[#f8ecea] text-[var(--color-alerta)]"
+                ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                : "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]"
             }`}
           >
             {aviso.texto}
@@ -290,7 +290,7 @@ export default function EditorCartera() {
                   </div>
 
                   {abierto === p.id_registro && (
-                    <div className="border-t border-[var(--color-linea)] bg-[#f7f9f7] px-4 py-4">
+                    <div className="border-t border-[var(--color-linea)] bg-[var(--color-sutil)] px-4 py-4">
                       <div className="grid gap-3 sm:grid-cols-2">
                         {CAMPOS.map(({ clave, etiqueta, tipo }) => (
                           <div key={clave}>
@@ -324,7 +324,7 @@ export default function EditorCartera() {
                           type="button"
                           onClick={() => guardar(p.id_registro)}
                           disabled={guardando}
-                          className="flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2 text-sm font-medium text-white disabled:opacity-45"
+                          className="boton boton-primario"
                         >
                           {guardando && (
                             <Loader2 size={15} className="animate-spin" aria-hidden />
@@ -334,7 +334,7 @@ export default function EditorCartera() {
                         <button
                           type="button"
                           onClick={() => setAbierto(null)}
-                          className="rounded-[4px] border border-[var(--color-linea)] px-4 py-2 text-sm"
+                          className="boton boton-secundario"
                         >
                           Cancelar
                         </button>
@@ -349,7 +349,7 @@ export default function EditorCartera() {
       </section>
 
       {/* ---------------------------------------------------- eliminar en bloque */}
-      <section className="rounded-[4px] border border-[var(--color-alerta)] bg-[var(--color-papel)] p-5">
+      <section className="tarjeta border-[var(--color-alerta)] p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--color-alerta)]">
           <TriangleAlert size={16} aria-hidden />
           Eliminar cartera
@@ -432,7 +432,7 @@ export default function EditorCartera() {
             )}
 
             {avisoArchivos && (
-              <p className="mt-1.5 text-xs leading-snug text-[#7a5410]">
+              <p className="mt-1.5 text-xs leading-snug text-[var(--color-aviso-tinta)]">
                 {avisoArchivos}
               </p>
             )}
@@ -456,7 +456,7 @@ export default function EditorCartera() {
             type="button"
             onClick={purgar}
             disabled={purgando || confirmacion.trim() !== fraseEsperada}
-            className="flex items-center gap-2 rounded-[4px] bg-[var(--color-alerta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+            className="boton boton-peligro"
           >
             {purgando && <Loader2 size={15} className="animate-spin" aria-hidden />}
             Eliminar definitivamente

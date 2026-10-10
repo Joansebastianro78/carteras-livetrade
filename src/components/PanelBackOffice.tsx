@@ -1,55 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { ChartColumn, ClipboardCheck, Image as IconoImagen, MapPin, Users } from "lucide-react";
+import type { Rol } from "@/lib/auth";
+import type { Modo } from "@/lib/modo";
+import PanelShell, { type SeccionPanel } from "./PanelShell";
 import Auditoria from "./Auditoria";
 import AuditoriaImagenes from "./AuditoriaImagenes";
 import BackOffice from "./BackOffice";
 import FiltroTerritorio from "./FiltroTerritorio";
 import VisorTableros from "./VisorTableros";
 
-const SECCIONES = [
-  { id: "consultores", titulo: "Consultores" },
-  { id: "territorio", titulo: "Departamento y ciudad" },
-  { id: "auditoria", titulo: "Auditoría" },
-  { id: "imagenes", titulo: "Auditoría de imágenes" },
-  { id: "tableros", titulo: "Tableros" },
-] as const;
+/** Secciones del BackOffice, en el orden del menú. */
+const SECCIONES: SeccionPanel[] = [
+  {
+    id: "consultores",
+    menu: "Consultores",
+    titulo: "Cartera de un consultor",
+    grupo: "Cartera",
+    Icono: Users,
+    encabezadoPropio: true,
+    render: () => <BackOffice />,
+  },
+  {
+    id: "territorio",
+    menu: "Departamento y ciudad",
+    titulo: "Puntos por departamento y ciudad",
+    grupo: "Cartera",
+    Icono: MapPin,
+    descripcion:
+      "Filtra todos los puntos por departamento o ciudad y descárgalos en Excel con las columnas de la plantilla.",
+    render: () => <FiltroTerritorio />,
+  },
+  {
+    id: "auditoria",
+    menu: "Datos",
+    titulo: "Auditoría de datos",
+    grupo: "Auditorías",
+    Icono: ClipboardCheck,
+    encabezadoPropio: true,
+    render: () => <Auditoria />,
+  },
+  {
+    id: "imagenes",
+    menu: "Imágenes",
+    titulo: "Auditoría de imágenes",
+    grupo: "Auditorías",
+    Icono: IconoImagen,
+    encabezadoPropio: true,
+    render: () => <AuditoriaImagenes />,
+  },
+  {
+    id: "tableros",
+    menu: "Tableros",
+    titulo: "Tableros de Power BI",
+    grupo: "Reportes",
+    Icono: ChartColumn,
+    descripcion:
+      "Se abren con tu propia cuenta de Power BI. Si un informe te pide iniciar sesión o dice que no tienes acceso, el permiso se pide allá, no aquí.",
+    render: () => <VisorTableros />,
+  },
+];
 
-type Seccion = (typeof SECCIONES)[number]["id"];
-
-export default function PanelBackOffice() {
-  const [activa, setActiva] = useState<Seccion>("consultores");
-
+export default function PanelBackOffice({
+  usuario,
+  rol,
+  modo,
+  menuOculto,
+}: {
+  usuario: string;
+  rol: Rol;
+  modo: Modo;
+  menuOculto: boolean;
+}) {
   return (
-    <>
-      <nav
-        aria-label="Secciones del BackOffice"
-        className="flex flex-wrap gap-1 border-b border-[var(--color-linea)]"
-      >
-        {SECCIONES.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setActiva(s.id)}
-            aria-current={activa === s.id ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2.5 text-sm ${
-              activa === s.id
-                ? "border-[var(--color-tinta)] font-medium text-[var(--color-tinta)]"
-                : "border-transparent text-[var(--color-tinta-suave)] hover:text-[var(--color-tinta)]"
-            }`}
-          >
-            {s.titulo}
-          </button>
-        ))}
-      </nav>
-
-      <div className="pt-7">
-        {activa === "consultores" && <BackOffice />}
-        {activa === "territorio" && <FiltroTerritorio />}
-        {activa === "auditoria" && <Auditoria />}
-        {activa === "imagenes" && <AuditoriaImagenes />}
-        {activa === "tableros" && <VisorTableros />}
-      </div>
-    </>
+    <PanelShell
+      panel="backoffice"
+      usuario={usuario}
+      rol={rol}
+      modo={modo}
+      menuOculto={menuOculto}
+      secciones={SECCIONES}
+      inicial="consultores"
+    />
   );
 }

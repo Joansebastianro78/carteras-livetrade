@@ -106,7 +106,8 @@ export function sufijoRango(r: Rango): string {
   if (r.desde && r.hasta) return `${r.desde}_a_${r.hasta}`;
   if (r.desde) return `desde_${r.desde}`;
   if (r.hasta) return `hasta_${r.hasta}`;
-  return new Date().toISOString().slice(0, 10);
+  // El día de aquí, no el de Greenwich: desde las 7 p. m. de Colombia ya sería mañana.
+  return diaDe(new Date());
 }
 
 export type ResumenFechas = {
@@ -140,4 +141,89 @@ export function resumirFechas<T>(
     }
   }
   return { primera, ultima, sinFecha, ilegible };
+}
+
+// ------------------------------------------------------------------ rangos rápidos
+const dos = (n: number) => String(n).padStart(2, "0");
+
+/** 'AAAA-MM-DD' de una fecha, en la hora del navegador (Colombia, para el equipo). */
+export function diaDe(fecha: Date): string {
+  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}`;
+}
+
+export type Atajo = "todo" | "hoy" | "siete" | "mes" | "personalizado";
+
+/** Los rangos de los botones rápidos, calculados para hoy. */
+export function rangoDeAtajo(atajo: Exclude<Atajo, "personalizado">, hoy = new Date()): Rango {
+  if (atajo === "todo") return SIN_RANGO;
+  const fin = diaDe(hoy);
+  if (atajo === "hoy") return { desde: fin, hasta: fin };
+  if (atajo === "siete") {
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 6);
+    return { desde: diaDe(inicio), hasta: fin };
+  }
+  return { desde: diaDe(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: fin };
+}
+
+/** Cuál botón rápido corresponde al rango puesto; "personalizado" si ninguno. */
+export function atajoDeRango(r: Rango, hoy = new Date()): Atajo {
+  if (!hayRango(r)) return "todo";
+  for (const a of ["hoy", "siete", "mes"] as const) {
+    const otro = rangoDeAtajo(a, hoy);
+    if (otro.desde === r.desde && otro.hasta === r.hasta) return a;
+  }
+  return "personalizado";
+}
+
+// ------------------------------------------------------------------ para leer
+const ZONA = "America/Bogota";
+
+/** "Jueves, 10 de septiembre" (con el año si no es el actual). */
+export function diaLargo(dia: string): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  const fecha = new Date(Date.UTC(a, m - 1, d));
+  const texto = new Intl.DateTimeFormat("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(a !== new Date().getFullYear() ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  }).format(fecha);
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** El momento dado en hora de Colombia: "Viernes, 9 de octubre" y "7:15 p. m.". */
+export function fechaYHora(fecha: Date): { dia: string; hora: string } {
+  const dia = new Intl.DateTimeFormat("es-CO", {
+    timeZone: ZONA,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(fecha);
+  const hora = new Intl.DateTimeFormat("es-CO", {
+    timeZone: ZONA,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(fecha);
+  return { dia: dia.charAt(0).toUpperCase() + dia.slice(1), hora };
+}
+
+/** "hoy, 8:42 a. m.", "ayer, 4:10 p. m." o "7 de octubre, 3:15 p. m.", en hora de Colombia. */
+export function cuando(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return "";
+  const dia = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: ZONA, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const hora = new Intl.DateTimeFormat("es-CO", { timeZone: ZONA, hour: "numeric", minute: "2-digit" }).format(fecha);
+  const ese = dia(fecha);
+  if (ese === dia(new Date())) return `hoy, ${hora}`;
+  if (ese === dia(new Date(Date.now() - 86_400_000))) return `ayer, ${hora}`;
+  const texto = new Intl.DateTimeFormat("es-CO", {
+    timeZone: ZONA,
+    day: "numeric",
+    month: "long",
+    ...(fecha.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
+  }).format(fecha);
+  return `${texto}, ${hora}`;
 }

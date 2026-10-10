@@ -26,6 +26,8 @@ export type FilaAuditoria = Record<ColumnaAuditoria, string | null> & {
   motivo: string;
   /** Día de `fecha`, 'AAAA-MM-DD'; null si no trae fecha o no se entiende. */
   dia: string | null;
+  /** Día y segundo, para ordenar; vacío si no trae fecha. */
+  orden: string;
 };
 
 // ---------------------------------------------------------------- motivos
@@ -110,7 +112,9 @@ export function filasDesdeAthena(
       limpiarTexto(fila.componente_etiqueta),
       limpiarTexto(fila.componente_valor)
     );
-    fila.dia = leerFecha(fila.fecha)?.dia ?? null;
+    const fecha = leerFecha(fila.fecha);
+    fila.dia = fecha?.dia ?? null;
+    fila.orden = fecha ? `${fecha.dia} ${String(fecha.segundos).padStart(5, "0")}` : "";
     return fila;
   });
 }

@@ -490,3 +490,22 @@ export function exportarAuditoria(filas: FilaAuditoria[], sufijo: string) {
   XLSX.utils.book_append_sheet(libro, hoja, "Auditoria");
   XLSX.writeFile(libro, `Auditoria_${sufijo}.xlsx`);
 }
+
+/**
+ * Las filas del Excel cargado que tuvieron alguna observación al leerlo (sin
+ * ID, coordenada fuera de Colombia...), para corregirlas en el archivo.
+ */
+export function exportarObservaciones(
+  observaciones: { fila: number; motivo: string }[],
+  archivo: string
+) {
+  const hoja = XLSX.utils.aoa_to_sheet([
+    ["fila_excel", "observacion"],
+    ...observaciones.map((o) => [o.fila, o.motivo]),
+  ]);
+  hoja["!cols"] = [{ wch: 11 }, { wch: 90 }];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Observaciones");
+  const base = archivo.replace(/\.[^.]+$/, "");
+  XLSX.writeFile(libro, `Observaciones_${base}.xlsx`);
+}

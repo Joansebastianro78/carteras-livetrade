@@ -74,6 +74,8 @@ export default function Mantenimiento() {
     }
 
     setEstado(json.estado);
+    // El encabezado del panel muestra si la consulta está abierta: que se entere.
+    window.dispatchEvent(new Event("cartera:estado"));
     setAviso({
       tipo: "ok",
       texto: activo
@@ -86,27 +88,18 @@ export default function Mantenimiento() {
 
   return (
     <div className="space-y-6">
-      <section>
-        <h2 className="text-sm font-semibold">Ventana de mantenimiento</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Mientras esté abierta, la página pública muestra un aviso en vez del
-          formulario y nadie puede consultar su cartera. Este panel sigue
-          funcionando: úsalo para cargar el Excel con calma y ciérrala al terminar.
-        </p>
-      </section>
-
       <section
-        className={`rounded-[4px] border p-5 ${
-          activo
-            ? "border-[#e0b970] bg-[#fdf4e3]"
-            : "border-[var(--color-linea)] bg-[var(--color-papel)]"
+        className={`tarjeta p-5 ${
+          activo ? "border-[var(--color-aviso-borde)] bg-[var(--color-aviso-fondo)]" : ""
         }`}
       >
         <p className="flex items-center gap-2 text-sm font-semibold">
           {activo ? (
             <>
-              <Wrench size={16} className="text-[#7a5410]" aria-hidden />
-              <span className="text-[#7a5410]">La página está en mantenimiento</span>
+              <Wrench size={16} className="text-[var(--color-aviso-tinta)]" aria-hidden />
+              <span className="text-[var(--color-aviso-tinta)]">
+                La página está en mantenimiento
+              </span>
             </>
           ) : (
             <>
@@ -161,8 +154,8 @@ export default function Mantenimiento() {
             role="status"
             className={`mt-4 rounded-[4px] px-3 py-2.5 text-[13px] ${
               aviso.tipo === "ok"
-                ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                : "bg-[#f8ecea] text-[var(--color-alerta)]"
+                ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                : "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]"
             }`}
           >
             {aviso.texto}
@@ -176,7 +169,7 @@ export default function Mantenimiento() {
                 type="button"
                 onClick={() => guardar(false)}
                 disabled={guardando}
-                className="flex items-center gap-2 rounded-[4px] bg-[var(--color-exito)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+                className="boton bg-[var(--color-exito)] text-[var(--color-sobre-exito)]"
               >
                 {guardando && <Loader2 size={15} className="animate-spin" aria-hidden />}
                 Cerrar la ventana y abrir la página
@@ -185,7 +178,7 @@ export default function Mantenimiento() {
                 type="button"
                 onClick={() => guardar(true)}
                 disabled={guardando}
-                className="rounded-[4px] border border-[var(--color-linea)] px-4 py-2.5 text-sm disabled:opacity-45"
+                className="boton boton-secundario"
               >
                 Guardar el mensaje
               </button>
@@ -195,7 +188,7 @@ export default function Mantenimiento() {
               type="button"
               onClick={() => guardar(true)}
               disabled={guardando}
-              className="flex items-center gap-2 rounded-[4px] bg-[#7a5410] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+              className="boton bg-[var(--color-aviso-tinta)] text-[var(--color-sobre-aviso)]"
             >
               {guardando ? (
                 <Loader2 size={15} className="animate-spin" aria-hidden />

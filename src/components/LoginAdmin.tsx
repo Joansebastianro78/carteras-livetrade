@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Eye, EyeOff, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import IlustracionRastreo from "@/components/IlustracionRastreo";
+import { AplicarModoPanel } from "@/components/ModoPanel";
+
+/** Por qué se cerró la sesión: llega en ?sesion= desde el middleware. */
+const MOTIVOS: Record<string, string> = {
+  expirada: "Tu sesión expiró. Vuelve a entrar.",
+  perfil: "Tu perfil cambió. Vuelve a entrar para seguir con el nuevo.",
+  inactiva: "Tu usuario fue desactivado. Si crees que es un error, habla con un administrador.",
+};
 
 type Props = {
-  expirada?: boolean;
+  /** expirada, perfil o inactiva. */
+  motivo?: string;
   /** Se reutiliza en /admin y en /backoffice: solo cambian el texto. */
   titulo?: string;
   descripcion?: string;
@@ -16,7 +24,7 @@ type Props = {
 };
 
 export default function LoginAdmin({
-  expirada,
+  motivo,
   titulo = "Administración",
   descripcion = "Esta sección carga la plantilla maestra y reemplaza la cartera de todo el equipo.",
   rotulo = "Cartera LiveTrade",
@@ -27,7 +35,7 @@ export default function LoginAdmin({
   const [verClave, setVerClave] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(
-    expirada ? "Tu sesión expiró. Vuelve a entrar." : null
+    motivo ? (MOTIVOS[motivo] ?? null) : null
   );
 
   async function entrar(e: React.FormEvent) {
@@ -66,6 +74,7 @@ export default function LoginAdmin({
 
   return (
     <main className="fondo-acceso flex-1 px-4 py-6 md:py-10">
+      <AplicarModoPanel />
       <div className="tarjeta-acceso mx-auto w-full max-w-3xl overflow-hidden rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] md:grid md:grid-cols-[1fr_1fr]">
         <aside className="panel-acceso hidden flex-col justify-between p-7 text-white md:flex">
           <div>
@@ -152,7 +161,7 @@ export default function LoginAdmin({
             {error && (
               <p
                 role="alert"
-                className="mt-4 flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
+                className="mt-4 flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
               >
                 <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
                 {error}
@@ -172,12 +181,10 @@ export default function LoginAdmin({
       </div>
 
       <p className="mt-6 text-center text-[13px]">
-        <Link
-          href="/"
-          className="text-[var(--color-tinta-suave)] underline underline-offset-2"
-        >
+        {/* <a> y no <Link>: la consulta se carga de nuevo y queda sin modo oscuro. */}
+        <a href="/" className="text-[var(--color-tinta-suave)] underline underline-offset-2">
           Volver a la consulta
-        </Link>
+        </a>
       </p>
     </main>
   );

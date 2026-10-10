@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { COOKIE_ADMIN, esRol, leerSesion, type Rol } from "@/lib/auth";
+import { registrarActividad } from "@/lib/actividad";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,10 +91,21 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!puedeTocar(sesion.rol, await perfilDe(limpio))) {
+  const antes = await perfilDe(limpio);
+
+  if (!puedeTocar(sesion.rol, antes)) {
     return NextResponse.json(
       { error: "Esa cuenta es de un superadministrador. Solo él puede cambiarla." },
       { status: 403 }
+    );
+  }
+
+  // Volver a guardar la propia cuenta con otro perfil es cambiarse el perfil a
+  // sí mismo: se podría quedar el panel sin quien lo maneje.
+  if (limpio === sesion.usuario && antes !== null && antes !== perfil) {
+    return NextResponse.json(
+      { error: "No puedes cambiar tu propio perfil. Pídeselo a otro administrador." },
+      { status: 400 }
     );
   }
 
@@ -125,22 +137,45 @@ export async function POST(req: Request) {
     );
   }
 
+  await registrarActividad(sesion.usuario, antes === null ? "usuario_crear" : "usuario_clave", {
+    usuario: limpio,
+    rol: perfil,
+    ...(antes !== null && antes !== perfil ? { antes } : {}),
+  });
+
   return NextResponse.json({ ok: true, usuario: limpio, rol: perfil });
 }
 
-// ------------------------------------------------- activar / desactivar
+// ------------------------------------------------- activar / desactivar o cambiar perfil
+/**
+ * { usuario, activo }  → activar o desactivar la cuenta
+ * { usuario, rol }     → cambiarle el perfil sin tocar su clave
+ *
+ * Reglas del perfil:
+ *   - nadie se cambia el perfil a sí mismo;
+ *   - dar o quitar el perfil de superadministrador solo lo hace otro
+ *     superadministrador;
+ *   - debe quedar al menos un administrador activo.
+ * Si el usuario tenía una sesión abierta, el middleware la cierra en su
+ * siguiente clic y le pide volver a entrar con el perfil nuevo.
+ */
 export async function PATCH(req: Request) {
-  const { usuario, activo } = (await req.json().catch(() => ({}))) as {
+  const body = (await req.json().catch(() => ({}))) as {
     usuario?: string;
     activo?: boolean;
+    rol?: string;
   };
 
-  const limpio = (usuario ?? "").trim().toLowerCase();
+  const limpio = (body.usuario ?? "").trim().toLowerCase();
+  const sesion = await quien();
+
+  if (limpio && body.rol !== undefined) return cambiarPerfil(limpio, body.rol, sesion);
+
+  const activo = body.activo;
   if (!limpio || typeof activo !== "boolean") {
     return NextResponse.json({ error: "Faltan datos." }, { status: 400 });
   }
 
-  const sesion = await quien();
   if (limpio === sesion.usuario && activo === false) {
     return NextResponse.json(
       { error: "No puedes desactivar tu propia cuenta." },
@@ -160,21 +195,13 @@ export async function PATCH(req: Request) {
     );
   }
 
-  if (!activo && objetivo !== "backoffice") {
+  if (!activo && objetivo !== "backoffice" && !(await quedaOtroAdministrador(limpio))) {
     // Los perfiles BackOffice no cuentan: desactivarlos a todos no deja el
     // panel sin dueño, pero quedarse sin administradores sí.
-    const { count } = await supabaseAdmin
-      .from("admins")
-      .select("id", { count: "exact", head: true })
-      .eq("activo", true)
-      .in("rol", ["admin", "superadmin"]);
-
-    if ((count ?? 0) <= 1) {
-      return NextResponse.json(
-        { error: "Debe quedar al menos un administrador activo." },
-        { status: 400 }
-      );
-    }
+    return NextResponse.json(
+      { error: "Debe quedar al menos un administrador activo." },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabaseAdmin
@@ -192,5 +219,90 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Ese usuario no existe." }, { status: 404 });
   }
 
+  await registrarActividad(sesion.usuario, activo ? "usuario_activar" : "usuario_desactivar", {
+    usuario: limpio,
+  });
+
   return NextResponse.json({ ok: true, ...data });
+}
+
+/** Si además de `usuario` queda al menos un administrador o superadministrador activo. */
+async function quedaOtroAdministrador(usuario: string): Promise<boolean> {
+  const { count } = await supabaseAdmin
+    .from("admins")
+    .select("id", { count: "exact", head: true })
+    .eq("activo", true)
+    .in("rol", ["admin", "superadmin"])
+    .neq("usuario", usuario);
+  return (count ?? 0) >= 1;
+}
+
+async function cambiarPerfil(
+  usuario: string,
+  rolPedido: string,
+  sesion: { usuario: string | null; rol: Rol }
+) {
+  if (!PERFILES.includes(rolPedido as Rol)) {
+    return NextResponse.json({ error: "Ese perfil no existe." }, { status: 400 });
+  }
+  const nuevo = rolPedido as Rol;
+
+  if (usuario === sesion.usuario) {
+    return NextResponse.json(
+      { error: "No puedes cambiar tu propio perfil. Pídeselo a otro administrador." },
+      { status: 400 }
+    );
+  }
+
+  const antes = await perfilDe(usuario);
+  if (antes === null) {
+    return NextResponse.json({ error: "Ese usuario no existe." }, { status: 404 });
+  }
+  if (antes === nuevo) {
+    return NextResponse.json({ ok: true, usuario, rol: nuevo, sinCambios: true });
+  }
+
+  if ((antes === "superadmin" || nuevo === "superadmin") && sesion.rol !== "superadmin") {
+    return NextResponse.json(
+      {
+        error:
+          "Solo un superadministrador puede dar o quitar el perfil de superadministrador.",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (nuevo === "backoffice" && !(await quedaOtroAdministrador(usuario))) {
+    return NextResponse.json(
+      { error: "Debe quedar al menos un administrador activo." },
+      { status: 400 }
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("admins")
+    .update({ rol: nuevo })
+    .eq("usuario", usuario)
+    .select("usuario,rol,activo")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[usuarios PATCH rol]", error.message);
+    const faltaRol = /column .*rol|admins_rol_valido/i.test(error.message);
+    return NextResponse.json(
+      {
+        error: faltaRol
+          ? "La tabla de usuarios todavía no tiene perfiles. Ejecuta supabase/roles.sql en el SQL Editor."
+          : "No se pudo cambiar el perfil.",
+      },
+      { status: 500 }
+    );
+  }
+  if (!data) {
+    return NextResponse.json({ error: "Ese usuario no existe." }, { status: 404 });
+  }
+
+  await registrarActividad(sesion.usuario, "usuario_rol", { usuario, antes, ahora: nuevo });
+
+  return NextResponse.json({ ok: true, usuario, rol: nuevo, antes });
 }

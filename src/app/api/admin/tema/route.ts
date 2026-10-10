@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { registrarActividad } from "@/lib/actividad";
 import { leerEstadoTema } from "@/lib/temaServidor";
 import { resolverTema, TEMAS, type IdTema, type ModoTema } from "@/lib/temas";
 
@@ -87,6 +88,16 @@ export async function POST(req: Request) {
   }
 
   const estado = { modo, temaFijo, apagados: apagados as IdTema[] };
+
+  await registrarActividad(sesion?.usuario ?? null, "tema_cambiar", {
+    descripcion:
+      modo === "apagado"
+        ? "Sin decoración"
+        : modo === "fijo"
+          ? `Fijo: ${TEMAS.find((t) => t.id === temaFijo)?.nombre ?? temaFijo}`
+          : "Automático, según las fechas",
+  });
+
   return NextResponse.json({
     ok: true,
     estado,

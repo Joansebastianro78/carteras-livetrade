@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 import { normalizarUrlTablero } from "@/lib/tableros";
+import { registrarActividad } from "@/lib/actividad";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +135,10 @@ export async function POST(req: Request) {
     );
   }
 
+  await registrarActividad(sesion?.usuario ?? null, body.id ? "tablero_editar" : "tablero_agregar", {
+    nombre,
+  });
+
   return NextResponse.json({ ok: true, tablero: data });
 }
 
@@ -151,10 +156,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Falta el tablero." }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("tableros")
     .update({ activo: activo === true, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .select("nombre")
+    .maybeSingle();
 
   if (error) {
     console.error("[tableros PATCH]", error.message);
@@ -163,6 +170,12 @@ export async function PATCH(req: Request) {
       { status: 500 }
     );
   }
+
+  await registrarActividad(
+    (await sesionActual())?.usuario ?? null,
+    activo === true ? "tablero_publicar" : "tablero_ocultar",
+    { nombre: data?.nombre ?? null }
+  );
 
   return NextResponse.json({ ok: true });
 }
@@ -178,7 +191,12 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Falta el tablero." }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.from("tableros").delete().eq("id", id);
+  const { data, error } = await supabaseAdmin
+    .from("tableros")
+    .delete()
+    .eq("id", id)
+    .select("nombre")
+    .maybeSingle();
 
   if (error) {
     console.error("[tableros DELETE]", error.message);
@@ -187,6 +205,10 @@ export async function DELETE(req: Request) {
       { status: 500 }
     );
   }
+
+  await registrarActividad((await sesionActual())?.usuario ?? null, "tablero_eliminar", {
+    nombre: data?.nombre ?? null,
+  });
 
   return NextResponse.json({ ok: true });
 }

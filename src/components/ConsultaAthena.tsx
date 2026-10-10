@@ -14,6 +14,8 @@ import type { RespuestaEstado, RespuestaInicio, RespuestaPagina } from "@/lib/re
 const TOPE_FILAS = 200_000;
 
 export type Fase =
+  /** Todavía no se ha pedido (consultas que no arrancan solas). */
+  | { tipo: "quieto" }
   | { tipo: "lanzando" }
   | { tipo: "esperando"; estado: "QUEUED" | "RUNNING"; desde: number }
   | { tipo: "leyendo"; leidas: number }
@@ -29,12 +31,12 @@ export const sinTildes = (s: string) =>
 
 export const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function megas(bytes: number): string {
+export function megas(bytes: number): string {
   const mb = bytes / 1_048_576;
   return `${mb.toLocaleString("es-CO", { maximumFractionDigits: mb < 10 ? 1 : 0 })} MB`;
 }
 
-function momento(iso: string | null): string {
+export function momento(iso: string | null): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("es-CO", {
     day: "numeric",
@@ -60,12 +62,15 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
  * Corre en Athena la consulta de `ruta` (una de las de lib/rutaAthena.ts) al
  * montar el componente y cada vez que se llama consultar(). `aFilas` convierte
  * cada página de Athena en las filas que usa la pantalla.
+ *
+ * Con `automatica: false` no arranca sola: espera a que se llame consultar().
  */
 export function useConsultaAthena<T>(
   ruta: string,
-  aFilas: (columnas: string[], filas: (string | null)[][]) => T[]
+  aFilas: (columnas: string[], filas: (string | null)[][]) => T[],
+  { automatica = true }: { automatica?: boolean } = {}
 ) {
-  const [fase, setFase] = useState<Fase>({ tipo: "lanzando" });
+  const [fase, setFase] = useState<Fase>(automatica ? { tipo: "lanzando" } : { tipo: "quieto" });
   const [filas, setFilas] = useState<T[]>([]);
   const [info, setInfo] = useState<InfoConsulta | null>(null);
 
@@ -150,58 +155,47 @@ export function useConsultaAthena<T>(
 
   // Al abrir la pestaña se consulta sola. Al salir, se deja de preguntar.
   useEffect(() => {
-    consultar(false);
+    if (automatica) consultar(false);
     return () => {
       consulta.current++;
     };
-  }, [consultar]);
+  }, [consultar, automatica]);
 
   return {
     fase,
     filas,
     info,
     consultar,
-    trabajando: fase.tipo !== "listo" && fase.tipo !== "error",
+    trabajando: fase.tipo !== "listo" && fase.tipo !== "error" && fase.tipo !== "quieto",
   };
 }
 
-/** Título de la pestaña, cuándo se consultó y el botón para volver a consultar. */
-export function EncabezadoConsulta({
-  titulo,
-  info,
+/** "Consultado el 7 de octubre, 6:44 p. m. · 46 MB leídos" (vacío mientras no termine). */
+export function textoConsulta(info: InfoConsulta | null): string {
+  if (!info) return "";
+  const cuando = `Consultado el ${momento(info.enviada)}`;
+  if (info.reutilizada) return `${cuando} · resultado de una consulta reciente`;
+  return info.bytes > 0 ? `${cuando} · ${megas(info.bytes)} leídos` : cuando;
+}
+
+/** Vuelve a consultar pidiendo datos nuevos. */
+export function BotonReconsultar({
   trabajando,
   onConsultar,
 }: {
-  titulo: string;
-  info: InfoConsulta | null;
   trabajando: boolean;
-  /** Vuelve a consultar pidiendo datos nuevos. */
   onConsultar: () => void;
 }) {
   return (
-    <section className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h2 className="text-sm font-semibold">{titulo}</h2>
-        {info && (
-          <p className="cifras mt-1 text-xs text-[var(--color-tinta-suave)]">
-            Consultado el {momento(info.enviada)}
-            {info.reutilizada
-              ? " · resultado de una consulta reciente"
-              : info.bytes > 0 && ` · ${megas(info.bytes)} leídos`}
-          </p>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={onConsultar}
-        disabled={trabajando}
-        className="flex items-center gap-2 rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] px-3 py-2 text-[13px] text-[var(--color-tinta)] hover:border-[var(--color-tinta)] disabled:opacity-45"
-      >
-        <RefreshCw size={14} aria-hidden className={trabajando ? "animate-spin" : undefined} />
-        Volver a consultar
-      </button>
-    </section>
+    <button
+      type="button"
+      onClick={onConsultar}
+      disabled={trabajando}
+      className="boton boton-secundario"
+    >
+      <RefreshCw size={15} aria-hidden className={trabajando ? "animate-spin" : undefined} />
+      Volver a consultar
+    </button>
   );
 }
 
@@ -216,13 +210,13 @@ export function ProgresoConsulta({ fase, onReintentar }: { fase: Fase; onReinten
     return () => window.clearInterval(t);
   }, [fase.tipo]);
 
-  if (fase.tipo === "listo") return null;
+  if (fase.tipo === "listo" || fase.tipo === "quieto") return null;
 
   if (fase.tipo === "error") {
     return (
       <div
         role="alert"
-        className="flex flex-wrap items-start justify-between gap-3 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]"
+        className="flex flex-wrap items-start justify-between gap-3 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]"
       >
         <span className="flex items-start gap-2">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />

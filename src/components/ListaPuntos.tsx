@@ -29,7 +29,7 @@ export default function ListaPuntos({ puntos, seleccionado, onSeleccionar }: Pro
               onClick={() => onSeleccionar?.(p.id_pdv)}
               aria-current={activo || undefined}
               className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                activo ? "bg-[#e4e9e6]" : "hover:bg-[#f3f5f2]"
+                activo ? "bg-[var(--color-seleccion)]" : "hover:bg-[var(--color-hover)]"
               }`}
             >
               <span
@@ -50,7 +50,7 @@ export default function ListaPuntos({ puntos, seleccionado, onSeleccionar }: Pro
 
                 <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
                   {p.ciclo && (
-                    <span className="cifras rounded-full bg-[#eceeeb] px-2 py-0.5 text-[var(--color-tinta)]">
+                    <span className="cifras rounded-full bg-[var(--color-relleno)] px-2 py-0.5 text-[var(--color-tinta)]">
                       Ciclo {p.ciclo}
                     </span>
                   )}

@@ -117,21 +117,14 @@ export default function PanelTemas() {
   }
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="text-sm font-semibold">Temas de temporada</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Adornos que aparecen solos en las fechas especiales y se retiran al
-          terminar. Son decoración y nada más: no tapan botones ni cambian cómo
-          se usa la página, y en celular salen más pequeños y con menos
-          elementos.
-        </p>
-
+    <div className="space-y-6">
+      {/* El título y la explicación los pone el panel arriba. */}
+      <div>
         <p
-          className={`mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium ${
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium ${
             activo
-              ? "bg-[#f0ebf7] text-[#4b3a6b]"
-              : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
+              ? "bg-[var(--color-morado-fondo)] text-[var(--color-morado-tinta)]"
+              : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
           }`}
         >
           <Sparkles size={14} aria-hidden />
@@ -145,24 +138,24 @@ export default function PanelTemas() {
             role="status"
             className={`mt-3 rounded-[4px] px-3 py-2.5 text-[13px] leading-snug ${
               aviso.tipo === "ok"
-                ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                : "bg-[#f8ecea] text-[var(--color-alerta)]"
+                ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                : "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]"
             }`}
           >
             {aviso.texto}
           </p>
         )}
-      </section>
+      </div>
 
-      <section>
-        <h3 className="campo-etiqueta">Cuándo mostrarlos</h3>
+      <section className="tarjeta p-5">
+        <h2 className="text-sm font-semibold">Cuándo mostrarlos</h2>
         <div className="mt-2 space-y-2">
           {MODOS.map((m) => (
             <label
               key={m.id}
               className={`flex cursor-pointer gap-3 rounded-[4px] border p-3 ${
                 modo === m.id
-                  ? "border-[var(--color-tinta)] bg-[#f7f9f7]"
+                  ? "border-[var(--color-tinta)] bg-[var(--color-sutil)]"
                   : "border-[var(--color-linea)]"
               }`}
             >
@@ -215,8 +208,8 @@ export default function PanelTemas() {
         )}
       </section>
 
-      <section>
-        <h3 className="campo-etiqueta">Cuáles están habilitados</h3>
+      <section className="tarjeta p-5">
+        <h2 className="text-sm font-semibold">Cuáles están habilitados</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           Un tema deshabilitado no sale aunque lleguen sus fechas.
         </p>
@@ -250,8 +243,8 @@ export default function PanelTemas() {
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                       encendido
-                        ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                        : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
+                        ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                        : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
                     }`}
                   >
                     {encendido ? "habilitado" : "deshabilitado"}
@@ -261,7 +254,7 @@ export default function PanelTemas() {
                     type="button"
                     onClick={() => alternarTema(t.id)}
                     disabled={guardando}
-                    className="shrink-0 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="boton boton-secundario boton-chico shrink-0"
                   >
                     {encendido ? "Deshabilitar" : "Habilitar"}
                   </button>

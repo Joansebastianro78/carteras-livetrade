@@ -24,8 +24,16 @@ autorizarlo o hospedar el tarball internamente.
 
 1. Crear el proyecto en supabase.com.
 2. Abrir **SQL Editor** y ejecutar, en orden: `supabase/schema.sql`,
-   `supabase/admins.sql`, `supabase/roles.sql`, `supabase/gestion.sql` y
-   `supabase/territorio.sql`.
+   `supabase/admins.sql`, `supabase/roles.sql`, `supabase/gestion.sql`,
+   `supabase/territorio.sql` y `supabase/panel.sql`.
+
+   En un proyecto que ya estaba andando basta con ejecutar `supabase/panel.sql`
+   una vez. Crea dos tablas: `actividad_panel` (la actividad reciente del
+   Inicio) y `revision_fotos` (las marcas de la auditoría de imágenes). Se
+   puede volver a correr sin problema. Mientras no se ejecute, el panel
+   funciona igual: el Inicio no muestra los cambios de usuarios,
+   mantenimiento, tableros y temas, y las fotos no se pueden marcar; las dos
+   cosas lo avisan en pantalla.
 3. En **Project Settings → API**, copiar la *Project URL* y la **service_role**
    key hacia `.env.local`.
 
@@ -47,14 +55,14 @@ directo con la base.
 | Ruta | Qué hace |
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
-| `/admin` | Login y panel completo: cargar, editar, BackOffice, mantenimiento y usuarios. |
-| `/backoffice` | Acceso de consulta: buscar un consultor, filtrar por departamento o ciudad, y ver o descargar la cartera. |
+| `/admin` | Login y panel completo, con menú lateral: Inicio, cargar, editar, consultores, departamento y ciudad, las dos auditorías, tableros, mantenimiento, temas y usuarios. |
+| `/backoffice` | Acceso de consulta: buscar un consultor, filtrar por departamento o ciudad, las dos auditorías y los tableros. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
 | `POST /api/admin/upload` | UPSERT de un lote de hasta 1000 filas. |
 | `GET/PATCH/DELETE /api/admin/puntos` | Buscar, editar o borrar un punto. |
 | `GET/POST /api/admin/purgar` | Resumen por ciclo y borrado masivo. |
-| `GET/POST/PATCH /api/admin/usuarios` | Listar, crear y activar usuarios del panel. |
+| `GET/POST/PATCH /api/admin/usuarios` | Listar, crear, activar o desactivar y cambiarle el perfil a un usuario del panel. |
 | `GET /api/admin/consultores` | Buscar un consultor o traer su cartera completa. |
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
@@ -62,10 +70,14 @@ directo con la base.
 | `GET /api/admin/territorio` | Departamentos y ciudades con su conteo, o una página de puntos de una región. Lo usa el BackOffice. |
 | `POST/GET /api/admin/auditoria` | Lanza la consulta de auditoría en Athena, informa su estado y entrega los resultados en páginas de 1000. La usan los tres perfiles. |
 | `POST/GET /api/admin/auditoria-imagenes` | Lo mismo, con la consulta de las fotos de inicio de visita. La usan los tres perfiles. |
+| `GET/POST /api/admin/revision-fotos` | Las marcas «Correcta» y «Para revisar» de la auditoría de imágenes, con quién las puso. La usan los tres perfiles. |
+| `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?lista=sin-ubicacion` o `?lista=libres`, los puntos para las descargas de «Para revisar». El BackOffice solo lee el encabezado. |
+| `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Solo administradores. |
+| `POST /api/admin/upload/previa` | Antes de aplicar una carga: cuántas filas del archivo ya existen y cuántas son nuevas. No cambia nada. |
 
 ### Filtro por departamento y ciudad
 
-Pestaña **Departamento y ciudad**, en `/backoffice` y en el panel `/admin`:
+Sección **Departamento y ciudad**, en `/backoffice` y en el panel `/admin`:
 la ven los tres perfiles (BackOffice, administrador y superadministrador). Se elige un departamento,
 todos los departamentos, o una ciudad directamente, y opcionalmente un ciclo; salen todos los puntos de esa
 región en el mapa y en una lista con buscador, con un desglose por ciudad (o
@@ -91,7 +103,7 @@ solo se habilita cuando llegaron todas las páginas.
 
 ### Tableros de Power BI
 
-Un administrador pega el enlace del informe en su pestaña **Tableros** y el
+Un administrador pega el enlace del informe en su sección **Tableros** y el
 perfil BackOffice lo ve en la suya. Solo se guarda el enlace: el informe vive
 en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo ve
 acá, y esta app nunca toca los datos del informe.
@@ -147,6 +159,29 @@ Las tres reglas del superadministrador se validan en `/api/admin/usuarios`, no
 en la interfaz: los botones que no aplican salen deshabilitados, pero aunque
 alguien llame la API a mano recibe 403.
 
+**Cambiar el perfil.** Un administrador o un superadministrador le cambia el
+perfil a otro usuario desde su fila en **Administradores**, sin tocarle la
+clave (pide confirmación). Reglas, también validadas en la API:
+
+- nadie se cambia el perfil a sí mismo;
+- dar o quitar el perfil de superadministrador solo lo hace otro
+  superadministrador (un admin ni siquiera ve esa opción);
+- siempre queda al menos un administrador activo.
+
+Cada cambio queda en la actividad del Inicio, con el perfil de antes y el
+nuevo.
+
+**Sesiones abiertas.** La cookie dura 8 horas y lleva el perfil adentro. Para
+que un cambio de perfil o una desactivación no esperen a que venza, el
+middleware confirma en la base, en cada petición, que el usuario sigue activo
+y con el mismo perfil. Lo recuerda medio minuto para no consultar la base a
+cada clic, así que el cambio se aplica como mucho unos 30 segundos después: la
+sesión se cierra y el login le explica por qué («Tu perfil cambió…» o «Tu
+usuario fue desactivado…»). Antes de sacar a alguien vuelve a preguntar, así
+que a quien reactivan o le cambian el perfil y entra de nuevo enseguida no lo
+saca un dato viejo. Si la base no contesta, sigue con lo que dice la cookie,
+como antes, para no dejar a nadie por fuera por un problema ajeno.
+
 ```sql
 -- crear o cambiarle la clave a alguien (el cuarto argumento es el perfil)
 select public.crear_admin('joan', 'clave-larga-y-unica', 'Joan');
@@ -161,7 +196,8 @@ select usuario, nombre, rol, activo, ultimo_login from public.admins order by ro
 ```
 
 El middleware protege `/admin`, `/backoffice` y `/api/admin/*` con una cookie
-httpOnly firmada con HMAC-SHA256 que lleva el usuario y el rol dentro. Cada carga queda registrada en
+httpOnly firmada con HMAC-SHA256 que lleva el usuario y el rol dentro, y lo
+confirma contra la base como se explica arriba. Cada carga queda registrada en
 `cargas_cartera.cargado_por`.
 
 El login responde el mismo mensaje para usuario inexistente y clave errada, para
@@ -202,9 +238,47 @@ en Postgres y obliga a comillas dobles en cada consulta.
 
 ## 5. El panel
 
-Tres pestañas.
+`/admin` y `/backoffice` comparten el mismo armazón (`src/components/PanelShell.tsx`):
+un menú lateral con las secciones agrupadas (Cartera, Auditorías, Reportes,
+Configuración), y arriba la fecha y la hora de Colombia y si la consulta está
+abierta o en mantenimiento. En el celular el menú se abre con el botón de las tres rayas.
+En pantallas grandes se puede ocultar con el botón que está junto al nombre de
+la app, para darle todo el ancho a mapas y tablas, y se vuelve a mostrar con
+«Menú» arriba a la izquierda; queda como cada quien lo dejó en su navegador
+(cookie `cartera_menu`).
+Cada sección tiene su dirección (`/admin#auditoria`, `/admin#usuarios`…), así
+que se puede guardar o compartir el enlace y el botón Atrás del navegador
+funciona. Las secciones de cada panel están en `PanelAdmin.tsx` y
+`PanelBackOffice.tsx`; agregar una es sumar una entrada a esa lista.
 
-**Cargar plantilla.** Tres modos, elegidos antes de soltar el archivo:
+Abajo del menú están el usuario con su perfil, **Apariencia**, «Ver consulta»
+(o «Panel completo» para un administrador dentro del BackOffice) y Salir.
+
+**Modo claro, oscuro o automático.** Cada quien lo elige en **Apariencia**;
+«Auto» sigue al sistema operativo. Queda en una cookie de ese navegador
+(`cartera_modo`, un año), no en la cuenta. El servidor la lee y pinta la
+página ya en su modo, sin un parpadeo claro al entrar. Solo aplica al panel,
+al BackOffice y a su login: la consulta de los consultores siempre se ve clara,
+aunque quien la abra tenga elegido el oscuro (el middleware marca las páginas
+del panel con un encabezado y el layout solo aplica el modo a esas). Los
+colores son variables CSS en `src/app/globals.css`: el bloque
+`:root[data-modo="oscuro"]` define la versión oscura de cada una, y las piezas
+comunes del panel (`tarjeta`, `boton`, `chip`, `tabla`…) están ahí mismo. Los
+mapas conservan sus capas de siempre.
+
+**Inicio.** Lo primero al entrar: puntos del ciclo actual (y cuántos hay en
+otros ciclos), consultores, puntos sin coordenadas y el último cargue; atajos;
+el resumen de la última auditoría de datos consultada desde ese navegador; la
+actividad reciente; los puntos por departamento; y «Para revisar», con las
+descargas de los puntos sin coordenadas y de los LIBRE, y las observaciones
+del último cargue. La actividad junta las cargas (`cargas_cartera`), las
+ediciones y borrados (`auditoria_cartera`) y, con `supabase/panel.sql`, los
+cambios de usuarios, mantenimiento, tableros y temas (`actividad_panel`). Las
+cuentas de consultores no incluyen el usuario LIBRE.
+
+**Cargar plantilla.** Va en cuatro pasos: qué quieres hacer, el archivo,
+revisar y aplicar. Nada cambia en la cartera hasta el último. Tres modos,
+elegidos antes de soltar el archivo:
 
 | Modo | Qué hace | Cuándo |
 |---|---|---|
@@ -217,11 +291,14 @@ El modo actualizar es el que resuelve la corrección masiva: basta un Excel con
 no, el mismo ID se cambia en todos los ciclos donde exista, y el panel lo
 advierte antes de aplicar.
 
-Antes de ejecutar, el panel muestra qué columnas reconoció, cuáles ignoró y
-cuántas filas trae. Vale la pena mirarlo: en modo actualizar una celda vacía
-cuenta como cambio y deja el campo en blanco.
+En el paso de revisar, el panel compara el archivo con la cartera
+(`/api/admin/upload/previa`) y dice cuántos puntos son nuevos y cuántos ya
+existen, cómo queda la cartera después, qué columnas reconoció y cuáles
+ignoró, y las filas con observaciones, que se pueden bajar en Excel
+(`Observaciones_<archivo>.xlsx`). Vale la pena mirarlo: en modo actualizar una
+celda vacía cuenta como cambio y deja el campo en blanco.
 
-Ninguno de los tres modos borra filas. Para sacar puntos hay que usar la pestaña
+Ninguno de los tres modos borra filas. Para sacar puntos hay que usar la sección
 de editar cartera.
 
 **Editar cartera.** Búsqueda por ID, código Bavaria, nombre, dirección, usuario
@@ -238,8 +315,8 @@ El borrado masivo pide escribir la frase exacta —el nombre del ciclo, o
 `ELIMINAR TODA LA CARTERA`— porque no hay papelera ni respaldo automático. Todo
 borrado y toda edición quedan en `auditoria_cartera` con el usuario que la hizo.
 
-**Usuarios del panel.** Crear, cambiar clave, elegir perfil, desactivar y
-reactivar. Guardas puestas: nadie puede desactivarse a sí mismo, y el sistema no
+**Usuarios del panel** (sección Administradores). Crear, cambiar clave,
+cambiar el perfil desde la fila, desactivar y reactivar. Guardas puestas: nadie puede desactivarse a sí mismo, y el sistema no
 permite quedarse sin ningún administrador activo (los perfiles BackOffice no
 cuentan para ese mínimo). Escribir un usuario que ya existe reemplaza su clave,
 que es la única forma de recuperarla, y le deja el perfil que esté marcado.
@@ -326,8 +403,9 @@ opción solo se permite dentro de un componente de cliente; de ahí la envoltura
 
 ## 9. Auditoría (Athena)
 
-Pestaña **Auditoría**, en `/backoffice` y en `/admin`, para los tres perfiles.
-Al abrirla ejecuta en Athena la consulta de `src/lib/consultaAuditoria.ts`
+Sección **Auditorías → Datos**, en `/backoffice` y en `/admin`, para los tres
+perfiles. En pantalla no se nombra Athena. Al abrirla ejecuta en Athena la
+consulta de `src/lib/consultaAuditoria.ts`
 (validaciones de cédula, fechas de nacimiento, «Select» sin responder, rangos
 de costos, ventas, porcentajes y años) y muestra los hallazgos con un desglose
 por motivo y un buscador. La consulta trae además `actividad_id` y
@@ -335,16 +413,25 @@ por motivo y un buscador. La consulta trae además `actividad_id` y
 avanza, Linea de seguimiento o Sin clasificar), que sale del `CASE` sobre la
 actividad. Si se agrega una actividad nueva, se agrega ahí.
 
+La pantalla tiene arriba los filtros (fechas, con atajos «Hoy», «Últimos 7
+días» y «Este mes»; consultor; tipo de línea; buscador) con los que están
+puestos a la vista y un botón para quitarlos; después las cifras (hallazgos,
+consultores, PDV con hallazgos y sin fecha), las barras «Por motivo», que
+también filtran, y la tabla de hallazgos de 50 en 50 (en el celular, tarjetas
+y una barra fija con «Filtros» y «Excel limpio»). Lo último que se consultó
+queda resumido en el Inicio de ese navegador.
+
 **Rango de fechas** («Desde» y «Hasta», los dos opcionales): delimita toda la
-pestaña —los hallazgos, los conteos por motivo y las dos descargas— a los
+sección —los hallazgos, los conteos por motivo y las dos descargas— a los
 hallazgos cuya `fecha` cae en esos días, ambos incluidos. Un hallazgo sin
-fecha queda fuera de cualquier rango y la pantalla dice cuántos son. El motivo
-y el buscador solo afinan lo que se ve; no recortan los Excel. Sin rango, todo
+fecha queda fuera de cualquier rango y la pantalla dice cuántos son. El
+consultor, el tipo de línea, el motivo y el buscador solo afinan lo que se ve;
+no recortan los Excel. Sin rango, todo
 funciona como siempre. La fecha se toma tal como la entrega la consulta, sin
 convertir zona horaria (igual que en la auditoría de imágenes, más abajo).
 
-Dos descargas, las dos con los hallazgos del rango de fechas (sin rango,
-todos). Con rango, el nombre del archivo lo lleva en lugar del día de hoy:
+Dos descargas, en el botón «Excel limpio» y su flecha, las dos con los
+hallazgos del rango de fechas (sin rango, todos). Con rango, el nombre del archivo lo lleva en lugar del día de hoy:
 `..._2026-09-05_a_2026-09-10.xlsx`.
 
 - **Excel limpio** (`auditoria_bavaria_puntos_limpia_<fecha>.xlsx`): los
@@ -421,7 +508,7 @@ variables van con `ATHENA_` y no con `AWS_` porque Vercel reserva esos nombres.
 
 ### Auditoría de imágenes
 
-Pestaña **Auditoría de imágenes**, en `/backoffice` y en `/admin`, para los
+Sección **Auditorías → Imágenes**, en `/backoffice` y en `/admin`, para los
 tres perfiles. Corre en Athena la consulta de `src/lib/consultaImagenes.ts`:
 la foto con la que cada consultor inició la visita (`foto_visita_inicio`),
 con el PDV, su código, el consultor y la fecha de la visita (`fecha_inicio`).
@@ -429,7 +516,7 @@ con el PDV, su código, el consultor y la fecha de la visita (`fecha_inicio`).
 otra se cambia en ese archivo.
 
 - **Rango de fechas** («Desde» y «Hasta», los dos opcionales): delimita toda
-  la pestaña —la galería, los conteos y el Excel— a las visitas de esos días,
+  la sección —la galería, los conteos y el Excel— a las visitas de esos días,
   ambos incluidos. El calendario ofrece los días entre la primera y la última
   visita. Una visita sin fecha, o con una fecha que no se entiende, queda
   fuera de cualquier rango y la pantalla dice cuántas son.
@@ -439,16 +526,23 @@ otra se cambia en ese archivo.
   consulta (`fecha_inicio AT TIME ZONE 'America/Bogota'`).
 - Las visitas salen de la más reciente a la más antigua; las que no traen
   fecha, al final.
-- Galería de fotos con filtro por consultor, buscador por PDV o código, y
-  filtros «Con foto», «Sin foto» y, si aparecen, «Sin enlace válido». Estos
-  filtros afinan lo que se ve dentro de las fechas elegidas. Al tocar una foto
-  se abre en grande; se pasa a la anterior o la siguiente con las flechas
-  (también las del teclado) y se cierra con Esc.
-- **Descargar en Excel**: las cinco columnas de la consulta, con la foto como
-  enlace para abrirla con un clic y `fecha_inicio` como fecha de Excel. Trae
-  las visitas del rango de fechas (sin rango, todas); el consultor, el
-  buscador y los filtros de foto no lo recortan. El nombre del archivo lleva
-  el rango: `Auditoria_imagenes_2026-09-05_a_2026-09-10.xlsx`.
+- Galería de fotos agrupada por día, con filtro por consultor, por revisión,
+  buscador por PDV o código, y filtros «Con foto», «Sin foto» y, si aparecen,
+  «Sin enlace válido». Estos filtros afinan lo que se ve dentro de las fechas
+  elegidas. En pantalla grande, tocar una foto la muestra a la derecha con sus
+  datos; en el celular se abre en grande. En el visor se pasa a la anterior o
+  la siguiente con las flechas (también las del teclado) y se cierra con Esc.
+- **Revisión de fotos.** Cada foto se puede marcar «Correcta» o «Para
+  revisar» (tocar la marca puesta la quita). Las marcas se guardan en la tabla
+  `revision_fotos` (de `supabase/panel.sql`) con quién y cuándo, así que las ve
+  todo el equipo; arriba sale cuántas van revisadas. La foto se reconoce por
+  una huella de su enlace: si el enlace cambia, la marca no la sigue.
+- **Descargar Excel**: las cinco columnas de la consulta, con la foto como
+  enlace para abrirla con un clic y `fecha_inicio` como fecha de Excel, más
+  `revision` y `revisado_por`. Trae las visitas del rango de fechas (sin
+  rango, todas); el consultor, la revisión, el buscador y los filtros de foto
+  no lo recortan. El nombre del archivo lleva el rango:
+  `Auditoria_imagenes_2026-09-05_a_2026-09-10.xlsx`.
 - Las fotos se cargan directamente desde la dirección que trae
   `foto_visita_inicio`, en su tamaño original; por eso la galería muestra de a
   24 y solo descarga las que van quedando a la vista. Si el servidor de fotos
@@ -474,6 +568,9 @@ de fechas: `src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
   de filas convendría generarla en el servidor y entregar un enlace.
 - No hay borrado de ciclos viejos. Cuando la tabla crezca, conviene un job que
   archive los ciclos cerrados.
+- El resumen de la auditoría que sale en el Inicio se guarda en el navegador
+  de cada quien, no en la base: otro computador no lo ve hasta consultarla.
+- El modo oscuro no oscurece los mapas: las capas son imágenes de terceros.
 - No hay recuperación de clave de administrador: se cambia desde el SQL Editor
   con `crear_admin`. Con más de cinco u ocho administradores, vale la pena mover
   todo esto a Supabase Auth en vez de mantener la tabla propia.

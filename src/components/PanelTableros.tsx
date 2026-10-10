@@ -123,31 +123,22 @@ export default function PanelTableros() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <h2 className="text-sm font-semibold">Tableros de Power BI</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Los enlaces que agregues aquí le aparecen al perfil BackOffice en su
-          pestaña Tableros. Aquí solo se guarda el enlace: el informe sigue en
-          Power BI con sus permisos, así que quien no tenga acceso allá tampoco
-          lo verá acá.
+      {/* El título y la explicación los pone el panel arriba. */}
+      {aviso && (
+        <p
+          role="status"
+          className={`rounded-[4px] px-3 py-2.5 text-[13px] leading-snug ${
+            aviso.tipo === "ok"
+              ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+              : "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]"
+          }`}
+        >
+          {aviso.texto}
         </p>
-
-        {aviso && (
-          <p
-            role="status"
-            className={`mt-3 rounded-[4px] px-3 py-2.5 text-[13px] leading-snug ${
-              aviso.tipo === "ok"
-                ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                : "bg-[#f8ecea] text-[var(--color-alerta)]"
-            }`}
-          >
-            {aviso.texto}
-          </p>
-        )}
-      </section>
+      )}
 
       <section>
-        <h3 className="campo-etiqueta">Tableros guardados</h3>
+        <h2 className="text-sm font-semibold">Tableros guardados</h2>
 
         {lista === null ? (
           <p className="mt-2 flex items-center gap-2 text-sm text-[var(--color-tinta-suave)]">
@@ -177,8 +168,8 @@ export default function PanelTableros() {
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                       t.activo
-                        ? "bg-[#e7f2ec] text-[var(--color-exito)]"
-                        : "bg-[#eceeeb] text-[var(--color-tinta-suave)]"
+                        ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                        : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
                     }`}
                   >
                     {t.activo ? "publicado" : "sin publicar"}
@@ -187,7 +178,7 @@ export default function PanelTableros() {
                   <button
                     type="button"
                     onClick={() => editar(t)}
-                    className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs"
+                    className="boton boton-secundario boton-chico"
                   >
                     <Pencil size={13} aria-hidden />
                     Editar
@@ -196,7 +187,7 @@ export default function PanelTableros() {
                   <button
                     type="button"
                     onClick={() => publicar(t)}
-                    className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs"
+                    className="boton boton-secundario boton-chico"
                   >
                     {t.activo ? (
                       <EyeOff size={13} aria-hidden />
@@ -209,7 +200,7 @@ export default function PanelTableros() {
                   <button
                     type="button"
                     onClick={() => borrar(t)}
-                    className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs text-[var(--color-alerta)]"
+                    className="boton boton-secundario boton-chico text-[var(--color-alerta)] hover:border-[var(--color-alerta)]"
                   >
                     <Trash2 size={13} aria-hidden />
                     Eliminar
@@ -222,14 +213,11 @@ export default function PanelTableros() {
       </section>
 
       <section>
-        <h3 className="campo-etiqueta">
+        <h2 className="text-sm font-semibold">
           {editando ? "Editar tablero" : "Agregar un tablero"}
-        </h3>
+        </h2>
 
-        <form
-          onSubmit={guardar}
-          className="mt-2 rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)] p-5"
-        >
+        <form onSubmit={guardar} className="tarjeta mt-2 p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="tablero-nombre" className="campo-etiqueta">
@@ -296,7 +284,7 @@ export default function PanelTableros() {
             <button
               type="submit"
               disabled={guardando || !nombre || !url}
-              className="flex items-center gap-2 rounded-[4px] bg-[var(--color-tinta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+              className="boton boton-primario"
             >
               {guardando ? (
                 <Loader2 size={15} className="animate-spin" aria-hidden />
@@ -310,7 +298,7 @@ export default function PanelTableros() {
               <button
                 type="button"
                 onClick={limpiar}
-                className="rounded-[4px] border border-[var(--color-linea)] px-4 py-2.5 text-sm"
+                className="boton boton-secundario"
               >
                 Cancelar
               </button>
@@ -320,17 +308,20 @@ export default function PanelTableros() {
 
         <p className="mt-3 flex items-start gap-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
           <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
-          Con enlaces de tipo <code>autoAuth=true</code> cada persona ve el
-          informe con su propia cuenta de Microsoft, y tiene que estar con sesión
-          abierta en ese mismo navegador. Si el informe no carga dentro de la
-          página, casi siempre es eso o que el tenant bloquea la incrustación:
-          ahí sirve el botón Abrir en Power BI.
+          {/* En un span: suelto, cada trozo de texto sería una columna del flex. */}
+          <span>
+            Con enlaces de tipo <code>autoAuth=true</code> cada persona ve el
+            informe con su propia cuenta de Microsoft, y tiene que estar con sesión
+            abierta en ese mismo navegador. Si el informe no carga dentro de la
+            página, casi siempre es eso o que el tenant bloquea la incrustación:
+            ahí sirve el botón Abrir en Power BI.
+          </span>
         </p>
       </section>
 
       {lista && lista.length > 0 && (
         <section className="border-t border-[var(--color-linea)] pt-6">
-          <h3 className="campo-etiqueta">Así lo ve el BackOffice</h3>
+          <h2 className="text-sm font-semibold">Así lo ve el BackOffice</h2>
           <div className="mt-2">
             <VisorTableros />
           </div>

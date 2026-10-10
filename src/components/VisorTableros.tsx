@@ -67,7 +67,7 @@ export default function VisorTableros() {
     return (
       <p
         role="alert"
-        className="flex items-start gap-2 rounded-[4px] bg-[#f8ecea] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
+        className="flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
       >
         <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
         {error}
@@ -79,7 +79,7 @@ export default function VisorTableros() {
     return (
       <p className="rounded-[4px] border border-dashed border-[var(--color-linea)] px-4 py-8 text-center text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
         Todavía no hay tableros publicados. Un administrador los agrega desde su
-        panel, en la pestaña Tableros.
+        panel, en la sección Tableros.
       </p>
     );
   }
@@ -88,17 +88,9 @@ export default function VisorTableros() {
 
   return (
     <div className="space-y-4">
-      <section>
-        <h2 className="text-sm font-semibold">Tableros de Power BI</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Se abren con tu propia cuenta de Power BI. Si un informe te pide
-          iniciar sesión o dice que no tienes acceso, el permiso se pide allá,
-          no aquí.
-        </p>
-      </section>
-
+      {/* El título y la explicación los pone el panel arriba. */}
       {tableros.length > 1 && (
-        <div>
+        <div className="max-w-md">
           <label htmlFor="tablero" className="campo-etiqueta">
             Cuál ver
           </label>
@@ -129,12 +121,12 @@ export default function VisorTableros() {
             )}
           </span>
 
-          <span className="flex items-center gap-2 sm:ml-auto">
+          <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <button
               type="button"
               onClick={() => setRecarga((n) => n + 1)}
               title="Volver a cargar el informe"
-              className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs"
+              className="boton boton-secundario boton-chico"
             >
               <RefreshCw size={13} aria-hidden />
               Recargar
@@ -143,7 +135,7 @@ export default function VisorTableros() {
             <button
               type="button"
               onClick={alternarPantallaCompleta}
-              className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs"
+              className="boton boton-secundario boton-chico"
             >
               {pantallaCompleta ? (
                 <Minimize2 size={13} aria-hidden />
@@ -157,7 +149,7 @@ export default function VisorTableros() {
               href={actual.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-[4px] border border-[var(--color-linea)] px-3 py-1.5 text-xs"
+              className="boton boton-secundario boton-chico"
             >
               <ExternalLink size={13} aria-hidden />
               Abrir en Power BI
