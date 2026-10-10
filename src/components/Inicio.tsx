@@ -49,10 +49,24 @@ type Resumen = {
   mantenimiento: { activo: boolean; hasta: string | null };
   errorCiclos: string | null;
   actual: { ciclo: string; puntos: number; consultores: number; sin_ubicacion: number } | null;
+  /** Toda la cartera, todos los ciclos. null: no se pudo contar. */
+  general: {
+    puntos: number;
+    asignados: number | null;
+    libres: number | null;
+    consultores: number | null;
+  };
   libres: number | null;
   ultimaCarga: Carga | null;
   departamentos: { nombre: string; puntos: number }[] | null;
 };
+
+/** "Ciclo 12", pero "CICLO 0 - PILOTO" tal cual: el nombre ya trae la palabra. */
+function nombreCiclo(ciclo: string | null | undefined): string {
+  const c = (ciclo ?? "").trim();
+  if (!c) return "Sin ciclo";
+  return /^ciclo\b/i.test(c) ? c : `Ciclo ${c}`;
+}
 
 type ItemActividad = {
   momento: string;
@@ -229,9 +243,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
   }
 
   const actual = resumen?.actual ?? null;
-  const otros = (resumen?.ciclos ?? [])
-    .filter((c) => c.ciclo !== resumen?.ciclo)
-    .reduce((a, c) => a + c.puntos, 0);
+  const general = resumen?.general ?? null;
   const ultima = resumen?.ultimaCarga ?? null;
   const deptos = resumen?.departamentos ?? null;
   const maxDepto = deptos?.[0]?.puntos ?? 1;
@@ -303,7 +315,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       tono: "neutro",
       Icono: UserX,
       titulo: `${cifra(resumen.libres)} ${resumen.libres === 1 ? "punto" : "puntos"} sin consultor (LIBRE)`,
-      detalle: `En el ciclo ${resumen.ciclo || "actual"}.`,
+      detalle: `${nombreCiclo(resumen.ciclo)}.`,
       accion: (
         <button
           type="button"
@@ -350,23 +362,31 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       <section aria-label="Resumen de la cartera" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           {
-            titulo: "Puntos en cartera",
-            valor: actual ? cifra(actual.puntos) : resumen ? "0" : null,
-            nota: actual
-              ? `Ciclo ${actual.ciclo || "sin nombre"}${otros > 0 ? ` · ${cifra(otros)} en otros ciclos` : ""}`
-              : "Todavía no hay cartera cargada",
+            // Conteo general: toda la cartera, todos los ciclos.
+            titulo: "Puntos asignados",
+            valor: general ? cifra(general.asignados ?? general.puntos) : null,
+            nota: !general || general.puntos === 0
+              ? "Todavía no hay cartera cargada"
+              : general.libres === null
+                ? "Toda la cartera"
+                : general.libres > 0
+                  ? `De ${cifra(general.puntos)} en total · ${cifra(general.libres)} sin consultor`
+                  : "Toda la cartera, todos los ciclos",
           },
           {
-            titulo: "Consultores con cartera",
-            valor: actual ? cifra(actual.consultores) : resumen ? "0" : null,
-            nota: resumen?.libres
-              ? `${cifra(resumen.libres)} puntos sin consultor`
-              : "Todos los puntos tienen consultor",
+            titulo: "Consultores con puntos",
+            valor: general ? (general.consultores === null ? "—" : cifra(general.consultores)) : null,
+            nota:
+              general?.consultores === null
+                ? "Falta la vista resumen_consultores (supabase/gestion.sql)"
+                : "Con al menos un punto asignado",
           },
           {
             titulo: "Puntos sin coordenadas",
             valor: actual ? cifra(actual.sin_ubicacion) : resumen ? "0" : null,
-            nota: "No salen en el mapa del consultor",
+            nota: actual
+              ? `${nombreCiclo(actual.ciclo)} · no salen en el mapa`
+              : "No salen en el mapa del consultor",
             alerta: (actual?.sin_ubicacion ?? 0) > 0,
           },
           {
@@ -389,7 +409,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
                 {c.valor}
               </p>
             )}
-            <p className="mt-1 truncate text-[13px] text-[var(--color-tinta-suave)]" title={c.nota}>
+            <p className="mt-1 line-clamp-2 text-[13px] break-words text-[var(--color-tinta-suave)]" title={c.nota}>
               {c.nota}
             </p>
           </div>
@@ -552,7 +572,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
               {resumen?.ciclo !== undefined && resumen?.ciclo !== null && (
                 <span className="font-normal text-[var(--color-tinta-suave)]">
                   {" "}
-                  · ciclo {resumen.ciclo || "sin nombre"}
+                  · {nombreCiclo(resumen.ciclo).replace(/^Ciclo /, "ciclo ")}
                 </span>
               )}
             </h2>

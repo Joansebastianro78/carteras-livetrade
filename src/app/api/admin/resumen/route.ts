@@ -10,8 +10,11 @@ export const dynamic = "force-dynamic";
  * Cómo está la cartera hoy.
  *
  *   GET ?corto=1                    → ciclo actual, ciclos y mantenimiento (barra del panel)
- *   GET                             → lo anterior y además: puntos sin consultor, las
- *                                     dos últimas cargas y los puntos por departamento
+ *   GET                             → lo anterior y además: las cifras de toda la
+ *                                     cartera (general: puntos, asignados, LIBRE y
+ *                                     consultores con puntos), puntos sin consultor
+ *                                     del ciclo, las dos últimas cargas y los puntos
+ *                                     por departamento
  *   GET ?lista=sin-ubicacion|libres → los puntos del ciclo actual sin coordenadas o
  *                                     sin consultor, para descargarlos
  *
@@ -60,6 +63,34 @@ async function contarLibres(ciclo: string): Promise<number | null> {
 }
 
 /** Si en el ciclo hay puntos con usuario LIBRE (la vista lo cuenta como consultor). */
+/** Puntos sin consultor (LIBRE) en toda la cartera, todos los ciclos. */
+async function contarLibresTodos(): Promise<number | null> {
+  const { count, error } = await filtroLibres(
+    supabaseAdmin.from("puntos_cartera").select("id_registro", { count: "exact", head: true })
+  );
+  if (error) {
+    console.error("[resumen libres todos]", error.message);
+    return null;
+  }
+  return count ?? 0;
+}
+
+/**
+ * Consultores con al menos un punto, en toda la cartera. Un consultor es la
+ * pareja usuario + cédula, igual que en el buscador del BackOffice
+ * (resumen_consultores ya deja fuera los LIBRE).
+ */
+async function contarConsultoresTodos(): Promise<number | null> {
+  const { count, error } = await supabaseAdmin
+    .from("resumen_consultores")
+    .select("usuario", { count: "exact", head: true });
+  if (error) {
+    console.error("[resumen consultores]", error.message);
+    return null;
+  }
+  return count ?? 0;
+}
+
 async function contarUsuarioLibre(ciclo: string): Promise<number> {
   const { count } = await supabaseAdmin
     .from("puntos_cartera")
@@ -175,12 +206,24 @@ export async function GET(req: Request) {
 
   if (searchParams.get("corto")) return NextResponse.json(base);
 
-  const [libres, conUsuarioLibre, cargas, departamentos] = await Promise.all([
-    ciclo === null ? Promise.resolve(0) : contarLibres(ciclo),
-    ciclo === null ? Promise.resolve(0) : contarUsuarioLibre(ciclo),
-    leerCargas(),
-    ciclo === null ? Promise.resolve([]) : leerDepartamentos(ciclo),
-  ]);
+  const [libres, conUsuarioLibre, cargas, departamentos, libresTodos, consultoresTodos] =
+    await Promise.all([
+      ciclo === null ? Promise.resolve(0) : contarLibres(ciclo),
+      ciclo === null ? Promise.resolve(0) : contarUsuarioLibre(ciclo),
+      leerCargas(),
+      ciclo === null ? Promise.resolve([]) : leerDepartamentos(ciclo),
+      contarLibresTodos(),
+      contarConsultoresTodos(),
+    ]);
+
+  // Toda la cartera, sin importar el ciclo: lo que muestran las cifras del Inicio.
+  const puntosTodos = (ciclos ?? []).reduce((a, c) => a + (Number(c.puntos) || 0), 0);
+  const general = {
+    puntos: puntosTodos,
+    asignados: libresTodos === null ? null : Math.max(0, puntosTodos - libresTodos),
+    libres: libresTodos,
+    consultores: consultoresTodos,
+  };
 
   // resumen_ciclos cuenta LIBRE como si fuera un consultor más.
   const ajustado =
@@ -190,6 +233,7 @@ export async function GET(req: Request) {
     ...base,
     errorCiclos: ciclos === null ? "No se pudo leer el resumen de ciclos." : null,
     actual: ajustado,
+    general,
     libres,
     ultimaCarga: cargas[0] ?? null,
     cargaAnterior: cargas[1] ?? null,
