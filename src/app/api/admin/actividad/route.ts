@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  *   auditoria_cartera  → ediciones, borrados y purgas de puntos (ya existía)
  *   actividad_panel    → todo lo demás (supabase/panel.sql)
  *
- * GET ?limite=8. Solo administradores: el middleware no se la abre al BackOffice.
+ * GET ?limite=8. Pide el módulo Inicio (src/lib/permisos.ts).
  */
 
 type ItemActividad = {

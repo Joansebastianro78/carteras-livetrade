@@ -13,11 +13,18 @@ alter table public.admins
 
 -- Se borra y se vuelve a crear para que al reejecutar el archivo quede con
 -- los tres perfiles, y no con los dos de la primera versión.
+-- Con perfiles.sql ya ejecutado no se vuelve a poner: ahí los perfiles los
+-- decide la tabla perfiles y esta regla dejaría por fuera los nuevos.
 alter table public.admins drop constraint if exists admins_rol_valido;
 
-alter table public.admins
-    add constraint admins_rol_valido
-    check (rol in ('admin', 'backoffice', 'superadmin'));
+do $$
+begin
+    if to_regclass('public.perfiles') is null then
+        alter table public.admins
+            add constraint admins_rol_valido
+            check (rol in ('admin', 'backoffice', 'superadmin'));
+    end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- crear_admin ahora recibe el rol.
@@ -43,7 +50,12 @@ begin
         raise exception 'La clave debe tener al menos 10 caracteres.';
     end if;
 
-    if p_rol not in ('admin', 'backoffice', 'superadmin') then
+    -- Con perfiles.sql, vale cualquier perfil de la tabla; sin él, los tres de siempre.
+    if to_regclass('public.perfiles') is not null then
+        if not exists (select 1 from public.perfiles where clave = p_rol) then
+            raise exception 'Rol no válido: %', p_rol;
+        end if;
+    elsif p_rol not in ('admin', 'backoffice', 'superadmin') then
         raise exception 'Rol no válido: %', p_rol;
     end if;
 

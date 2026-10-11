@@ -1,20 +1,23 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ChartColumn,
   ClipboardCheck,
   House,
   Image as IconoImagen,
+  Lock,
   MapPin,
   Palette,
   Pencil,
   ShieldCheck,
   Sparkles,
   Upload,
+  UserCog,
   Users,
   Wrench,
 } from "lucide-react";
-import type { Rol } from "@/lib/auth";
+import type { IdModulo } from "@/lib/permisos";
 import type { Modo } from "@/lib/modo";
 import PanelShell, { type SeccionPanel } from "./PanelShell";
 import Inicio from "./Inicio";
@@ -28,20 +31,30 @@ import FiltroTerritorio from "./FiltroTerritorio";
 import Mantenimiento from "./Mantenimiento";
 import PanelTemas from "./PanelTemas";
 import PanelTableros from "./PanelTableros";
+import VisorTableros from "./VisorTableros";
 import AsistenteIA from "./AsistenteIA";
+import PanelPerfiles from "./PanelPerfiles";
 
-/** Secciones del panel de administración, en el orden del menú. */
-const SECCIONES: SeccionPanel[] = [
+/** Una sección del menú y el módulo que hay que tener para verla. */
+type Seccion = SeccionPanel & { modulo: IdModulo };
+
+/**
+ * Todas las secciones del panel, en el orden del menú. Cada perfil ve solo
+ * las de sus módulos (Configuración › Perfiles y permisos).
+ */
+const SECCIONES: Seccion[] = [
   {
     id: "inicio",
+    modulo: "inicio",
     menu: "Inicio",
     grupo: null,
     Icono: House,
     encabezadoPropio: true,
-    render: (nav) => <Inicio irA={nav.irA} />,
+    render: (nav) => <Inicio nav={nav} />,
   },
   {
     id: "cargar",
+    modulo: "cargar",
     menu: "Cargar plantilla",
     grupo: "Cartera",
     Icono: Upload,
@@ -50,6 +63,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "editar",
+    modulo: "editar",
     menu: "Editar cartera",
     grupo: "Cartera",
     Icono: Pencil,
@@ -60,6 +74,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "consultores",
+    modulo: "consultores",
     menu: "Consultores",
     titulo: "Cartera de un consultor",
     grupo: "Cartera",
@@ -69,6 +84,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "territorio",
+    modulo: "territorio",
     menu: "Departamento y ciudad",
     titulo: "Puntos por departamento y ciudad",
     grupo: "Cartera",
@@ -79,6 +95,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "auditoria",
+    modulo: "auditoria",
     menu: "Datos",
     titulo: "Auditoría de datos",
     grupo: "Auditorías",
@@ -88,6 +105,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "imagenes",
+    modulo: "imagenes",
     menu: "Imágenes",
     titulo: "Auditoría de imágenes",
     grupo: "Auditorías",
@@ -95,19 +113,34 @@ const SECCIONES: SeccionPanel[] = [
     encabezadoPropio: true,
     render: () => <AuditoriaImagenes />,
   },
+  // Los tableros tienen dos versiones: quien los administra los agrega y
+  // publica; quien solo los ve, ve los publicados.
   {
     id: "tableros",
+    modulo: "tableros_admin",
     menu: "Tableros",
     titulo: "Tableros de Power BI",
     grupo: "Reportes",
     Icono: ChartColumn,
     descripcion:
-      "Los enlaces que agregues aquí le aparecen al perfil BackOffice en su sección Tableros. Aquí solo se guarda el enlace: el informe sigue en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo verá acá.",
+      "Los tableros que publiques aquí les aparecen a los perfiles con «Ver tableros». Aquí solo se guarda el enlace: el informe sigue en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo verá acá.",
     ancho: "angosto",
     render: () => <PanelTableros />,
   },
   {
+    id: "tableros",
+    modulo: "tableros",
+    menu: "Tableros",
+    titulo: "Tableros de Power BI",
+    grupo: "Reportes",
+    Icono: ChartColumn,
+    descripcion:
+      "Se abren con tu propia cuenta de Power BI. Si un informe te pide iniciar sesión o dice que no tienes acceso, el permiso se pide allá, no aquí.",
+    render: () => <VisorTableros />,
+  },
+  {
     id: "asistente",
+    modulo: "asistente",
     menu: "Asistente IA",
     grupo: "Herramientas",
     Icono: Sparkles,
@@ -116,6 +149,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "mantenimiento",
+    modulo: "mantenimiento",
     menu: "Mantenimiento",
     grupo: "Configuración",
     Icono: Wrench,
@@ -126,6 +160,7 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "temas",
+    modulo: "temas",
     menu: "Temas",
     titulo: "Temas de temporada",
     grupo: "Configuración",
@@ -137,37 +172,78 @@ const SECCIONES: SeccionPanel[] = [
   },
   {
     id: "usuarios",
+    modulo: "usuarios",
     menu: "Administradores",
     titulo: "Usuarios del panel",
     grupo: "Configuración",
     Icono: ShieldCheck,
     descripcion:
-      "Los administradores manejan toda la cartera y los perfiles BackOffice solo consultan. Al superadministrador únicamente lo puede tocar otro superadministrador.",
+      "Cada usuario tiene un perfil y el perfil decide qué módulos ve: se arman en Perfiles y permisos. Al superadministrador únicamente lo puede tocar otro superadministrador.",
     ancho: "angosto",
     render: () => <AdminUsuarios />,
+  },
+  {
+    id: "perfiles",
+    modulo: "perfiles",
+    menu: "Perfiles y permisos",
+    grupo: "Configuración",
+    Icono: UserCog,
+    descripcion:
+      "Crea perfiles y marca qué módulos ve cada uno. El menú de cada persona muestra solo lo suyo, y el servidor le niega lo demás aunque intente entrar por otro lado.",
+    render: (nav) => <PanelPerfiles nav={nav} />,
   },
 ];
 
 export default function PanelAdmin({
+  panel,
   usuario,
-  rol,
+  nombrePerfil,
+  modulos,
   modo,
   menuOculto,
 }: {
+  /** Por dónde entró: solo cambia el nombre y el color del panel. */
+  panel: "admin" | "backoffice";
   usuario: string;
-  rol: Rol;
+  nombrePerfil: string;
+  modulos: IdModulo[];
   modo: Modo;
   menuOculto: boolean;
 }) {
+  const secciones = useMemo(() => {
+    const tiene = (m: IdModulo) => modulos.includes(m);
+    const visibles = SECCIONES.filter((s) => {
+      if (!tiene(s.modulo)) return false;
+      // Quien administra los tableros no necesita además el visor.
+      if (s.modulo === "tableros" && tiene("tableros_admin")) return false;
+      return true;
+    });
+
+    if (visibles.length > 0) return visibles;
+
+    const vacia: SeccionPanel = {
+      id: "sin-modulos",
+      menu: "Sin módulos",
+      titulo: "Tu perfil todavía no tiene módulos",
+      grupo: null,
+      Icono: Lock,
+      descripcion: `El perfil ${nombrePerfil} no tiene ningún módulo asignado. Pídele a un administrador que te dé permisos en Configuración › Perfiles y permisos y, cuando lo haga, recarga esta página.`,
+      ancho: "angosto",
+      render: () => null,
+    };
+    return [vacia];
+  }, [modulos, nombrePerfil]);
+
   return (
     <PanelShell
-      panel="admin"
+      panel={panel}
       usuario={usuario}
-      rol={rol}
+      nombrePerfil={nombrePerfil}
+      modulos={modulos}
       modo={modo}
       menuOculto={menuOculto}
-      secciones={SECCIONES}
-      inicial="inicio"
+      secciones={secciones}
+      inicial={secciones[0].id}
     />
   );
 }

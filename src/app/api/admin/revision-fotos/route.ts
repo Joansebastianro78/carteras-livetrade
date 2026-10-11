@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Revisión de las fotos de la auditoría de imágenes (tabla revision_fotos,
- * en supabase/panel.sql). La pueden usar los tres perfiles: revisar fotos es
- * trabajo de la auditoría y no cambia nada de la cartera. Queda guardado
- * quién marcó cada una.
+ * en supabase/panel.sql). Pide el módulo «Auditoría de imágenes»: revisar
+ * fotos es trabajo de la auditoría y no cambia nada de la cartera. Queda
+ * guardado quién marcó cada una.
  *
  *   GET                                        → todas las revisiones
  *   POST { clave, estado, cod, usuario, fecha, foto }

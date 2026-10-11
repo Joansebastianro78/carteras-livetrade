@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
 import { COOKIE_MENU, COOKIE_MODO, esModo } from "@/lib/modo";
+import { sesionConPermisos } from "@/lib/perfilesServidor";
 import LoginAdmin from "@/components/LoginAdmin";
-import PanelBackOffice from "@/components/PanelBackOffice";
+import PanelAdmin from "@/components/PanelAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,7 @@ export default async function PaginaBackOffice({
 }) {
   const { sesion } = await searchParams;
   const store = await cookies();
-  const activa = await leerSesion(
-    store.get(COOKIE_ADMIN)?.value,
-    process.env.ADMIN_SECRET
-  );
+  const activa = await sesionConPermisos();
 
   if (!activa) {
     return (
@@ -29,12 +26,14 @@ export default async function PaginaBackOffice({
     );
   }
 
-  // Un administrador también puede entrar aquí; solo que él además tiene el
-  // panel completo a un clic, desde el menú.
+  // Es el mismo panel que /admin, con el nombre de BackOffice: cada quien ve
+  // los módulos de su perfil, entre por donde entre.
   return (
-    <PanelBackOffice
+    <PanelAdmin
+      panel="backoffice"
       usuario={activa.usuario}
-      rol={activa.rol}
+      nombrePerfil={activa.nombrePerfil}
+      modulos={activa.modulos}
       modo={esModo(store.get(COOKIE_MODO)?.value)}
       menuOculto={store.get(COOKIE_MENU)?.value === "oculto"}
     />

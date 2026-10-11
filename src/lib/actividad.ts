@@ -23,7 +23,10 @@ export type AccionPanel =
   | "tablero_publicar"
   | "tablero_ocultar"
   | "tablero_eliminar"
-  | "tema_cambiar";
+  | "tema_cambiar"
+  | "perfil_crear"
+  | "perfil_editar"
+  | "perfil_eliminar";
 
 let avisado = false;
 

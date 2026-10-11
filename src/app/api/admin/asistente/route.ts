@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Asistente IA. Lo usan los tres perfiles.
+ * Asistente IA. Pide el módulo «Asistente IA» (src/lib/permisos.ts).
  *
  *   POST { modo, mensajes, imagenes? }
  *   → texto plano, una línea de JSON por evento (ver Evento en lib/asistenteIA):

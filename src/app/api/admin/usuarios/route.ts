@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { COOKIE_ADMIN, esRol, leerSesion, type Rol } from "@/lib/auth";
+import { esRol, type Rol } from "@/lib/auth";
 import { registrarActividad } from "@/lib/actividad";
+import {
+  leerPerfiles,
+  quedaQuienManejeUsuarios,
+  sesionConPermisos,
+  type Perfil,
+} from "@/lib/perfilesServidor";
+import { cubre, SUPERADMIN, type IdModulo } from "@/lib/permisos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const LARGO_MINIMO_CLAVE = 10;
 
-const PERFILES: Rol[] = ["admin", "backoffice", "superadmin"];
+type Quien = { usuario: string | null; rol: Rol; modulos: IdModulo[] };
 
-async function quien(): Promise<{ usuario: string | null; rol: Rol }> {
-  const store = await cookies();
-  const s = await leerSesion(store.get(COOKIE_ADMIN)?.value, process.env.ADMIN_SECRET);
-  return { usuario: s?.usuario ?? null, rol: s?.rol ?? "admin" };
+async function quien(): Promise<Quien> {
+  const s = await sesionConPermisos();
+  return { usuario: s?.usuario ?? null, rol: s?.rol ?? "", modulos: s?.modulos ?? [] };
 }
 
 /** El perfil que tiene hoy ese usuario en la base, o null si no existe. */
@@ -29,33 +34,60 @@ async function perfilDe(usuario: string): Promise<Rol | null> {
 }
 
 /**
- * Un superadministrador solo lo toca otro superadministrador. Sin esta regla
- * cualquier admin podría desactivarlo, cambiarle la clave o ascenderse a sí
- * mismo, y la jerarquía no serviría de nada.
+ * Si quien manda puede dar ese perfil, o tocar a alguien que lo tiene:
+ *   - el de superadministrador solo lo da (y a quien lo tiene solo lo toca)
+ *     otro superadministrador. Sin esta regla cualquier admin podría
+ *     desactivarlo, cambiarle la clave o ascenderse a sí mismo;
+ *   - los demás, solo quien ya tiene todos sus módulos: nadie crea a alguien
+ *     con más permisos que los suyos.
  */
-function puedeTocar(quienManda: Rol, perfilDelOtro: Rol | null): boolean {
-  if (perfilDelOtro !== "superadmin") return true;
-  return quienManda === "superadmin";
+function puedeDar(sesion: Quien, perfil: Rol | null, perfiles: Perfil[]): boolean {
+  if (perfil === null) return true;
+  if (sesion.rol === SUPERADMIN) return true;
+  if (perfil === SUPERADMIN) return false;
+  const modulos = perfiles.find((p) => p.clave === perfil)?.modulos ?? [];
+  return cubre(sesion.rol, sesion.modulos, modulos);
 }
+
+const NO_PUEDE_TOCAR = (perfil: Rol | null) =>
+  perfil === SUPERADMIN
+    ? "Esa cuenta es de un superadministrador. Solo otro superadministrador puede cambiarla."
+    : "Ese usuario tiene permisos que tú no tienes: solo lo puede cambiar alguien que también los tenga.";
+
+const nombreDe = (perfiles: Perfil[], clave: Rol | null) =>
+  perfiles.find((p) => p.clave === clave)?.nombre ?? clave;
 
 // ------------------------------------------------- listar
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("admins")
-    // clave_hash nunca sale de la base, ni siquiera hacia el panel.
-    .select("id,usuario,nombre,rol,activo,ultimo_login,created_at")
-    .order("usuario");
+  const [{ data, error }, sesion, lectura] = await Promise.all([
+    supabaseAdmin
+      .from("admins")
+      // clave_hash nunca sale de la base, ni siquiera hacia el panel.
+      .select("id,usuario,nombre,rol,activo,ultimo_login,created_at")
+      .order("usuario"),
+    quien(),
+    leerPerfiles(),
+  ]);
 
   if (error) {
     console.error("[usuarios GET]", error.message);
     return NextResponse.json({ error: "No se pudo leer la lista." }, { status: 500 });
   }
 
-  const sesion = await quien();
   return NextResponse.json({
     usuarios: data ?? [],
     yo: sesion.usuario,
     miRol: sesion.rol,
+    // Para la lista de perfiles de cada fila y del formulario. asignable:
+    // si quien pregunta lo puede dar (la API lo vuelve a revisar al guardar).
+    perfiles: lectura.perfiles.map((p) => ({
+      clave: p.clave,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+      modulos: p.modulos,
+      sistema: p.sistema,
+      asignable: puedeDar(sesion, p.clave, lectura.perfiles),
+    })),
   });
 }
 
@@ -68,7 +100,6 @@ export async function POST(req: Request) {
     rol?: string;
   };
 
-  const perfil: Rol = PERFILES.includes(rol as Rol) ? (rol as Rol) : "admin";
   const limpio = (usuario ?? "").trim().toLowerCase();
 
   // Los usuarios del panel son correos corporativos, así que la arroba entra.
@@ -82,20 +113,27 @@ export async function POST(req: Request) {
     );
   }
 
-  const sesion = await quien();
+  const [sesion, { perfiles }, antes] = await Promise.all([quien(), leerPerfiles(), perfilDe(limpio)]);
 
-  if (perfil === "superadmin" && sesion.rol !== "superadmin") {
+  const perfil = typeof rol === "string" ? rol : "";
+  if (!perfiles.some((p) => p.clave === perfil)) {
+    return NextResponse.json({ error: "Elige un perfil que exista." }, { status: 400 });
+  }
+
+  if (perfil === SUPERADMIN && sesion.rol !== SUPERADMIN) {
     return NextResponse.json(
       { error: "Solo un superadministrador puede crear otro superadministrador." },
       { status: 403 }
     );
   }
 
-  const antes = await perfilDe(limpio);
+  if (!puedeDar(sesion, antes, perfiles)) {
+    return NextResponse.json({ error: NO_PUEDE_TOCAR(antes) }, { status: 403 });
+  }
 
-  if (!puedeTocar(sesion.rol, antes)) {
+  if (!puedeDar(sesion, perfil, perfiles)) {
     return NextResponse.json(
-      { error: "Esa cuenta es de un superadministrador. Solo él puede cambiarla." },
+      { error: "Solo puedes dar perfiles con permisos que tú también tienes." },
       { status: 403 }
     );
   }
@@ -112,6 +150,17 @@ export async function POST(req: Request) {
   if (!clave || clave.length < LARGO_MINIMO_CLAVE) {
     return NextResponse.json(
       { error: `La clave debe tener al menos ${LARGO_MINIMO_CLAVE} caracteres.` },
+      { status: 400 }
+    );
+  }
+
+  if (
+    antes !== null &&
+    antes !== perfil &&
+    !(await quedaQuienManejeUsuarios({ usuario: { usuario: limpio, rol: perfil } }))
+  ) {
+    return NextResponse.json(
+      { error: "Con ese cambio no queda nadie activo que pueda manejar los usuarios del panel." },
       { status: 400 }
     );
   }
@@ -140,10 +189,11 @@ export async function POST(req: Request) {
   await registrarActividad(sesion.usuario, antes === null ? "usuario_crear" : "usuario_clave", {
     usuario: limpio,
     rol: perfil,
-    ...(antes !== null && antes !== perfil ? { antes } : {}),
+    perfil: nombreDe(perfiles, perfil),
+    ...(antes !== null && antes !== perfil ? { antes, perfilAntes: nombreDe(perfiles, antes) } : {}),
   });
 
-  return NextResponse.json({ ok: true, usuario: limpio, rol: perfil });
+  return NextResponse.json({ ok: true, usuario: limpio, rol: perfil, perfil: nombreDe(perfiles, perfil) });
 }
 
 // ------------------------------------------------- activar / desactivar o cambiar perfil
@@ -155,7 +205,8 @@ export async function POST(req: Request) {
  *   - nadie se cambia el perfil a sí mismo;
  *   - dar o quitar el perfil de superadministrador solo lo hace otro
  *     superadministrador;
- *   - debe quedar al menos un administrador activo.
+ *   - los demás perfiles los da (y los quita) quien tenga todos sus módulos;
+ *   - debe quedar al menos un usuario activo que pueda manejar los usuarios.
  * Si el usuario tenía una sesión abierta, el middleware la cierra en su
  * siguiente clic y le pide volver a entrar con el perfil nuevo.
  */
@@ -183,23 +234,25 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const objetivo = await perfilDe(limpio);
+  const [objetivo, { perfiles }] = await Promise.all([perfilDe(limpio), leerPerfiles()]);
 
-  if (!puedeTocar(sesion.rol, objetivo)) {
+  if (!puedeDar(sesion, objetivo, perfiles)) {
     return NextResponse.json(
       {
         error:
-          "No puedes desactivar al superadministrador. Solo él puede hacerlo.",
+          objetivo === SUPERADMIN
+            ? "No puedes desactivar al superadministrador. Solo otro superadministrador puede hacerlo."
+            : NO_PUEDE_TOCAR(objetivo),
       },
       { status: 403 }
     );
   }
 
-  if (!activo && objetivo !== "backoffice" && !(await quedaOtroAdministrador(limpio))) {
-    // Los perfiles BackOffice no cuentan: desactivarlos a todos no deja el
-    // panel sin dueño, pero quedarse sin administradores sí.
+  // Los perfiles que no manejan usuarios no cuentan: desactivarlos a todos no
+  // deja el panel sin dueño, pero quedarse sin quien maneje los usuarios sí.
+  if (!activo && !(await quedaQuienManejeUsuarios({ usuario: { usuario: limpio, rol: null } }))) {
     return NextResponse.json(
-      { error: "Debe quedar al menos un administrador activo." },
+      { error: "Debe quedar al menos un usuario activo que pueda manejar los usuarios del panel." },
       { status: 400 }
     );
   }
@@ -226,26 +279,12 @@ export async function PATCH(req: Request) {
   return NextResponse.json({ ok: true, ...data });
 }
 
-/** Si además de `usuario` queda al menos un administrador o superadministrador activo. */
-async function quedaOtroAdministrador(usuario: string): Promise<boolean> {
-  const { count } = await supabaseAdmin
-    .from("admins")
-    .select("id", { count: "exact", head: true })
-    .eq("activo", true)
-    .in("rol", ["admin", "superadmin"])
-    .neq("usuario", usuario);
-  return (count ?? 0) >= 1;
-}
-
-async function cambiarPerfil(
-  usuario: string,
-  rolPedido: string,
-  sesion: { usuario: string | null; rol: Rol }
-) {
-  if (!PERFILES.includes(rolPedido as Rol)) {
+async function cambiarPerfil(usuario: string, rolPedido: unknown, sesion: Quien) {
+  const { perfiles } = await leerPerfiles();
+  const nuevo = typeof rolPedido === "string" ? rolPedido : "";
+  if (!perfiles.some((p) => p.clave === nuevo)) {
     return NextResponse.json({ error: "Ese perfil no existe." }, { status: 400 });
   }
-  const nuevo = rolPedido as Rol;
 
   if (usuario === sesion.usuario) {
     return NextResponse.json(
@@ -262,7 +301,7 @@ async function cambiarPerfil(
     return NextResponse.json({ ok: true, usuario, rol: nuevo, sinCambios: true });
   }
 
-  if ((antes === "superadmin" || nuevo === "superadmin") && sesion.rol !== "superadmin") {
+  if ((antes === SUPERADMIN || nuevo === SUPERADMIN) && sesion.rol !== SUPERADMIN) {
     return NextResponse.json(
       {
         error:
@@ -272,9 +311,19 @@ async function cambiarPerfil(
     );
   }
 
-  if (nuevo === "backoffice" && !(await quedaOtroAdministrador(usuario))) {
+  if (!puedeDar(sesion, antes, perfiles)) {
+    return NextResponse.json({ error: NO_PUEDE_TOCAR(antes) }, { status: 403 });
+  }
+  if (!puedeDar(sesion, nuevo, perfiles)) {
     return NextResponse.json(
-      { error: "Debe quedar al menos un administrador activo." },
+      { error: "Solo puedes dar perfiles con permisos que tú también tienes." },
+      { status: 403 }
+    );
+  }
+
+  if (!(await quedaQuienManejeUsuarios({ usuario: { usuario, rol: nuevo } }))) {
+    return NextResponse.json(
+      { error: "Con ese cambio no queda nadie activo que pueda manejar los usuarios del panel." },
       { status: 400 }
     );
   }
@@ -288,6 +337,10 @@ async function cambiarPerfil(
 
   if (error) {
     console.error("[usuarios PATCH rol]", error.message);
+    // Lo borraron mientras tanto: la llave admins.rol → perfiles no lo deja.
+    if (error.code === "23503" || /admins_rol_perfil/i.test(error.message)) {
+      return NextResponse.json({ error: "Ese perfil ya no existe. Recarga la página." }, { status: 400 });
+    }
     const faltaRol = /column .*rol|admins_rol_valido/i.test(error.message);
     return NextResponse.json(
       {
@@ -302,7 +355,13 @@ async function cambiarPerfil(
     return NextResponse.json({ error: "Ese usuario no existe." }, { status: 404 });
   }
 
-  await registrarActividad(sesion.usuario, "usuario_rol", { usuario, antes, ahora: nuevo });
+  await registrarActividad(sesion.usuario, "usuario_rol", {
+    usuario,
+    antes,
+    ahora: nuevo,
+    perfilAntes: nombreDe(perfiles, antes),
+    perfilAhora: nombreDe(perfiles, nuevo),
+  });
 
-  return NextResponse.json({ ok: true, usuario, rol: nuevo, antes });
+  return NextResponse.json({ ok: true, usuario, rol: nuevo, antes, perfil: nombreDe(perfiles, nuevo) });
 }

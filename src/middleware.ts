@@ -1,34 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_ADMIN, COOKIE_OPTS, leerSesion, mandaEnElPanel } from "@/lib/auth";
-import { estadoEnBase } from "@/lib/estadoUsuario";
+import { COOKIE_ADMIN, COOKIE_OPTS, leerSesion } from "@/lib/auth";
+import { estadoEnBase, type EstadoUsuario } from "@/lib/estadoUsuario";
 import { ENCABEZADO_PANEL } from "@/lib/modo";
+import { modulosEfectivos, puedeUsarRuta } from "@/lib/permisos";
 
 /**
- * Rutas de API que un perfil BackOffice sí puede usar. Todo lo demás bajo
- * /api/admin (cargar, editar, borrar, mantenimiento, usuarios) queda solo
- * para el rol admin. Las dos auditorías necesitan POST para lanzar la consulta
- * en Athena, pero no cambian nada de la cartera; la revisión de fotos guarda
- * si una foto está bien o hay que revisarla, que es trabajo de la auditoría.
+ * Qué puede usar cada perfil lo dice src/lib/permisos.ts: cada ruta de
+ * /api/admin pide un módulo y el perfil lo tiene o no. Las páginas /admin y
+ * /backoffice muestran solo los módulos del perfil, pero el permiso de verdad
+ * se revisa aquí: esconder un botón no basta.
  */
-const API_BACKOFFICE = [
-  "/api/admin/consultores",
-  "/api/admin/logout",
-  "/api/admin/auditoria",
-  "/api/admin/auditoria-imagenes",
-  "/api/admin/revision-fotos",
-  "/api/admin/asistente",
-];
-
-/**
- * Rutas que el perfil BackOffice puede LEER pero no cambiar. Los tableros de
- * Power BI los agrega un administrador; el BackOffice solo los consulta. El
- * filtro por departamento y ciudad y el resumen de la cartera solo tienen GET.
- */
-const API_BACKOFFICE_LECTURA = [
-  "/api/admin/tableros",
-  "/api/admin/territorio",
-  "/api/admin/resumen",
-];
 
 function esPaginaDelPanel(pathname: string): boolean {
   return (
@@ -81,6 +62,13 @@ function sesionVencida(req: NextRequest, motivo: "perfil" | "inactiva") {
   return res;
 }
 
+/** Por qué ya no sirve la sesión, o null si sigue bien. */
+function motivoParaSacar(e: EstadoUsuario, rol: string): "perfil" | "inactiva" | null {
+  if (e === null) return "inactiva";
+  if (e !== "desconocido" && e.rol !== rol) return "perfil";
+  return null;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -119,40 +107,37 @@ export async function middleware(req: NextRequest) {
   }
 
   // ------------------------------------------------- la base manda sobre la cookie
-  const choca = (e: Awaited<ReturnType<typeof estadoEnBase>>) =>
-    e === null || (e !== "desconocido" && e.rol !== sesion.rol);
+  const esApi = pathname.startsWith("/api/admin/");
+  const permite = (e: EstadoUsuario) =>
+    puedeUsarRuta(
+      modulosEfectivos(sesion.rol, e === null || e === "desconocido" ? null : e.modulos),
+      sesion.rol,
+      pathname,
+      req.method,
+      req.nextUrl.searchParams
+    );
 
   let enBase = await estadoEnBase(sesion.usuario);
-  // Lo guardado en memoria puede ser de antes de que lo reactivaran o de que
-  // entrara con el perfil nuevo: antes de sacarlo, se pregunta otra vez.
-  if (choca(enBase)) enBase = await estadoEnBase(sesion.usuario, { fresco: true });
 
-  if (enBase === null) return sesionVencida(req, "inactiva");
-  if (enBase !== "desconocido" && enBase.rol !== sesion.rol) {
-    return sesionVencida(req, "perfil");
+  // Lo guardado en memoria puede ser de antes de que lo reactivaran, de que
+  // entrara con el perfil nuevo o de que le dieran el permiso: antes de
+  // sacarlo o de negarle algo, se pregunta otra vez.
+  if (
+    enBase !== "desconocido" &&
+    (motivoParaSacar(enBase, sesion.rol) !== null || (esApi && !permite(enBase)))
+  ) {
+    enBase = await estadoEnBase(sesion.usuario, { fresco: true });
   }
 
-  // ------------------------------------------------------------ con sesión
-  if (!mandaEnElPanel(sesion.rol)) {
-    if (pathname.startsWith("/admin")) {
-      // Un BackOffice que llegue al panel completo se va a lo suyo.
-      const url = req.nextUrl.clone();
-      url.pathname = "/backoffice";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
+  const motivo = motivoParaSacar(enBase, sesion.rol);
+  if (motivo) return sesionVencida(req, motivo);
 
-    const permitida =
-      API_BACKOFFICE.some((ruta) => pathname.startsWith(ruta)) ||
-      (req.method === "GET" &&
-        API_BACKOFFICE_LECTURA.some((ruta) => pathname.startsWith(ruta)));
-
-    if (pathname.startsWith("/api/admin") && !permitida) {
-      return NextResponse.json(
-        { error: "Tu perfil BackOffice no tiene permiso para esta acción." },
-        { status: 403 }
-      );
-    }
+  // ------------------------------------------------------------ permisos
+  if (esApi && !permite(enBase)) {
+    return NextResponse.json(
+      { error: "Tu perfil no tiene permiso para esto. Pídeselo a un administrador." },
+      { status: 403 }
+    );
   }
 
   return seguir(req);

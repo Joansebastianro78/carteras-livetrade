@@ -11,24 +11,25 @@ export const COOKIE_ADMIN = "cartera_admin";
 const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
 
 /**
- * superadmin: panel completo y, además, el único que puede tocar a otro
- *             superadministrador (desactivarlo, cambiarle clave o perfil).
- * admin:      panel completo sobre la cartera y sobre los demás usuarios.
- * backoffice: solo consulta la cartera de un consultor.
+ * El perfil del usuario: la clave de la tabla perfiles (supabase/perfiles.sql).
+ * Los de siempre son superadmin, admin y backoffice, pero se pueden crear
+ * más desde el panel. Qué ve cada uno lo dice src/lib/permisos.ts.
+ *
+ * superadmin es especial: lo ve todo y es el único que puede tocar a otro
+ * superadministrador (desactivarlo, cambiarle clave o perfil).
  */
-export type Rol = "admin" | "backoffice" | "superadmin";
+export type Rol = string;
 
 export type Sesion = { usuario: string; rol: Rol; expira: number };
 
+/**
+ * El perfil tal como viene de la base o de la cookie. Vacío es "admin": así
+ * quedaban los usuarios antes de que existieran los perfiles. Cualquier otro
+ * valor se respeta tal cual: sus permisos los decide la tabla perfiles, y uno
+ * que no esté ahí no ve nada.
+ */
 export function esRol(valor: string | null | undefined): Rol {
-  if (valor === "backoffice") return "backoffice";
-  if (valor === "superadmin") return "superadmin";
-  return "admin";
-}
-
-/** Los dos perfiles que entran al panel de administración. */
-export function mandaEnElPanel(rol: Rol): boolean {
-  return rol === "admin" || rol === "superadmin";
+  return (valor ?? "").trim() || "admin";
 }
 
 function b64urlDesdeBytes(bytes: ArrayBuffer | Uint8Array): string {

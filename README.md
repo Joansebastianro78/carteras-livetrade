@@ -25,7 +25,7 @@ autorizarlo o hospedar el tarball internamente.
 1. Crear el proyecto en supabase.com.
 2. Abrir **SQL Editor** y ejecutar, en orden: `supabase/schema.sql`,
    `supabase/admins.sql`, `supabase/roles.sql`, `supabase/gestion.sql`,
-   `supabase/territorio.sql` y `supabase/panel.sql`.
+   `supabase/territorio.sql`, `supabase/panel.sql` y `supabase/perfiles.sql`.
 
    En un proyecto que ya estaba andando basta con ejecutar `supabase/panel.sql`
    una vez. Crea dos tablas: `actividad_panel` (la actividad reciente del
@@ -34,6 +34,13 @@ autorizarlo o hospedar el tarball internamente.
    funciona igual: el Inicio no muestra los cambios de usuarios,
    mantenimiento, tableros y temas, y las fotos no se pueden marcar; las dos
    cosas lo avisan en pantalla.
+
+   Para **Perfiles y permisos** hay que ejecutar `supabase/perfiles.sql` una
+   vez, después de los anteriores. Crea la tabla `perfiles` con los tres de
+   siempre (con sus permisos de siempre) y hace que el perfil de cada usuario
+   tenga que existir en ella. Se puede volver a correr: no pisa los permisos
+   que ya se hayan cambiado. Mientras no se ejecute, el panel funciona como
+   antes, con los tres perfiles fijos, y la pantalla de perfiles lo avisa.
 3. En **Project Settings → API**, copiar la *Project URL* y la **service_role**
    key hacia `.env.local`.
 
@@ -55,8 +62,8 @@ directo con la base.
 | Ruta | Qué hace |
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
-| `/admin` | Login y panel completo, con menú lateral: Inicio, cargar, editar, consultores, departamento y ciudad, las dos auditorías, tableros, mantenimiento, temas y usuarios. |
-| `/backoffice` | Acceso de consulta: buscar un consultor, filtrar por departamento o ciudad, las dos auditorías y los tableros. |
+| `/admin` | Login y panel, con menú lateral: Inicio, cargar, editar, consultores, departamento y ciudad, las dos auditorías, tableros, asistente IA, mantenimiento, temas, usuarios y perfiles. Cada quien ve solo los módulos de su perfil. |
+| `/backoffice` | El mismo panel, con el nombre y el login de BackOffice. También muestra solo los módulos del perfil. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
 | `POST /api/admin/upload` | UPSERT de un lote de hasta 1000 filas. |
@@ -66,21 +73,22 @@ directo con la base.
 | `GET /api/admin/consultores` | Buscar un consultor o traer su cartera completa. |
 | `GET/POST /api/admin/mantenimiento` | Leer y cambiar la ventana de mantenimiento. |
 | `GET/POST /api/admin/tema` | Leer y cambiar los temas de temporada. |
-| `GET/POST/PATCH/DELETE /api/admin/tableros` | Tableros de Power BI. El GET lo puede llamar también el perfil BackOffice; el resto, no. |
-| `GET /api/admin/territorio` | Departamentos y ciudades con su conteo, o una página de puntos de una región. Lo usa el BackOffice. |
-| `POST/GET /api/admin/auditoria` | Lanza la consulta de auditoría en Athena, informa su estado y entrega los resultados en páginas de 1000. La usan los tres perfiles. |
-| `POST/GET /api/admin/auditoria-imagenes` | Lo mismo, con la consulta de las fotos de inicio de visita. La usan los tres perfiles. |
-| `GET/POST /api/admin/revision-fotos` | Las marcas «Correcta» y «Para revisar» de la auditoría de imágenes, con quién las puso. La usan los tres perfiles. |
-| `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?lista=sin-ubicacion` o `?lista=libres`, los puntos para las descargas de «Para revisar». El BackOffice solo lee el encabezado. |
-| `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Solo administradores. |
-| `POST /api/admin/asistente` | Asistente IA: responde con Gemini, DeepSeek o las dos combinadas, en vivo (una línea de JSON por evento). Los tres perfiles. |
-| `POST /api/admin/asistente/archivo` | Sube una imagen o un PDF del asistente a la Files API de Gemini. Los tres perfiles. |
+| `GET/POST/PATCH/DELETE /api/admin/tableros` | Tableros de Power BI. El GET lo usa quien tenga «Ver tableros» (solo los publicados) o «Administrar tableros» (todos); lo demás, solo el segundo. |
+| `GET /api/admin/territorio` | Departamentos y ciudades con su conteo, o una página de puntos de una región. Módulo «Departamento y ciudad». |
+| `POST/GET /api/admin/auditoria` | Lanza la consulta de auditoría en Athena, informa su estado y entrega los resultados en páginas de 1000. Módulo «Auditoría de datos». |
+| `POST/GET /api/admin/auditoria-imagenes` | Lo mismo, con la consulta de las fotos de inicio de visita. Módulo «Auditoría de imágenes». |
+| `GET/POST /api/admin/revision-fotos` | Las marcas «Correcta» y «Para revisar» de la auditoría de imágenes, con quién las puso. Módulo «Auditoría de imágenes». |
+| `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?corto=1`, solo el encabezado: lo lee cualquiera con sesión. Las cifras piden «Inicio» o «Cargar plantilla»; `?lista=sin-ubicacion` o `?lista=libres` (las descargas de «Para revisar»), «Inicio». |
+| `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Módulo «Inicio». |
+| `POST /api/admin/asistente` | Asistente IA: responde con Gemini, DeepSeek o las dos combinadas, en vivo (una línea de JSON por evento). Módulo «Asistente IA». |
+| `POST /api/admin/asistente/archivo` | Sube una imagen o un PDF del asistente a la Files API de Gemini. Módulo «Asistente IA». |
+| `GET/POST/PATCH/DELETE /api/admin/perfiles` | Perfiles y permisos: la lista con cuántos usuarios tiene cada uno, crear, cambiar nombre, descripción y módulos, y borrar. Módulo «Perfiles y permisos». |
 | `POST /api/admin/upload/previa` | Antes de aplicar una carga: cuántas filas del archivo ya existen y cuántas son nuevas. No cambia nada. |
 
 ### Filtro por departamento y ciudad
 
 Sección **Departamento y ciudad**, en `/backoffice` y en el panel `/admin`:
-la ven los tres perfiles (BackOffice, administrador y superadministrador). Se elige un departamento,
+la ven los perfiles que tengan ese módulo (de entrada, los tres de siempre). Se elige un departamento,
 todos los departamentos, o una ciudad directamente, y opcionalmente un ciclo; salen todos los puntos de esa
 región en el mapa y en una lista con buscador, con un desglose por ciudad (o
 por departamento, cuando se piden todos) que además sirve de leyenda de colores.
@@ -105,8 +113,9 @@ solo se habilita cuando llegaron todas las páginas.
 
 ### Tableros de Power BI
 
-Un administrador pega el enlace del informe en su sección **Tableros** y el
-perfil BackOffice lo ve en la suya. Solo se guarda el enlace: el informe vive
+Quien tiene «Administrar tableros» pega el enlace del informe en su sección
+**Tableros** y los perfiles con «Ver tableros» lo ven en la suya cuando está
+publicado. Solo se guarda el enlace: el informe vive
 en Power BI con sus permisos, así que quien no tenga acceso allá tampoco lo ve
 acá, y esta app nunca toca los datos del informe.
 
@@ -145,19 +154,19 @@ Viven en `public.admins`, con la clave guardada como hash bcrypt. La comparació
 ocurre dentro de Postgres mediante la función `verificar_admin`, así que el hash
 nunca sale del motor ni pasa por la aplicación.
 
-Hay tres perfiles, en la columna `admins.rol`:
+Cada usuario tiene un perfil, en la columna `admins.rol`, y cada perfil decide
+qué módulos ve (ver **Perfiles y permisos**, abajo). Los tres de siempre:
 
-- `superadmin`: todo lo del administrador y, además, el único que puede
-  desactivar, cambiarle la clave o cambiarle el perfil a otro superadministrador.
-  También es el único que puede crear superadministradores; si no, cualquier
-  admin se ascendería y la jerarquía no serviría de nada.
-- `admin`: el panel completo, incluido crear usuarios y borrar cartera.
-- `backoffice`: solo `/backoffice`, para consultar la cartera de un consultor y
-  descargarla. El middleware le responde 403 en cualquier otra ruta de
-  `/api/admin`, así que la restricción no depende de que la interfaz esconda
-  botones.
+- `superadmin`: todo, también los módulos que se agreguen más adelante, y es el
+  único que puede desactivar, cambiarle la clave o cambiarle el perfil a otro
+  superadministrador. También es el único que puede crear superadministradores;
+  si no, cualquier admin se ascendería y la jerarquía no serviría de nada. Su
+  perfil es fijo: no se edita ni se borra.
+- `admin`: de entrada, todos los módulos, incluido crear usuarios y borrar cartera.
+- `backoffice`: de entrada, consultar: Consultores, Departamento y ciudad, las
+  dos auditorías, Ver tableros y el Asistente IA.
 
-Las tres reglas del superadministrador se validan en `/api/admin/usuarios`, no
+Las reglas del superadministrador se validan en `/api/admin/usuarios`, no
 en la interfaz: los botones que no aplican salen deshabilitados, pero aunque
 alguien llame la API a mano recibe 403.
 
@@ -168,7 +177,11 @@ clave (pide confirmación). Reglas, también validadas en la API:
 - nadie se cambia el perfil a sí mismo;
 - dar o quitar el perfil de superadministrador solo lo hace otro
   superadministrador (un admin ni siquiera ve esa opción);
-- siempre queda al menos un administrador activo.
+- los demás perfiles los da, y a quien los tiene lo toca (clave, perfil,
+  desactivar), solo quien ya tenga todos sus módulos: nadie crea a alguien con
+  más permisos que los suyos;
+- siempre queda alguien activo que pueda manejar los usuarios (un
+  superadministrador o un perfil con «Administradores»).
 
 Cada cambio queda en la actividad del Inicio, con el perfil de antes y el
 nuevo.
@@ -185,7 +198,8 @@ saca un dato viejo. Si la base no contesta, sigue con lo que dice la cookie,
 como antes, para no dejar a nadie por fuera por un problema ajeno.
 
 ```sql
--- crear o cambiarle la clave a alguien (el cuarto argumento es el perfil)
+-- crear o cambiarle la clave a alguien (el cuarto argumento es la clave del
+-- perfil: superadmin, admin, backoffice o uno creado en Perfiles y permisos)
 select public.crear_admin('joan', 'clave-larga-y-unica', 'Joan');
 select public.crear_admin('soporte1', 'otra-clave-larga', 'Soporte 1', 'backoffice');
 select public.crear_admin('jefe@empresa.com', 'clave-larga-aqui', 'Jefe', 'superadmin');
@@ -204,6 +218,54 @@ confirma contra la base como se explica arriba. Cada carga queda registrada en
 
 El login responde el mismo mensaje para usuario inexistente y clave errada, para
 no confirmar qué usuarios existen.
+
+### Perfiles y permisos
+
+Sección **Configuración → Perfiles y permisos**. A la izquierda, los perfiles
+con cuántos módulos ve cada uno y cuántos usuarios lo tienen; al elegir uno, una
+casilla por módulo, agrupadas como en el menú. Se pueden crear perfiles nuevos
+(por ejemplo, alguien que cargue archivos pero no pueda borrar, o que solo vea
+las auditorías) y asignarlos en **Administradores**, como cualquier otro.
+
+Los módulos son las secciones del panel: Inicio, Cargar plantilla, Editar
+cartera, Consultores, Departamento y ciudad, Auditoría de datos, Auditoría de
+imágenes, Ver tableros, Administrar tableros, Asistente IA, Mantenimiento,
+Temas, Administradores y Perfiles y permisos. El catálogo está en
+`src/lib/permisos.ts` (`MODULOS`), y ahí mismo `modulosDeRuta` dice qué módulo
+pide cada ruta de `/api/admin`.
+
+**El permiso se revisa en el servidor.** El menú muestra solo los módulos del
+perfil, pero lo que manda es el middleware: cada petición a `/api/admin` se
+compara con los módulos del perfil y, si no lo tiene, responde 403 aunque
+alguien escriba la ruta a mano. Una ruta que no esté registrada en
+`modulosDeRuta` solo la puede usar el superadministrador: si mañana se agrega
+una y nadie la registra, queda cerrada en vez de abierta.
+
+**Cuándo se aplica un cambio.** El middleware recuerda los permisos de cada
+usuario medio minuto. Dar un permiso se aplica enseguida (antes de negar algo,
+vuelve a preguntar); quitarlo, en menos de medio minuto. El menú se actualiza
+cuando la persona recarga la página. Quien tenga un perfil sin módulos entra y
+ve un aviso de que pida permisos.
+
+Reglas, validadas en `/api/admin/perfiles`:
+
+- el superadministrador es fijo: lo ve todo y no se edita ni se borra;
+- nadie cambia los permisos de su propio perfil (el nombre y la descripción sí);
+- solo se dan o quitan permisos que uno mismo tiene;
+- Administrador y BackOffice se pueden editar, pero no borrar;
+- un perfil que tiene usuarios (activos o no) no se borra: primero hay que
+  cambiárselo a ellos;
+- siempre queda alguien activo que pueda manejar los usuarios.
+
+«Administradores» y «Perfiles y permisos» son los módulos delicados: quien los
+tiene reparte permisos, aunque nunca más de los que él mismo tiene. Crear,
+editar y borrar perfiles queda en la actividad del Inicio.
+
+```sql
+-- qué ve cada perfil y quién lo tiene
+select clave, nombre, modulos from public.perfiles order by sistema desc, nombre;
+select a.usuario, a.rol, p.nombre from public.admins a join public.perfiles p on p.clave = a.rol;
+```
 
 ## 4. Lo que encontré en `101_BOGOTA_12_SEP.xlsx`
 
@@ -250,11 +312,14 @@ la app, para darle todo el ancho a mapas y tablas, y se vuelve a mostrar con
 (cookie `cartera_menu`).
 Cada sección tiene su dirección (`/admin#auditoria`, `/admin#usuarios`…), así
 que se puede guardar o compartir el enlace y el botón Atrás del navegador
-funciona. Las secciones de cada panel están en `PanelAdmin.tsx` y
-`PanelBackOffice.tsx`; agregar una es sumar una entrada a esa lista.
+funciona. Las secciones están en `PanelAdmin.tsx`, cada una con el módulo que
+pide, y el menú muestra solo las del perfil de quien entró. Agregar una es
+sumar una entrada a esa lista, su módulo en `src/lib/permisos.ts` (`MODULOS` y
+`modulosDeRuta`) y, si los perfiles de siempre deben tenerla, agregarla a sus
+módulos en Perfiles y permisos.
 
-Abajo del menú están el usuario con su perfil, **Apariencia**, «Ver consulta»
-(o «Panel completo» para un administrador dentro del BackOffice) y Salir.
+Abajo del menú están el usuario con el nombre de su perfil, **Apariencia**,
+«Ver consulta» (en `/admin`) y Salir.
 
 **Modo claro, oscuro o automático.** Cada quien lo elige en **Apariencia**;
 «Auto» sigue al sistema operativo. Queda en una cookie de ese navegador
@@ -278,7 +343,9 @@ descargas de los puntos sin coordenadas y de los LIBRE, y las observaciones
 del último cargue. Todas las cifras, los departamentos y esas descargas son de
 toda la cartera, todos los ciclos. La actividad junta las cargas (`cargas_cartera`), las
 ediciones y borrados (`auditoria_cartera`) y, con `supabase/panel.sql`, los
-cambios de usuarios, mantenimiento, tableros y temas (`actividad_panel`).
+cambios de usuarios, perfiles, mantenimiento, tableros y temas (`actividad_panel`).
+El botón de cargar, los atajos, la tarjeta de la auditoría y los enlaces a
+otras secciones salen solo si el perfil tiene esos módulos.
 
 **Cargar plantilla.** Va en cuatro pasos: qué quieres hacer, el archivo,
 revisar y aplicar. Nada cambia en la cartera hasta el último. Tres modos,
@@ -321,17 +388,15 @@ borrado y toda edición quedan en `auditoria_cartera` con el usuario que la hizo
 
 **Usuarios del panel** (sección Administradores). Crear, cambiar clave,
 cambiar el perfil desde la fila, desactivar y reactivar. Guardas puestas: nadie puede desactivarse a sí mismo, y el sistema no
-permite quedarse sin ningún administrador activo (los perfiles BackOffice no
-cuentan para ese mínimo). Escribir un usuario que ya existe reemplaza su clave,
+permite quedarse sin nadie activo que pueda manejar los usuarios (los perfiles
+sin «Administradores» no cuentan para ese mínimo). Escribir un usuario que ya existe reemplaza su clave,
 que es la única forma de recuperarla, y le deja el perfil que esté marcado.
 
-Los perfiles son `superadmin`, `admin` y `backoffice`. Cada fila de la lista
-trae un botón **Cambiar clave** que carga ese usuario en el formulario de abajo;
-guardar reemplaza su clave, que sigue siendo la única forma de recuperarla.
-
-Si algún día hace falta otro perfil —por ejemplo alguien que cargue archivos
-pero no pueda borrar—, el sitio donde se decide qué rutas ve cada uno es
-`API_BACKOFFICE` en `src/middleware.ts`.
+Los perfiles salen de la tabla `perfiles`: los tres de siempre y los que se
+creen en **Perfiles y permisos**; cada uno dice qué módulos ve. Cada fila de la
+lista trae un botón **Cambiar clave** que carga ese usuario en el formulario de
+abajo; guardar reemplaza su clave, que sigue siendo la única forma de
+recuperarla.
 
 ## 6. Carga y duplicados
 
@@ -407,8 +472,8 @@ opción solo se permite dentro de un componente de cliente; de ahí la envoltura
 
 ## 9. Auditoría (Athena)
 
-Sección **Auditorías → Datos**, en `/backoffice` y en `/admin`, para los tres
-perfiles. En pantalla no se nombra Athena. Al abrirla ejecuta en Athena la
+Sección **Auditorías → Datos**, en `/backoffice` y en `/admin`, para los
+perfiles con ese módulo (de entrada, los tres de siempre). En pantalla no se nombra Athena. Al abrirla ejecuta en Athena la
 consulta de `src/lib/consultaAuditoria.ts`
 (validaciones de cédula, fechas de nacimiento, «Select» sin responder, rangos
 de costos, ventas, porcentajes y años) y muestra los hallazgos con un desglose
@@ -513,7 +578,7 @@ variables van con `ATHENA_` y no con `AWS_` porque Vercel reserva esos nombres.
 ### Auditoría de imágenes
 
 Sección **Auditorías → Imágenes**, en `/backoffice` y en `/admin`, para los
-tres perfiles. Corre en Athena la consulta de `src/lib/consultaImagenes.ts`:
+perfiles con ese módulo (de entrada, los tres de siempre). Corre en Athena la consulta de `src/lib/consultaImagenes.ts`:
 la foto con la que cada consultor inició la visita (`foto_visita_inicio`),
 con el PDV, su código, el consultor y la fecha de la visita (`fecha_inicio`).
 **La campaña está fija en la consulta (`campana_id = 2423`)**: para auditar
@@ -567,7 +632,7 @@ de fechas: `src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
 ## 10. Asistente IA
 
 Sección **Herramientas → Asistente IA**, en `/admin` y en `/backoffice`, para
-los tres perfiles. Es un chat: se le pregunta lo que sea y se le pueden
+los perfiles con ese módulo (de entrada, los tres de siempre). Es un chat: se le pregunta lo que sea y se le pueden
 adjuntar imágenes (también pegadas o arrastradas), PDF, Word (.docx), Excel,
 PowerPoint (.pptx), CSV y texto.
 

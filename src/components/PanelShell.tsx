@@ -12,8 +12,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { Rol } from "@/lib/auth";
 import { fechaYHora } from "@/lib/fechas";
+import type { IdModulo } from "@/lib/permisos";
 import { COOKIE_MENU, DURACION_COOKIE_MODO_S, type Modo } from "@/lib/modo";
 import EncabezadoPagina from "./EncabezadoPagina";
 import { SelectorModo, useModoPanel } from "./ModoPanel";
@@ -32,7 +32,11 @@ import { SelectorModo, useModoPanel } from "./ModoPanel";
  * mostrar.
  */
 
-export type Navegacion = { irA: (id: string) => void };
+export type Navegacion = {
+  irA: (id: string) => void;
+  /** Si el perfil de quien está en el panel tiene ese módulo. */
+  puede: (modulo: IdModulo) => boolean;
+};
 
 export type SeccionPanel = {
   id: string;
@@ -54,12 +58,6 @@ export type SeccionPanel = {
 type EstadoPagina = {
   ciclo: string | null;
   mantenimiento: { activo: boolean; hasta: string | null };
-};
-
-const NOMBRE_ROL: Record<Rol, string> = {
-  superadmin: "Superadministrador",
-  admin: "Administrador",
-  backoffice: "BackOffice · solo consulta",
 };
 
 /**
@@ -102,7 +100,8 @@ function iniciales(usuario: string): string {
 export default function PanelShell({
   panel,
   usuario,
-  rol,
+  nombrePerfil,
+  modulos,
   modo: modoInicial,
   menuOculto: menuOcultoInicial = false,
   secciones,
@@ -110,7 +109,10 @@ export default function PanelShell({
 }: {
   panel: "admin" | "backoffice";
   usuario: string;
-  rol: Rol;
+  /** El nombre del perfil, para mostrarlo debajo del usuario. */
+  nombrePerfil: string;
+  /** Los módulos de su perfil: el menú ya viene filtrado con ellos. */
+  modulos: IdModulo[];
   modo: Modo;
   /** El menú lateral oculto, como lo dejó la persona la última vez. */
   menuOculto?: boolean;
@@ -163,6 +165,8 @@ export default function PanelShell({
     window.location.hash = id;
   }, []);
 
+  const puede = useCallback((m: IdModulo) => modulos.includes(m), [modulos]);
+
   // ------------------------------------------------------- estado de la página
   useEffect(() => {
     let vivo = true;
@@ -204,7 +208,7 @@ export default function PanelShell({
 
   const seccion = secciones.find((s) => s.id === activa) ?? secciones[0];
   const titulo = seccion.titulo ?? seccion.menu;
-  const nav = useMemo(() => ({ irA }), [irA]);
+  const nav = useMemo(() => ({ irA, puede }), [irA, puede]);
   const enMantenimiento = estado?.mantenimiento.activo === true;
 
   const grupos = useMemo(() => {
@@ -299,25 +303,21 @@ export default function PanelShell({
             <span className="block truncate text-[13px] font-semibold" title={usuario}>
               {usuario}
             </span>
-            <span className="block text-xs text-[var(--color-tinta-suave)]">{NOMBRE_ROL[rol]}</span>
+            <span className="block truncate text-xs text-[var(--color-tinta-suave)]" title={nombrePerfil}>
+              {nombrePerfil}
+            </span>
           </span>
         </div>
 
         <SelectorModo modo={modo} onElegir={elegirModo} />
 
         <div className="flex gap-2">
-          {panel === "admin" ? (
+          {panel === "admin" && (
             // <a> y no <Link>: la consulta se carga de nuevo y queda sin modo oscuro.
             <a href="/" className="boton boton-secundario boton-chico flex-1">
               <ExternalLink size={14} aria-hidden />
               Ver consulta
             </a>
-          ) : (
-            rol !== "backoffice" && (
-              <a href="/admin" className="boton boton-secundario boton-chico flex-1">
-                Panel completo
-              </a>
-            )
           )}
           <button type="button" onClick={salir} className="boton boton-secundario boton-chico flex-1">
             <LogOut size={14} aria-hidden />
@@ -347,7 +347,7 @@ export default function PanelShell({
             ? "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]"
             : "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
         }`;
-        return panel === "admin" ? (
+        return puede("mantenimiento") ? (
           <a
             href="#mantenimiento"
             className={clase}

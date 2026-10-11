@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, KeyRound, Loader2, ShieldAlert, UserPlus } from "lucide-react";
 import { cuando } from "@/lib/fechas";
+import { MODULOS } from "@/lib/permisos";
 
-type Rol = "admin" | "backoffice" | "superadmin";
+/** La clave del perfil (tabla perfiles): superadmin, admin, backoffice o uno creado en el panel. */
+type Rol = string;
 
 type Admin = {
   id: number;
@@ -16,46 +18,50 @@ type Admin = {
   created_at: string;
 };
 
+/** Un perfil, tal como lo manda la API. asignable: si yo lo puedo dar. */
+type OpcionPerfil = {
+  clave: Rol;
+  nombre: string;
+  descripcion: string | null;
+  modulos: string[];
+  sistema: boolean;
+  asignable: boolean;
+};
+
 const LARGO_MINIMO = 10;
 
-const NOMBRE_PERFIL: Record<Rol, string> = {
+/** Cómo se nombran los de siempre en una frase («Se creó X como administrador»). */
+const EN_FRASE: Record<string, string> = {
   superadmin: "superadministrador",
   admin: "administrador",
   backoffice: "BackOffice",
 };
 
-/** Lo que diga la base; si viene vacío o raro, administrador. */
+/** Lo que diga la base; si viene vacío, administrador (así quedaban antes de los perfiles). */
 function perfilDe(a: { rol: string | null }): Rol {
-  if (a.rol === "backoffice") return "backoffice";
-  if (a.rol === "superadmin") return "superadmin";
-  return "admin";
+  return (a.rol ?? "").trim() || "admin";
 }
 
-const PERFILES: { id: Rol; titulo: string; detalle: string }[] = [
-  {
-    id: "superadmin",
-    titulo: "Superadministrador",
-    detalle:
-      "Todo lo del administrador y, además, el único que puede tocar a otro superadministrador y dar o quitar este perfil.",
-  },
-  {
-    id: "admin",
-    titulo: "Administrador",
-    detalle:
-      "Panel completo: cargar la plantilla, editar y borrar cartera, mantenimiento y usuarios.",
-  },
-  {
-    id: "backoffice",
-    titulo: "BackOffice",
-    detalle:
-      "Solo consulta: busca un consultor, ve su mapa y sus puntos, y descarga el Excel o la imagen.",
-  },
-];
+/** El color de la pastilla del perfil en la lista. */
+function colorPerfil(clave: Rol): string {
+  if (clave === "backoffice") return "bg-[var(--color-info-fondo)] text-[var(--color-info-tinta)]";
+  if (clave === "superadmin") return "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]";
+  if (clave === "admin") return "bg-[var(--color-morado-fondo)] text-[var(--color-morado-tinta)]";
+  return "bg-[var(--color-relleno)] text-[var(--color-tinta)]";
+}
+
+/** "Inicio, Consultores y 3 más". */
+function resumenModulos(p: OpcionPerfil): string {
+  if (p.modulos.length === 0) return "Sin módulos: no ve nada del panel.";
+  const nombres = p.modulos.map((m) => MODULOS.find((x) => x.id === m)?.nombre ?? m);
+  if (nombres.length === MODULOS.length) return "Ve todos los módulos.";
+  return `Ve ${nombres.length <= 4 ? nombres.join(", ") : `${nombres.slice(0, 3).join(", ")} y ${nombres.length - 3} más`}.`;
+}
 
 export default function AdminUsuarios() {
   const [lista, setLista] = useState<Admin[] | null>(null);
+  const [perfiles, setPerfiles] = useState<OpcionPerfil[]>([]);
   const [yo, setYo] = useState<string | null>(null);
-  const [miRol, setMiRol] = useState<Rol>("admin");
   const [aviso, setAviso] = useState<{ tipo: "ok" | "mal"; texto: string } | null>(null);
 
   const [usuario, setUsuario] = useState("");
@@ -76,8 +82,8 @@ export default function AdminUsuarios() {
     const json = await res.json().catch(() => ({}));
     if (res.ok) {
       setLista(json.usuarios ?? []);
+      setPerfiles(json.perfiles ?? []);
       setYo(json.yo ?? null);
-      setMiRol((json.miRol as Rol) ?? "admin");
     } else {
       setAviso({ tipo: "mal", texto: json.error ?? "No se pudo leer la lista." });
     }
@@ -85,6 +91,10 @@ export default function AdminUsuarios() {
 
   const existente = lista?.find((a) => a.usuario === usuario.trim().toLowerCase());
   const yaExiste = existente !== undefined;
+  const asignables = perfiles.filter((p) => p.asignable);
+
+  const nombrePerfil = (clave: Rol) => perfiles.find((p) => p.clave === clave)?.nombre ?? clave;
+  const enFrase = (clave: Rol) => EN_FRASE[clave] ?? nombrePerfil(clave);
 
   // Al escribir un usuario que ya existe se precarga SU perfil: así cambiarle
   // la clave no lo asciende ni lo degrada sin querer.
@@ -92,12 +102,21 @@ export default function AdminUsuarios() {
     if (existente) setRol(perfilDe(existente));
   }, [existente]);
 
+  // Si el perfil marcado no es uno que yo pueda dar, se marca el primero que sí.
+  useEffect(() => {
+    if (existente || perfiles.length === 0) return;
+    if (!perfiles.some((p) => p.clave === rol && p.asignable)) {
+      setRol(perfiles.find((p) => p.asignable)?.clave ?? "");
+    }
+  }, [perfiles, rol, existente]);
+
   /**
-   * Un superadministrador solo lo toca otro superadministrador. La API lo
-   * vuelve a validar; esto es solo para no ofrecer botones que van a fallar.
+   * Al superadministrador solo lo toca otro superadministrador, y a los demás
+   * quien tenga todos los módulos de su perfil. La API lo vuelve a validar;
+   * esto es solo para no ofrecer botones que van a fallar.
    */
   function puedoTocar(a: Admin): boolean {
-    return perfilDe(a) !== "superadmin" || miRol === "superadmin";
+    return perfiles.find((p) => p.clave === perfilDe(a))?.asignable ?? false;
   }
 
   /** Carga a ese usuario en el formulario de abajo para cambiarle la clave. */
@@ -130,7 +149,7 @@ export default function AdminUsuarios() {
       return;
     }
 
-    const comoRol = NOMBRE_PERFIL[(json.rol as Rol) ?? "admin"];
+    const comoRol = enFrase((json.rol as Rol) ?? rol);
 
     setAviso({
       tipo: "ok",
@@ -142,7 +161,6 @@ export default function AdminUsuarios() {
     setNombre("");
     setClave("");
     setVerClave(false);
-    setRol("admin");
     cargar();
   }
 
@@ -152,15 +170,16 @@ export default function AdminUsuarios() {
   async function cambiarPerfil(a: Admin, nuevo: Rol) {
     const antes = perfilDe(a);
     if (nuevo === antes) return;
+    const opcion = perfiles.find((p) => p.clave === nuevo);
     const aviso =
-      nuevo === "backoffice"
-        ? " Desde ahí solo podrá consultar."
-        : nuevo === "superadmin"
-          ? " Podrá tocar a otros superadministradores."
+      nuevo === "superadmin"
+        ? " Podrá tocar a otros superadministradores."
+        : opcion
+          ? ` ${resumenModulos(opcion)}`
           : "";
     if (
       !confirm(
-        `¿Cambiar el perfil de ${a.nombre ?? a.usuario} de ${NOMBRE_PERFIL[antes]} a ${NOMBRE_PERFIL[nuevo]}?${aviso} Si tiene una sesión abierta, tendrá que volver a entrar.`
+        `¿Cambiar el perfil de ${a.nombre ?? a.usuario} de ${enFrase(antes)} a ${enFrase(nuevo)}?${aviso} Si tiene una sesión abierta, tendrá que volver a entrar.`
       )
     ) {
       return;
@@ -182,7 +201,7 @@ export default function AdminUsuarios() {
     }
     setAviso({
       tipo: "ok",
-      texto: `${a.nombre ?? a.usuario} ahora es ${NOMBRE_PERFIL[nuevo]}. Si tenía una sesión abierta, tendrá que volver a entrar.`,
+      texto: `${a.nombre ?? a.usuario} ahora es ${enFrase(nuevo)}. Si tenía una sesión abierta, tendrá que volver a entrar.`,
     });
     cargar();
   }
@@ -270,25 +289,27 @@ export default function AdminUsuarios() {
                       a.usuario === yo
                         ? "No puedes cambiar tu propio perfil"
                         : !puedoTocar(a)
-                          ? "Solo un superadministrador puede cambiar este perfil"
+                          ? perfilDe(a) === "superadmin"
+                            ? "Solo un superadministrador puede cambiar este perfil"
+                            : "Tiene permisos que tú no tienes"
                           : "Cambiar el perfil"
                     }
-                    onChange={(e) => cambiarPerfil(a, e.target.value as Rol)}
-                    className={`min-h-[32px] shrink-0 rounded-full border-0 py-0 pr-7 pl-2.5 text-xs font-medium disabled:opacity-100 ${
-                      perfilDe(a) === "backoffice"
-                        ? "bg-[var(--color-info-fondo)] text-[var(--color-info-tinta)]"
-                        : perfilDe(a) === "superadmin"
-                          ? "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]"
-                          : "bg-[var(--color-morado-fondo)] text-[var(--color-morado-tinta)]"
-                    }`}
+                    onChange={(e) => cambiarPerfil(a, e.target.value)}
+                    className={`min-h-[32px] max-w-[14rem] shrink-0 truncate rounded-full border-0 py-0 pr-7 pl-2.5 text-xs font-medium disabled:opacity-100 ${colorPerfil(
+                      perfilDe(a)
+                    )}`}
                   >
-                    {PERFILES.filter(
-                      (p) => p.id !== "superadmin" || miRol === "superadmin" || perfilDe(a) === "superadmin"
-                    ).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {NOMBRE_PERFIL[p.id]}
-                      </option>
-                    ))}
+                    {/* Los que yo puedo dar, y el que ya tiene aunque yo no pueda darlo. */}
+                    {perfiles
+                      .filter((p) => p.asignable || p.clave === perfilDe(a))
+                      .map((p) => (
+                        <option key={p.clave} value={p.clave}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    {!perfiles.some((p) => p.clave === perfilDe(a)) && (
+                      <option value={perfilDe(a)}>{perfilDe(a)}</option>
+                    )}
                   </select>
                   {cambiandoPerfil === a.usuario && (
                     <Loader2 size={14} className="animate-spin text-[var(--color-tinta-suave)]" aria-label="Guardando" />
@@ -311,7 +332,9 @@ export default function AdminUsuarios() {
                     title={
                       puedoTocar(a)
                         ? "Cargar este usuario abajo para ponerle una clave nueva"
-                        : "Solo el superadministrador puede cambiar esta clave"
+                        : perfilDe(a) === "superadmin"
+                          ? "Solo un superadministrador puede cambiar esta clave"
+                          : "Tiene permisos que tú no tienes"
                     }
                     className="boton boton-secundario boton-chico shrink-0 text-xs"
                   >
@@ -326,7 +349,9 @@ export default function AdminUsuarios() {
                     title={
                       puedoTocar(a)
                         ? undefined
-                        : "Solo el superadministrador puede desactivar esta cuenta"
+                        : perfilDe(a) === "superadmin"
+                          ? "Solo un superadministrador puede desactivar esta cuenta"
+                          : "Tiene permisos que tú no tienes"
                     }
                     className="boton boton-secundario boton-chico shrink-0 text-xs"
                   >
@@ -386,14 +411,17 @@ export default function AdminUsuarios() {
 
           <fieldset className="mt-4">
             <legend className="campo-etiqueta">Perfil</legend>
+            {lista !== null && asignables.length === 0 && (
+              <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
+                Tu perfil no puede dar ninguno de los perfiles que hay.
+              </p>
+            )}
             <div className="mt-1 space-y-2">
-              {PERFILES.filter(
-                (p) => p.id !== "superadmin" || miRol === "superadmin"
-              ).map((p) => (
+              {asignables.map((p) => (
                 <label
-                  key={p.id}
+                  key={p.clave}
                   className={`flex cursor-pointer gap-3 rounded-[4px] border p-3 ${
-                    rol === p.id
+                    rol === p.clave
                       ? "border-[var(--color-tinta)] bg-[var(--color-sutil)]"
                       : "border-[var(--color-linea)]"
                   }`}
@@ -401,15 +429,16 @@ export default function AdminUsuarios() {
                   <input
                     type="radio"
                     name="perfil"
-                    value={p.id}
-                    checked={rol === p.id}
-                    onChange={() => setRol(p.id)}
+                    value={p.clave}
+                    checked={rol === p.clave}
+                    onChange={() => setRol(p.clave)}
                     className="mt-0.5"
                   />
-                  <span>
-                    <span className="block text-sm font-medium">{p.titulo}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{p.nombre}</span>
                     <span className="mt-0.5 block text-[13px] leading-snug text-[var(--color-tinta-suave)]">
-                      {p.detalle}
+                      {p.descripcion ? `${p.descripcion.replace(/[.\s]+$/, "")}. ` : ""}
+                      {p.clave === "superadmin" ? "" : resumenModulos(p)}
                     </span>
                   </span>
                 </label>
@@ -464,8 +493,9 @@ export default function AdminUsuarios() {
           {existente && !puedoTocar(existente) && (
             <p className="mt-3 flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-alerta)]">
               <ShieldAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
-              Esa cuenta es de un superadministrador. Solo él puede cambiarle la
-              clave o el perfil.
+              {perfilDe(existente) === "superadmin"
+                ? "Esa cuenta es de un superadministrador. Solo otro superadministrador puede cambiarle la clave o el perfil."
+                : "Ese usuario tiene permisos que tú no tienes: solo lo puede cambiar alguien que también los tenga."}
             </p>
           )}
 
@@ -474,6 +504,7 @@ export default function AdminUsuarios() {
             disabled={
               guardando ||
               !usuario ||
+              !rol ||
               clave.length < LARGO_MINIMO ||
               (existente !== undefined && !puedoTocar(existente))
             }
@@ -484,7 +515,7 @@ export default function AdminUsuarios() {
             ) : (
               <UserPlus size={15} aria-hidden />
             )}
-            {yaExiste ? "Cambiar la clave" : `Crear ${NOMBRE_PERFIL[rol]}`}
+            {yaExiste ? "Cambiar la clave" : rol ? `Crear ${enFrase(rol)}` : "Crear usuario"}
           </button>
         </form>
       </section>

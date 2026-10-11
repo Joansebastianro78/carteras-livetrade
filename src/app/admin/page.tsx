@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
 import { COOKIE_MENU, COOKIE_MODO, esModo } from "@/lib/modo";
+import { sesionConPermisos } from "@/lib/perfilesServidor";
 import LoginAdmin from "@/components/LoginAdmin";
 import PanelAdmin from "@/components/PanelAdmin";
 
@@ -14,23 +13,20 @@ export default async function Admin({
 }) {
   const { sesion } = await searchParams;
   const store = await cookies();
-  const activa = await leerSesion(
-    store.get(COOKIE_ADMIN)?.value,
-    process.env.ADMIN_SECRET
-  );
+  const activa = await sesionConPermisos();
 
   if (!activa) {
     return <LoginAdmin motivo={sesion} />;
   }
 
-  // El middleware ya desvía a los perfiles BackOffice, pero la página no se
-  // fía de eso: quien no sea admin no llega a ver el panel completo.
-  if (!mandaEnElPanel(activa.rol)) redirect("/backoffice");
-
+  // El panel muestra solo los módulos del perfil; el middleware cierra las
+  // rutas de API de los demás.
   return (
     <PanelAdmin
+      panel="admin"
       usuario={activa.usuario}
-      rol={activa.rol}
+      nombrePerfil={activa.nombrePerfil}
+      modulos={activa.modulos}
       modo={esModo(store.get(COOKIE_MODO)?.value)}
       menuOculto={store.get(COOKIE_MENU)?.value === "oculto"}
     />

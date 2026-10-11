@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { filasDesdeAthena, type FilaAuditoria } from "@/lib/auditoria";
+import { MODULOS, type IdModulo } from "@/lib/permisos";
 import { cuando } from "@/lib/fechas";
 import { exportarTerritorio } from "@/lib/excel";
 import {
@@ -26,10 +27,13 @@ import {
 import type { PuntoTerritorio } from "@/lib/territorio";
 import EncabezadoPagina from "./EncabezadoPagina";
 import { ProgresoConsulta, cifra, useConsultaAthena } from "./ConsultaAthena";
+import type { Navegacion } from "./PanelShell";
 
 /**
- * Inicio del administrador: cómo está la cartera hoy, atajos, un resumen de
- * la auditoría, lo último que se hizo en el panel y lo que conviene revisar.
+ * Inicio del panel: cómo está la cartera hoy, atajos, un resumen de la
+ * auditoría, lo último que se hizo en el panel y lo que conviene revisar.
+ * Los atajos y las tarjetas que llevan a otro módulo salen solo si el perfil
+ * tiene ese módulo.
  */
 
 type Carga = {
@@ -92,6 +96,20 @@ const PERFIL: Record<string, string> = {
   backoffice: "BackOffice",
 };
 
+/** El nombre del perfil: el que quedó guardado con la acción, o el de siempre. */
+function nombrePerfil(clave: string, guardado: unknown): string {
+  return typeof guardado === "string" && guardado ? guardado : (PERFIL[clave] ?? clave);
+}
+
+/** "Inicio, Consultores y 2 más". */
+function nombresModulos(ids: unknown): string {
+  if (!Array.isArray(ids) || ids.length === 0) return "";
+  const nombres = ids.map((id) => MODULOS.find((m) => m.id === id)?.nombre ?? String(id));
+  return nombres.length <= 3
+    ? nombres.join(", ")
+    : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más`;
+}
+
 /** Lo que pasó, en una frase, y un detalle debajo. */
 function describir(a: ItemActividad): { frase: string; detalle: string | null } {
   const d = a.detalle ?? {};
@@ -134,14 +152,14 @@ function describir(a: ItemActividad): { frase: string; detalle: string | null } 
     case "usuario_crear":
       return {
         frase: `creó el usuario ${txt("usuario")}`,
-        detalle: `Perfil ${PERFIL[txt("rol")] ?? txt("rol")}`,
+        detalle: `Perfil ${nombrePerfil(txt("rol"), d.perfil)}`,
       };
     case "usuario_clave":
       return { frase: `cambió la clave de ${txt("usuario")}`, detalle: null };
     case "usuario_rol":
       return {
         frase: `cambió el perfil de ${txt("usuario")}`,
-        detalle: `De ${PERFIL[txt("antes")] ?? txt("antes")} a ${PERFIL[txt("ahora")] ?? txt("ahora")}`,
+        detalle: `De ${nombrePerfil(txt("antes"), d.perfilAntes)} a ${nombrePerfil(txt("ahora"), d.perfilAhora)}`,
       };
     case "usuario_activar":
       return { frase: `reactivó a ${txt("usuario")}`, detalle: null };
@@ -159,6 +177,26 @@ function describir(a: ItemActividad): { frase: string; detalle: string | null } 
       return { frase: `eliminó el tablero «${txt("nombre")}»`, detalle: null };
     case "tema_cambiar":
       return { frase: "cambió los temas de temporada", detalle: txt("descripcion") || null };
+    case "perfil_crear": {
+      const n = Array.isArray(d.modulos) ? d.modulos.length : 0;
+      return {
+        frase: `creó el perfil «${txt("nombre")}»`,
+        detalle: n === 0 ? "Sin módulos" : `${n} ${n === 1 ? "módulo" : "módulos"}: ${nombresModulos(d.modulos)}`,
+      };
+    }
+    case "perfil_editar": {
+      const partes = [
+        nombresModulos(d.agregados) && `Puede ver ${nombresModulos(d.agregados)}`,
+        nombresModulos(d.quitados) && `ya no ve ${nombresModulos(d.quitados)}`,
+      ].filter(Boolean);
+      const frase = partes.length
+        ? `cambió los permisos del perfil «${txt("nombre")}»`
+        : `editó el perfil «${txt("nombre")}»`;
+      const detalle = partes.join("; ");
+      return { frase, detalle: detalle ? detalle.charAt(0).toUpperCase() + detalle.slice(1) : null };
+    }
+    case "perfil_eliminar":
+      return { frase: `eliminó el perfil «${txt("nombre")}»`, detalle: null };
     default:
       return { frase: a.accion.replace(/_/g, " "), detalle: null };
   }
@@ -175,7 +213,8 @@ function hoyEnPalabras(): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
+export default function Inicio({ nav }: { nav: Navegacion }) {
+  const { irA, puede } = nav;
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [errorResumen, setErrorResumen] = useState<string | null>(null);
   const [actividad, setActividad] = useState<ItemActividad[] | null>(null);
@@ -257,7 +296,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       Icono: Wrench,
       titulo: "La consulta está en mantenimiento",
       detalle: "Los consultores ven el aviso y no pueden consultar su cartera.",
-      accion: (
+      accion: puede("mantenimiento") && (
         <a href="#mantenimiento" className="text-[13px] font-medium whitespace-nowrap underline underline-offset-2">
           Revisar
         </a>
@@ -322,6 +361,15 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
     });
   }
 
+  const atajos = (
+    [
+      { id: "editar", Icono: Search, titulo: "Buscar un punto", detalle: "Por código, PDV o dirección" },
+      { id: "consultores", Icono: Users, titulo: "Cartera de un consultor", detalle: "Mapa, puntos y descargas" },
+      { id: "territorio", Icono: MapPin, titulo: "Puntos por departamento", detalle: "Filtrar y bajar en Excel" },
+      { id: "auditoria", Icono: ClipboardCheck, titulo: "Auditoría de datos", detalle: "Hallazgos y Excel limpio" },
+    ] satisfies { id: IdModulo; Icono: typeof MapPin; titulo: string; detalle: string }[]
+  ).filter((a) => puede(a.id));
+
   const TONO = {
     alerta: "bg-[var(--color-alerta-fondo)] text-[var(--color-alerta)]",
     aviso: "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]",
@@ -334,10 +382,12 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
         titulo="Inicio"
         descripcion={hoy ? `${hoy} · así está la cartera hoy` : " "}
         acciones={
-          <button type="button" onClick={() => irA("cargar")} className="boton boton-primario">
-            <Upload size={16} aria-hidden />
-            Cargar plantilla
-          </button>
+          puede("cargar") && (
+            <button type="button" onClick={() => irA("cargar")} className="boton boton-primario">
+              <Upload size={16} aria-hidden />
+              Cargar plantilla
+            </button>
+          )
         }
       />
 
@@ -408,99 +458,102 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
       </section>
 
       {/* ------------------------------------------------------------ atajos */}
-      <section aria-labelledby="atajos" className="space-y-3">
-        <h2 id="atajos" className="text-[15px] font-semibold">
-          Atajos
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { id: "editar", Icono: Search, titulo: "Buscar un punto", detalle: "Por código, PDV o dirección" },
-            { id: "consultores", Icono: Users, titulo: "Cartera de un consultor", detalle: "Mapa, puntos y descargas" },
-            { id: "territorio", Icono: MapPin, titulo: "Puntos por departamento", detalle: "Filtrar y bajar en Excel" },
-            { id: "auditoria", Icono: ClipboardCheck, titulo: "Auditoría de datos", detalle: "Hallazgos y Excel limpio" },
-          ].map((a) => (
-            <a
-              key={a.id}
-              href={`#${a.id}`}
-              className="tarjeta flex min-h-[64px] items-center gap-3 px-4 py-3 hover:border-[var(--color-tinta)]"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[6px] bg-[var(--color-relleno)]">
-                <a.Icono size={18} strokeWidth={1.75} aria-hidden />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[14px] font-medium">{a.titulo}</span>
-                <span className="block text-xs text-[var(--color-tinta-suave)]">{a.detalle}</span>
-              </span>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        {/* ---------------------------------------------------------- auditoría */}
-        <section aria-labelledby="resumen-auditoria" className="tarjeta px-5 py-5 sm:px-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="resumen-auditoria" className="text-[15px] font-semibold">
-              Auditoría de datos
-            </h2>
-            {auditoria && (
-              <span className="text-xs text-[var(--color-tinta-suave)]">
-                Consultada {cuando(auditoria.momento)}
-              </span>
-            )}
-          </div>
-
-          {consulta.trabajando || consulta.fase.tipo === "error" ? (
-            <div className="mt-4">
-              <ProgresoConsulta fase={consulta.fase} onReintentar={() => consulta.consultar(false)} />
-            </div>
-          ) : auditoria ? (
-            <>
-              <p className="cifras mt-1.5 text-[22px] font-semibold">
-                {cifra(auditoria.total)} hallazgos{" "}
-                <span className="text-[14px] font-normal text-[var(--color-tinta-suave)]">
-                  · {cifra(auditoria.consultores)} consultores
+      {atajos.length > 0 && (
+        <section aria-labelledby="atajos" className="space-y-3">
+          <h2 id="atajos" className="text-[15px] font-semibold">
+            Atajos
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {atajos.map((a) => (
+              <a
+                key={a.id}
+                href={`#${a.id}`}
+                className="tarjeta flex min-h-[64px] items-center gap-3 px-4 py-3 hover:border-[var(--color-tinta)]"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[6px] bg-[var(--color-relleno)]">
+                  <a.Icono size={18} strokeWidth={1.75} aria-hidden />
                 </span>
-              </p>
-              <ul className="mt-4 space-y-3">
-                {auditoria.motivos.slice(0, 5).map((m) => (
-                  <li key={m.nombre}>
-                    <div className="flex justify-between gap-3 text-[13px]">
-                      <span>{m.nombre}</span>
-                      <span className="cifras text-[var(--color-tinta-suave)]">{cifra(m.n)}</span>
-                    </div>
-                    <div className="mt-1.5 h-2 rounded bg-[var(--color-relleno)]">
-                      <div
-                        className="h-2 rounded bg-[var(--color-tinta-suave)]"
-                        style={{ width: `${Math.max(2, (m.n / (auditoria.motivos[0]?.n || 1)) * 100)}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-              Todavía no has consultado la auditoría desde este navegador. Al consultarla, aquí
-              queda cuántos hallazgos hay y de qué tipo.
-            </p>
-          )}
-
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <a href="#auditoria" className="inline-flex items-center gap-1.5 text-[14px] font-medium">
-              Abrir la auditoría
-              <ArrowRight size={15} aria-hidden />
-            </a>
-            <button
-              type="button"
-              onClick={() => consulta.consultar(true)}
-              disabled={consulta.trabajando}
-              className="text-[13px] text-[var(--color-tinta-suave)] underline underline-offset-2 hover:text-[var(--color-tinta)] disabled:opacity-50"
-            >
-              {auditoria ? "Actualizar el resumen" : "Consultar ahora"}
-            </button>
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-medium">{a.titulo}</span>
+                  <span className="block text-xs text-[var(--color-tinta-suave)]">{a.detalle}</span>
+                </span>
+              </a>
+            ))}
           </div>
         </section>
+      )}
+
+      <div
+        className={`grid grid-cols-1 items-start gap-5 ${
+          puede("auditoria") ? "xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
+        }`}
+      >
+        {/* ---------------------------------------------------------- auditoría */}
+        {puede("auditoria") && (
+          <section aria-labelledby="resumen-auditoria" className="tarjeta px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="resumen-auditoria" className="text-[15px] font-semibold">
+                Auditoría de datos
+              </h2>
+              {auditoria && (
+                <span className="text-xs text-[var(--color-tinta-suave)]">
+                  Consultada {cuando(auditoria.momento)}
+                </span>
+              )}
+            </div>
+
+            {consulta.trabajando || consulta.fase.tipo === "error" ? (
+              <div className="mt-4">
+                <ProgresoConsulta fase={consulta.fase} onReintentar={() => consulta.consultar(false)} />
+              </div>
+            ) : auditoria ? (
+              <>
+                <p className="cifras mt-1.5 text-[22px] font-semibold">
+                  {cifra(auditoria.total)} hallazgos{" "}
+                  <span className="text-[14px] font-normal text-[var(--color-tinta-suave)]">
+                    · {cifra(auditoria.consultores)} consultores
+                  </span>
+                </p>
+                <ul className="mt-4 space-y-3">
+                  {auditoria.motivos.slice(0, 5).map((m) => (
+                    <li key={m.nombre}>
+                      <div className="flex justify-between gap-3 text-[13px]">
+                        <span>{m.nombre}</span>
+                        <span className="cifras text-[var(--color-tinta-suave)]">{cifra(m.n)}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 rounded bg-[var(--color-relleno)]">
+                        <div
+                          className="h-2 rounded bg-[var(--color-tinta-suave)]"
+                          style={{ width: `${Math.max(2, (m.n / (auditoria.motivos[0]?.n || 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
+                Todavía no has consultado la auditoría desde este navegador. Al consultarla, aquí
+                queda cuántos hallazgos hay y de qué tipo.
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <a href="#auditoria" className="inline-flex items-center gap-1.5 text-[14px] font-medium">
+                Abrir la auditoría
+                <ArrowRight size={15} aria-hidden />
+              </a>
+              <button
+                type="button"
+                onClick={() => consulta.consultar(true)}
+                disabled={consulta.trabajando}
+                className="text-[13px] text-[var(--color-tinta-suave)] underline underline-offset-2 hover:text-[var(--color-tinta)] disabled:opacity-50"
+              >
+                {auditoria ? "Actualizar el resumen" : "Consultar ahora"}
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ---------------------------------------------------------- actividad */}
         <section aria-labelledby="actividad" className="tarjeta px-5 py-5 sm:px-6">
@@ -567,7 +620,7 @@ export default function Inicio({ irA }: { irA: (seccion: string) => void }) {
                 </span>
               )}
             </h2>
-            {deptos && deptos.length > 0 && (
+            {deptos && deptos.length > 0 && puede("territorio") && (
               <a href="#territorio" className="text-[13px] underline underline-offset-2">
                 Ver {deptos.length === 1 ? "el departamento" : `los ${deptos.length} departamentos`}
               </a>

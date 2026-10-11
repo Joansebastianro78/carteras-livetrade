@@ -1,7 +1,8 @@
 import { esRol, type Rol } from "./auth";
 
 /**
- * Cómo está hoy un usuario del panel en la base: su perfil y si sigue activo.
+ * Cómo está hoy un usuario del panel en la base: su perfil, los módulos de
+ * ese perfil y si sigue activo.
  *
  * La cookie de sesión dura 8 horas y lleva el perfil adentro. Sin esta
  * consulta, a alguien que le quitan el perfil de administrador (o lo
@@ -9,16 +10,27 @@ import { esRol, type Rol } from "./auth";
  * lo revisa en cada petición, con una memoria corta para no consultar la base
  * a cada rato: un cambio tarda como mucho medio minuto en aplicarse.
  *
- * La memoria solo sirve para dejar pasar. Antes de sacar a alguien, el
- * middleware vuelve a preguntar con { fresco: true }: así, a quien reactivan
- * o le cambian el perfil y entra de nuevo enseguida, no lo saca un dato viejo.
+ * La memoria solo sirve para dejar pasar. Antes de sacar a alguien o de
+ * negarle algo, el middleware vuelve a preguntar con { fresco: true }: así, a
+ * quien reactivan, le cambian el perfil o le dan un permiso, no lo frena un
+ * dato viejo.
  *
  * Usa fetch contra la API REST de Supabase porque el middleware corre en el
  * runtime Edge. Va con la service_role key: solo se usa en el servidor.
  */
 
-/** null: el usuario no existe o está desactivado. */
-export type EstadoUsuario = { rol: Rol } | null | "desconocido";
+/**
+ * null: el usuario no existe o está desactivado.
+ * modulos null: no se pudieron leer (falta supabase/perfiles.sql) y valen los
+ * de siempre de su perfil.
+ */
+export type EstadoUsuario = { rol: Rol; modulos: string[] | null } | null | "desconocido";
+
+type Fila = {
+  rol: string | null;
+  activo: boolean;
+  perfiles?: { modulos: string[] | null } | null;
+};
 
 const MEMORIA_MS = 30_000;
 const memoria = new Map<string, { valor: EstadoUsuario; hasta: number }>();
@@ -40,24 +52,39 @@ export async function estadoEnBase(
   const control = new AbortController();
   const reloj = setTimeout(() => control.abort(), 4000);
 
+  const pedir = (campos: string) =>
+    fetch(`${url}/rest/v1/admins?select=${campos}&usuario=eq.${encodeURIComponent(usuario)}`, {
+      headers: { apikey: llave, Authorization: `Bearer ${llave}` },
+      cache: "no-store",
+      signal: control.signal,
+    });
+
   try {
-    const res = await fetch(
-      `${url}/rest/v1/admins?select=rol,activo&usuario=eq.${encodeURIComponent(usuario)}`,
-      {
-        headers: { apikey: llave, Authorization: `Bearer ${llave}` },
-        cache: "no-store",
-        signal: control.signal,
-      }
-    );
+    // El perfil viene pegado al usuario por la llave admins.rol → perfiles.
+    let res = await pedir("rol,activo,perfiles(modulos)");
+    let conPerfiles = true;
+
+    // Sin perfiles.sql no existe esa relación y PostgREST responde 400: se
+    // pregunta sin ella y valen los permisos de siempre.
+    if (res.status === 400) {
+      res = await pedir("rol,activo");
+      conPerfiles = false;
+    }
 
     // Sin roles.sql la columna rol no existe y PostgREST responde 400. En ese
     // caso, o si la base no contesta, se sigue con lo que dice la cookie: es
     // como funcionaba antes y no deja a nadie por fuera por un problema ajeno.
     if (!res.ok) return "desconocido";
 
-    const filas = (await res.json()) as { rol: string | null; activo: boolean }[];
+    const filas = (await res.json()) as Fila[];
+    const fila = filas[0];
     const valor: EstadoUsuario =
-      filas.length === 0 || !filas[0].activo ? null : { rol: esRol(filas[0].rol) };
+      !fila || !fila.activo
+        ? null
+        : {
+            rol: esRol(fila.rol),
+            modulos: conPerfiles && fila.perfiles ? (fila.perfiles.modulos ?? []) : null,
+          };
 
     if (memoria.size > 500) memoria.clear();
     memoria.set(usuario, { valor, hasta: ahora + MEMORIA_MS });

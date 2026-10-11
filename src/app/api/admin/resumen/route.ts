@@ -20,7 +20,8 @@ export const dynamic = "force-dynamic";
  *                                     o sin consultor, para descargarlos
  *
  * El ciclo actual es el que se tocó más recientemente.
- * Solo GET: el BackOffice también lo puede leer.
+ * Solo GET. ?corto=1 lo lee cualquiera con sesión; lo demás pide «Inicio» o
+ * «Cargar plantilla» (src/lib/permisos.ts).
  */
 
 type FilaCiclo = {

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { COOKIE_ADMIN, leerSesion, mandaEnElPanel } from "@/lib/auth";
+import { sesionConPermisos } from "@/lib/perfilesServidor";
 import { normalizarUrlTablero } from "@/lib/tableros";
 import { registrarActividad } from "@/lib/actividad";
 
@@ -16,20 +15,24 @@ function esTablaFaltante(mensaje: string): boolean {
 }
 
 async function sesionActual() {
-  const store = await cookies();
-  return leerSesion(store.get(COOKIE_ADMIN)?.value, process.env.ADMIN_SECRET);
+  return sesionConPermisos();
+}
+
+/** Si quien llama tiene «Administrar tableros» en su perfil. */
+async function administraTableros(): Promise<boolean> {
+  const sesion = await sesionActual();
+  return sesion?.modulos.includes("tableros_admin") ?? false;
 }
 
 /**
- * El middleware ya deja pasar el GET al perfil BackOffice y le bloquea el
+ * El middleware ya deja leer a quien tiene «Ver tableros» y le bloquea el
  * resto. Esta función lo vuelve a comprobar aquí: si mañana alguien mueve una
  * ruta en el middleware, la regla de quién escribe no se pierde con ella.
  */
 async function soloAdministradores() {
-  const sesion = await sesionActual();
-  if (!sesion || !mandaEnElPanel(sesion.rol)) {
+  if (!(await administraTableros())) {
     return NextResponse.json(
-      { error: "Solo un administrador puede cambiar los tableros." },
+      { error: "Tu perfil no puede cambiar los tableros: le falta «Administrar tableros»." },
       { status: 403 }
     );
   }
@@ -38,8 +41,7 @@ async function soloAdministradores() {
 
 // ------------------------------------------------- listar
 export async function GET() {
-  const sesion = await sesionActual();
-  const esAdmin = sesion ? mandaEnElPanel(sesion.rol) : false;
+  const esAdmin = await administraTableros();
 
   let consulta = supabaseAdmin
     .from("tableros")
@@ -47,7 +49,7 @@ export async function GET() {
     .order("orden", { ascending: true })
     .order("created_at", { ascending: true });
 
-  // El BackOffice solo ve los que están publicados; el administrador ve todo
+  // Quien solo ve tableros ve los publicados; quien los administra ve todo
   // para poder preparar uno antes de mostrarlo.
   if (!esAdmin) consulta = consulta.eq("activo", true);
 
