@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import {
+  fechaEnBogota,
+  rangoDelTema,
   rangoLegible,
   TEMAS,
+  tieneFecha,
   type EstadoTema,
   type IdTema,
   type ModoTema,
+  type Tema,
 } from "@/lib/temas";
 
 const MODOS: { id: ModoTema; titulo: string; detalle: string }[] = [
@@ -29,6 +33,21 @@ const MODOS: { id: ModoTema; titulo: string; detalle: string }[] = [
     detalle: "La página queda limpia todo el año.",
   },
 ];
+
+/**
+ * En la lista van por fecha, de enero a diciembre, y al final los que no
+ * tienen fecha. El orden de TEMAS es otro: el de cuál gana si dos coinciden.
+ */
+function porCalendario(temas: Tema[]): Tema[] {
+  const anio = fechaEnBogota().anio;
+  const clave = (t: Tema) => {
+    const r = rangoDelTema(t, anio);
+    return r ? r.desde[0] * 100 + r.desde[1] : 10_000;
+  };
+  return [...temas].sort((a, b) => clave(a) - clave(b));
+}
+
+const EN_CALENDARIO = porCalendario(TEMAS);
 
 export default function PanelTemas() {
   const [modo, setModo] = useState<ModoTema>("automatico");
@@ -198,11 +217,20 @@ export default function PanelTemas() {
               className="campo"
             >
               <option value="">Elige un tema</option>
-              {TEMAS.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nombre}
-                </option>
-              ))}
+              <optgroup label="Con fecha">
+                {EN_CALENDARIO.filter(tieneFecha).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Sin fecha (solo así)">
+                {EN_CALENDARIO.filter((t) => !tieneFecha(t)).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
         )}
@@ -211,12 +239,14 @@ export default function PanelTemas() {
       <section className="tarjeta p-5">
         <h2 className="text-sm font-semibold">Cuáles están habilitados</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Un tema deshabilitado no sale aunque lleguen sus fechas.
+          Un tema deshabilitado no sale aunque lleguen sus fechas. Los que no
+          tienen fecha nunca salen solos: se ponen con «Dejar uno fijo».
         </p>
 
         <ul className="mt-3 divide-y divide-[var(--color-linea)] rounded-[4px] border border-[var(--color-linea)] bg-[var(--color-papel)]">
-          {TEMAS.map((t) => {
+          {EN_CALENDARIO.map((t) => {
             const encendido = !apagados.includes(t.id);
+            const conFecha = tieneFecha(t);
 
             return (
               <li
@@ -239,35 +269,56 @@ export default function PanelTemas() {
                   </span>
                 </span>
 
-                <span className="flex items-center gap-2 sm:ml-auto">
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                      encendido
-                        ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
-                        : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
-                    }`}
-                  >
-                    {encendido ? "habilitado" : "deshabilitado"}
-                  </span>
+                {conFecha ? (
+                  <span className="flex items-center gap-2 sm:ml-auto">
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                        encendido
+                          ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
+                          : "bg-[var(--color-relleno)] text-[var(--color-tinta-suave)]"
+                      }`}
+                    >
+                      {encendido ? "habilitado" : "deshabilitado"}
+                    </span>
 
-                  <button
-                    type="button"
-                    onClick={() => alternarTema(t.id)}
-                    disabled={guardando}
-                    className="boton boton-secundario boton-chico shrink-0"
-                  >
-                    {encendido ? "Deshabilitar" : "Habilitar"}
-                  </button>
-                </span>
+                    <button
+                      type="button"
+                      onClick={() => alternarTema(t.id)}
+                      disabled={guardando}
+                      className="boton boton-secundario boton-chico shrink-0"
+                    >
+                      {encendido ? "Deshabilitar" : "Habilitar"}
+                    </button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 sm:ml-auto">
+                    <span className="shrink-0 rounded-full bg-[var(--color-info-fondo)] px-2 py-0.5 text-xs text-[var(--color-info-tinta)]">
+                      sin fecha
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModo("fijo");
+                        setTemaFijo(t.id);
+                        guardar({ modo: "fijo", temaFijo: t.id });
+                      }}
+                      disabled={guardando || (modo === "fijo" && temaFijo === t.id)}
+                      className="boton boton-secundario boton-chico shrink-0"
+                    >
+                      {modo === "fijo" && temaFijo === t.id ? "Puesto" : "Dejarlo fijo"}
+                    </button>
+                  </span>
+                )}
               </li>
             );
           })}
         </ul>
 
         <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-          Para agregar otra fecha —la Independencia, el aniversario de la
-          empresa— se añade al listado de <code>src/lib/temas.ts</code> con su
-          rango y su adorno; el panel la recoge sola.
+          Para agregar otra fecha —el aniversario de la empresa, un
+          lanzamiento— se añade al listado de <code>src/lib/temas.ts</code> con
+          su rango (o la regla, si cambia cada año) y su adorno; el panel la
+          recoge sola.
         </p>
       </section>
     </div>

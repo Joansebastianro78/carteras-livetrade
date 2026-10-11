@@ -60,6 +60,9 @@
   --color-foco: rgb(22 36 43 / 0.12);
   --color-sombra: rgb(22 36 43 / 0.18);
   --color-velo: rgb(22 36 43 / 0.5);
+  /* Los dos tintes suaves del fondo de las pantallas de acceso. */
+  --color-tinte-frio: #d8ebf1;
+  --color-tinte-calido: #f7ead0;
 }
 
 /*
@@ -110,6 +113,8 @@
   --color-foco: rgb(227 234 232 / 0.18);
   --color-sombra: rgb(0 0 0 / 0.5);
   --color-velo: rgb(0 0 0 / 0.6);
+  --color-tinte-frio: #12323b;
+  --color-tinte-calido: #33270f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -150,6 +155,8 @@
     --color-foco: rgb(227 234 232 / 0.18);
     --color-sombra: rgb(0 0 0 / 0.5);
     --color-velo: rgb(0 0 0 / 0.6);
+    --color-tinte-frio: #12323b;
+    --color-tinte-calido: #33270f;
   }
 }
 
@@ -157,6 +164,507 @@
   :root[data-modo="auto"] {
     color-scheme: light;
   }
+}
+
+/*
+  Temas de color. Cada uno va encima de su modo (data-modo="claro" u
+  "oscuro"): aquí solo cambian los colores; lo que arregla el modo oscuro para
+  el mapa y los avisos también les sirve a los temas oscuros. Los nombres y
+  las muestras del selector están en src/lib/modo.ts.
+
+  Todos pasan las mismas pruebas de contraste: texto principal 7:1 o más sobre
+  el fondo y las tarjetas, texto secundario y avisos 4,5:1 o más.
+*/
+:root[data-paleta="arena"] {
+  color-scheme: light;
+  --color-base: #f1ebe1;
+  --color-papel: #fffdf9;
+  --color-tinta: #2f241a;
+  --color-tinta-suave: #5c4e42;
+  --color-marcador: #6f6255;
+  --color-linea: #e2d8c9;
+  --color-ambar: #cc8a17;
+  --color-ambar-oscuro: #9a6206;
+  --color-ambar-hover: #d89a35;
+  --color-alerta: #a3352a;
+  --color-exito: #2c7342;
+  --color-petroleo: #2d6e78;
+  --color-sobre-tinta: #fffdf9;
+  --color-sobre-ambar: #2f241a;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #ece4d7;
+  --color-hover: #f6f1e9;
+  --color-seleccion: #e6dccd;
+  --color-sutil: #faf6f0;
+  --color-mapa: #ebe3d6;
+  --color-barra: #8a5a2b;
+  --color-alerta-fondo: #f7e8e3;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2e8;
+  --color-info-fondo: #e6edf2;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(47 36 26 / 0.12);
+  --color-sombra: rgb(47 36 26 / 0.18);
+  --color-velo: rgb(47 36 26 / 0.5);
+  --color-tinte-frio: #e9dcc6;
+  --color-tinte-calido: #f3e2c8;
+}
+
+:root[data-paleta="menta"] {
+  color-scheme: light;
+  --color-base: #e6f1ec;
+  --color-papel: #ffffff;
+  --color-tinta: #0e3328;
+  --color-tinta-suave: #3a5c52;
+  --color-marcador: #526f66;
+  --color-linea: #cde0d7;
+  --color-ambar: #c98a12;
+  --color-ambar-oscuro: #a06d06;
+  --color-ambar-hover: #d79b2b;
+  --color-alerta: #a32f28;
+  --color-exito: #1d7a52;
+  --color-petroleo: #127a6a;
+  --color-sobre-tinta: #ffffff;
+  --color-sobre-ambar: #0e3328;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #e0ede7;
+  --color-hover: #f0f7f3;
+  --color-seleccion: #d6e8df;
+  --color-sutil: #f4faf7;
+  --color-mapa: #e1ede7;
+  --color-barra: #1f7a5c;
+  --color-alerta-fondo: #f8ecea;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e4f3eb;
+  --color-info-fondo: #e8eef5;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(14 51 40 / 0.12);
+  --color-sombra: rgb(14 51 40 / 0.18);
+  --color-velo: rgb(14 51 40 / 0.5);
+  --color-tinte-frio: #cdeedf;
+  --color-tinte-calido: #eef0d2;
+}
+
+:root[data-paleta="lavanda"] {
+  color-scheme: light;
+  --color-base: #eeebf6;
+  --color-papel: #fefdff;
+  --color-tinta: #261f42;
+  --color-tinta-suave: #554c72;
+  --color-marcador: #6a6286;
+  --color-linea: #dcd6ea;
+  --color-ambar: #c98a12;
+  --color-ambar-oscuro: #a06d06;
+  --color-ambar-hover: #d79b2b;
+  --color-alerta: #a32f28;
+  --color-exito: #1d7a52;
+  --color-petroleo: #5b4bb0;
+  --color-sobre-tinta: #fefdff;
+  --color-sobre-ambar: #261f42;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #e9e5f4;
+  --color-hover: #f5f3fb;
+  --color-seleccion: #e1dcf0;
+  --color-sutil: #f9f8fd;
+  --color-mapa: #e8e5f2;
+  --color-barra: #5a45a0;
+  --color-alerta-fondo: #f8ecea;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2ec;
+  --color-info-fondo: #e8eef5;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #ece5f8;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(38 31 66 / 0.12);
+  --color-sombra: rgb(38 31 66 / 0.18);
+  --color-velo: rgb(38 31 66 / 0.5);
+  --color-tinte-frio: #e0d8f6;
+  --color-tinte-calido: #f5e3ef;
+}
+
+:root[data-paleta="cielo"] {
+  color-scheme: light;
+  --color-base: #e6eef7;
+  --color-papel: #ffffff;
+  --color-tinta: #0f2740;
+  --color-tinta-suave: #3d5873;
+  --color-marcador: #58718d;
+  --color-linea: #cfdcea;
+  --color-ambar: #c98a12;
+  --color-ambar-oscuro: #a06d06;
+  --color-ambar-hover: #d79b2b;
+  --color-alerta: #a32f28;
+  --color-exito: #1d7a52;
+  --color-petroleo: #1b6eb0;
+  --color-sobre-tinta: #ffffff;
+  --color-sobre-ambar: #0f2740;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #e0e9f4;
+  --color-hover: #f1f6fb;
+  --color-seleccion: #d5e3f1;
+  --color-sutil: #f5f9fc;
+  --color-mapa: #e0e9f2;
+  --color-barra: #1f5f99;
+  --color-alerta-fondo: #f8ecea;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2ec;
+  --color-info-fondo: #e1ecf8;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(15 39 64 / 0.12);
+  --color-sombra: rgb(15 39 64 / 0.18);
+  --color-velo: rgb(15 39 64 / 0.5);
+  --color-tinte-frio: #cfe3f7;
+  --color-tinte-calido: #f4ead6;
+}
+
+:root[data-paleta="rosa"] {
+  color-scheme: light;
+  --color-base: #f7e9ee;
+  --color-papel: #fffbfc;
+  --color-tinta: #3b1426;
+  --color-tinta-suave: #6b4354;
+  --color-marcador: #815c6b;
+  --color-linea: #ecd5de;
+  --color-ambar: #c98a12;
+  --color-ambar-oscuro: #a06d06;
+  --color-ambar-hover: #d79b2b;
+  --color-alerta: #a02d2a;
+  --color-exito: #1d7a52;
+  --color-petroleo: #a2366a;
+  --color-sobre-tinta: #fffbfc;
+  --color-sobre-ambar: #3b1426;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #f2e2e8;
+  --color-hover: #fbf3f6;
+  --color-seleccion: #eed8e1;
+  --color-sutil: #fdf7f9;
+  --color-mapa: #f1e3e8;
+  --color-barra: #9c3b62;
+  --color-alerta-fondo: #f9e6e6;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2ec;
+  --color-info-fondo: #e8eef5;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(59 20 38 / 0.12);
+  --color-sombra: rgb(59 20 38 / 0.18);
+  --color-velo: rgb(59 20 38 / 0.5);
+  --color-tinte-frio: #f5d8e3;
+  --color-tinte-calido: #f7e6d4;
+}
+
+:root[data-paleta="terracota"] {
+  color-scheme: light;
+  --color-base: #f4e9e2;
+  --color-papel: #fffaf7;
+  --color-tinta: #3a1c10;
+  --color-tinta-suave: #6a4839;
+  --color-marcador: #7f5e4f;
+  --color-linea: #e9d7cb;
+  --color-ambar: #cf8f22;
+  --color-ambar-oscuro: #93600a;
+  --color-ambar-hover: #dc9f3a;
+  --color-alerta: #a32f28;
+  --color-exito: #1d7a52;
+  --color-petroleo: #b0532a;
+  --color-sobre-tinta: #fffaf7;
+  --color-sobre-ambar: #3a1c10;
+  --color-sobre-alerta: #ffffff;
+  --color-sobre-exito: #ffffff;
+  --color-sobre-aviso: #ffffff;
+  --color-relleno: #efe1d7;
+  --color-hover: #f9f2ed;
+  --color-seleccion: #ead9cc;
+  --color-sutil: #fcf6f2;
+  --color-mapa: #eee1d7;
+  --color-barra: #a14b26;
+  --color-alerta-fondo: #f8ecea;
+  --color-aviso-fondo: #fdf4e3;
+  --color-aviso-tinta: #7a5410;
+  --color-aviso-borde: #e0b970;
+  --color-exito-fondo: #e7f2ec;
+  --color-info-fondo: #e8eef5;
+  --color-info-tinta: #2b4c6f;
+  --color-morado-fondo: #f0ebf7;
+  --color-morado-tinta: #4b3a6b;
+  --color-foco: rgb(58 28 16 / 0.12);
+  --color-sombra: rgb(58 28 16 / 0.18);
+  --color-velo: rgb(58 28 16 / 0.5);
+  --color-tinte-frio: #f1d6c4;
+  --color-tinte-calido: #f6e8cf;
+}
+
+:root[data-paleta="medianoche"] {
+  color-scheme: dark;
+  --color-base: #0a1120;
+  --color-papel: #111a2d;
+  --color-tinta: #e4e9f5;
+  --color-tinta-suave: #a5b0c8;
+  --color-marcador: #8a95b0;
+  --color-linea: #27324b;
+  --color-ambar: #e0a43a;
+  --color-ambar-oscuro: #f0b54f;
+  --color-ambar-hover: #f0b54f;
+  --color-alerta: #f4938c;
+  --color-exito: #63c99d;
+  --color-petroleo: #6aa8f0;
+  --color-sobre-tinta: #0a1120;
+  --color-sobre-ambar: #111a2d;
+  --color-sobre-alerta: #111a2d;
+  --color-sobre-exito: #0a1120;
+  --color-sobre-aviso: #111a2d;
+  --color-relleno: #1c2741;
+  --color-hover: #172137;
+  --color-seleccion: #22304e;
+  --color-sutil: #141e33;
+  --color-mapa: #131c2f;
+  --color-barra: #7f9bd6;
+  --color-alerta-fondo: #3a1d26;
+  --color-aviso-fondo: #322a12;
+  --color-aviso-tinta: #f1c76d;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #12302b;
+  --color-info-fondo: #172a47;
+  --color-info-tinta: #a3c4f3;
+  --color-morado-fondo: #29244a;
+  --color-morado-tinta: #cbbdf0;
+  --color-foco: rgb(228 233 245 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #15295a;
+  --color-tinte-calido: #2c2414;
+}
+
+:root[data-paleta="bosque"] {
+  color-scheme: dark;
+  --color-base: #0b1611;
+  --color-papel: #122019;
+  --color-tinta: #e1eee6;
+  --color-tinta-suave: #a0b7a9;
+  --color-marcador: #84a091;
+  --color-linea: #24372d;
+  --color-ambar: #d9a03a;
+  --color-ambar-oscuro: #e8b257;
+  --color-ambar-hover: #e8b257;
+  --color-alerta: #f2918a;
+  --color-exito: #6fd3a2;
+  --color-petroleo: #5fc4a0;
+  --color-sobre-tinta: #0b1611;
+  --color-sobre-ambar: #16242b;
+  --color-sobre-alerta: #16242b;
+  --color-sobre-exito: #0b1611;
+  --color-sobre-aviso: #16242b;
+  --color-relleno: #1b2d23;
+  --color-hover: #16261e;
+  --color-seleccion: #20362a;
+  --color-sutil: #15231c;
+  --color-mapa: #132119;
+  --color-barra: #79b596;
+  --color-alerta-fondo: #3a1f1d;
+  --color-aviso-fondo: #33290f;
+  --color-aviso-tinta: #f1c76d;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #143a2a;
+  --color-info-fondo: #16303a;
+  --color-info-tinta: #9ccbe0;
+  --color-morado-fondo: #2a2340;
+  --color-morado-tinta: #c9b8ec;
+  --color-foco: rgb(225 238 230 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #11392a;
+  --color-tinte-calido: #2f2b12;
+}
+
+:root[data-paleta="cafe"] {
+  color-scheme: dark;
+  --color-base: #14100c;
+  --color-papel: #1e1712;
+  --color-tinta: #f1e7dc;
+  --color-tinta-suave: #c2b1a1;
+  --color-marcador: #a6927f;
+  --color-linea: #3a2d24;
+  --color-ambar: #dba04a;
+  --color-ambar-oscuro: #e9b466;
+  --color-ambar-hover: #e9b466;
+  --color-alerta: #f3968b;
+  --color-exito: #7acb9c;
+  --color-petroleo: #8fc1b5;
+  --color-sobre-tinta: #14100c;
+  --color-sobre-ambar: #1e1712;
+  --color-sobre-alerta: #16242b;
+  --color-sobre-exito: #14100c;
+  --color-sobre-aviso: #16242b;
+  --color-relleno: #2b2119;
+  --color-hover: #251c15;
+  --color-seleccion: #33271e;
+  --color-sutil: #211913;
+  --color-mapa: #1f1712;
+  --color-barra: #c69a6d;
+  --color-alerta-fondo: #3b1f1a;
+  --color-aviso-fondo: #3a2d12;
+  --color-aviso-tinta: #f2c97a;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #1b3326;
+  --color-info-fondo: #1d2a33;
+  --color-info-tinta: #a6c8de;
+  --color-morado-fondo: #2e2236;
+  --color-morado-tinta: #d4bce8;
+  --color-foco: rgb(241 231 220 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #2c2219;
+  --color-tinte-calido: #3d2b13;
+}
+
+:root[data-paleta="grafito"] {
+  color-scheme: dark;
+  --color-base: #121212;
+  --color-papel: #1b1c1e;
+  --color-tinta: #ececec;
+  --color-tinta-suave: #b1b4b9;
+  --color-marcador: #95999f;
+  --color-linea: #303236;
+  --color-ambar: #d9a23a;
+  --color-ambar-oscuro: #e8b457;
+  --color-ambar-hover: #e8b457;
+  --color-alerta: #f2918a;
+  --color-exito: #66c99a;
+  --color-petroleo: #7fb3d5;
+  --color-sobre-tinta: #121212;
+  --color-sobre-ambar: #121212;
+  --color-sobre-alerta: #16242b;
+  --color-sobre-exito: #121212;
+  --color-sobre-aviso: #16242b;
+  --color-relleno: #26282b;
+  --color-hover: #212325;
+  --color-seleccion: #2d2f33;
+  --color-sutil: #1e1f21;
+  --color-mapa: #1c1d1f;
+  --color-barra: #a0a7b0;
+  --color-alerta-fondo: #3a1f1f;
+  --color-aviso-fondo: #332a12;
+  --color-aviso-tinta: #f1c76d;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #17322a;
+  --color-info-fondo: #1e2a36;
+  --color-info-tinta: #a5c6e6;
+  --color-morado-fondo: #2a2440;
+  --color-morado-tinta: #c9b8ec;
+  --color-foco: rgb(236 236 236 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #23272c;
+  --color-tinte-calido: #2b2618;
+}
+
+:root[data-paleta="vino"] {
+  color-scheme: dark;
+  --color-base: #170b10;
+  --color-papel: #21111a;
+  --color-tinta: #f3e3ea;
+  --color-tinta-suave: #c9a8b6;
+  --color-marcador: #ad8c9a;
+  --color-linea: #3c232f;
+  --color-ambar: #e0a24a;
+  --color-ambar-oscuro: #ecb465;
+  --color-ambar-hover: #ecb465;
+  --color-alerta: #ff9d91;
+  --color-exito: #72cf9f;
+  --color-petroleo: #e48aab;
+  --color-sobre-tinta: #170b10;
+  --color-sobre-ambar: #21111a;
+  --color-sobre-alerta: #21111a;
+  --color-sobre-exito: #170b10;
+  --color-sobre-aviso: #16242b;
+  --color-relleno: #2e1923;
+  --color-hover: #29151f;
+  --color-seleccion: #39202d;
+  --color-sutil: #25131c;
+  --color-mapa: #23121a;
+  --color-barra: #d58aa8;
+  --color-alerta-fondo: #40171c;
+  --color-aviso-fondo: #3a2a12;
+  --color-aviso-tinta: #f1c76d;
+  --color-aviso-borde: #6b5320;
+  --color-exito-fondo: #17332a;
+  --color-info-fondo: #24233a;
+  --color-info-tinta: #b7c0f0;
+  --color-morado-fondo: #34203f;
+  --color-morado-tinta: #e1c2ef;
+  --color-foco: rgb(243 227 234 / 0.18);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #3b1526;
+  --color-tinte-calido: #3a2412;
+}
+
+:root[data-paleta="alto-contraste"] {
+  color-scheme: dark;
+  --color-base: #000000;
+  --color-papel: #000000;
+  --color-tinta: #ffffff;
+  --color-tinta-suave: #ececec;
+  --color-marcador: #d4d4d4;
+  --color-linea: #a8a8a8;
+  --color-ambar: #ffd400;
+  --color-ambar-oscuro: #ffe14d;
+  --color-ambar-hover: #ffe14d;
+  --color-alerta: #ff6b6b;
+  --color-exito: #4cf39a;
+  --color-petroleo: #4fd1ff;
+  --color-sobre-tinta: #000000;
+  --color-sobre-ambar: #000000;
+  --color-sobre-alerta: #000000;
+  --color-sobre-exito: #000000;
+  --color-sobre-aviso: #000000;
+  --color-relleno: #1c1c1c;
+  --color-hover: #262626;
+  --color-seleccion: #333333;
+  --color-sutil: #0f0f0f;
+  --color-mapa: #0f0f0f;
+  --color-barra: #ffffff;
+  --color-alerta-fondo: #2e0000;
+  --color-aviso-fondo: #2b2400;
+  --color-aviso-tinta: #ffd400;
+  --color-aviso-borde: #ffd400;
+  --color-exito-fondo: #00301a;
+  --color-info-fondo: #00213a;
+  --color-info-tinta: #8fd8ff;
+  --color-morado-fondo: #22003a;
+  --color-morado-tinta: #e0bfff;
+  --color-foco: rgb(255 212 0 / 0.55);
+  --color-sombra: rgb(0 0 0 / 0.55);
+  --color-velo: rgb(0 0 0 / 0.62);
+  --color-tinte-frio: #000000;
+  --color-tinte-calido: #000000;
 }
 
 html {
@@ -547,7 +1055,7 @@ html .leaflet-container {
 }
 
 :root[data-modo="oscuro"] .leaflet-control-attribution {
-  background: rgb(23 35 40 / 0.85);
+  background: color-mix(in srgb, var(--color-papel) 85%, transparent);
   color: var(--color-tinta-suave);
 }
 
@@ -609,8 +1117,8 @@ html .leaflet-container {
 */
 .fondo-acceso {
   background:
-    radial-gradient(85% 65% at 6% 0%, #d8ebf1 0%, transparent 58%),
-    radial-gradient(70% 60% at 100% 100%, #f7ead0 0%, transparent 55%),
+    radial-gradient(85% 65% at 6% 0%, var(--color-tinte-frio) 0%, transparent 58%),
+    radial-gradient(70% 60% at 100% 100%, var(--color-tinte-calido) 0%, transparent 55%),
     var(--color-base);
 }
 
@@ -625,23 +1133,9 @@ html .leaflet-container {
     0 12px 32px -12px rgba(22, 36, 43, 0.22);
 }
 
-:root[data-modo="oscuro"] .fondo-acceso {
-  background:
-    radial-gradient(85% 65% at 6% 0%, #12323b 0%, transparent 58%),
-    radial-gradient(70% 60% at 100% 100%, #33270f 0%, transparent 55%),
-    var(--color-base);
-}
-
 @media (prefers-color-scheme: dark) {
-  :root[data-modo="auto"] .fondo-acceso {
-    background:
-      radial-gradient(85% 65% at 6% 0%, #12323b 0%, transparent 58%),
-      radial-gradient(70% 60% at 100% 100%, #33270f 0%, transparent 55%),
-      var(--color-base);
-  }
-
   :root[data-modo="auto"] .leaflet-control-attribution {
-    background: rgb(23 35 40 / 0.85);
+    background: color-mix(in srgb, var(--color-papel) 85%, transparent);
     color: var(--color-tinta-suave);
   }
 
@@ -688,10 +1182,10 @@ html .leaflet-container {
 @keyframes tema-colgar {
   0%,
   100% {
-    transform: rotate(-7deg);
+    transform: rotate(calc(var(--colgar, 7deg) * -1));
   }
   50% {
-    transform: rotate(7deg);
+    transform: rotate(var(--colgar, 7deg));
   }
 }
 
@@ -745,15 +1239,232 @@ html .leaflet-container {
   animation: tema-titilar 2.4s ease-in-out infinite;
 }
 
-/* Quien pidió menos movimiento se queda con los adornos quietos y sin nieve. */
+/* Pétalos y hojas: se mecen de lado a lado mientras caen (va dentro de .tema-cae). */
+@keyframes tema-vaiven {
+  0%,
+  100% {
+    transform: translateX(calc(var(--vaiven, 24px) * -1)) rotate(-26deg);
+  }
+  50% {
+    transform: translateX(var(--vaiven, 24px)) rotate(26deg);
+  }
+}
+
+/* Cruza la pantalla de lado a lado: mariposas, nubes, balones. */
+@keyframes tema-cruzar {
+  from {
+    transform: translate3d(-14vw, 0, 0);
+  }
+  to {
+    transform: translate3d(112vw, 0, 0);
+  }
+}
+
+/* Sube y baja en su sitio. */
+@keyframes tema-flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(var(--flote, -14px));
+  }
+}
+
+/* Alas que se abren y se cierran. */
+@keyframes tema-aletear {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.42);
+  }
+}
+
+/* Va y vuelve despacio de lado: las nubes. */
+@keyframes tema-pasear {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(var(--paseo, 40px));
+  }
+}
+
+/* La burbuja tiembla mientras sube. */
+@keyframes tema-temblar {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.07, 0.93);
+  }
+}
+
+/* Los brotes crecen desde el suelo, una sola vez. */
+@keyframes tema-crecer {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Se mece apoyado en un punto: plantas, cometas, globos. */
+@keyframes tema-mecer {
+  0%,
+  100% {
+    transform: rotate(calc(var(--mecer, 4deg) * -1));
+  }
+  50% {
+    transform: rotate(var(--mecer, 4deg));
+  }
+}
+
+/* Una chispa de fuego artificial: sale del centro y se apaga. */
+@keyframes tema-estallar {
+  0% {
+    transform: rotate(var(--angulo)) translateY(0) scale(0.4);
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  30% {
+    transform: rotate(var(--angulo)) translateY(calc(var(--radio) * -1)) scale(1);
+    opacity: 1;
+  }
+  48%,
+  100% {
+    transform: rotate(var(--angulo)) translateY(calc(var(--radio) * -1 - 8px)) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* Vapor que sube y se deshace. */
+@keyframes tema-vapor {
+  0% {
+    transform: translateY(6px) scaleX(0.9);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(-30px) scaleX(1.2);
+    opacity: 0;
+  }
+}
+
+/* Rebote: sube frenando y cae acelerando. */
+@keyframes tema-rebotar {
+  0%,
+  100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  }
+  50% {
+    transform: translateY(var(--rebote, -70px));
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+}
+
+@keyframes tema-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tema-vaiven {
+  animation: tema-vaiven ease-in-out infinite;
+}
+
+.tema-cruza {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  animation: tema-cruzar linear infinite;
+}
+
+.tema-flota {
+  animation: tema-flotar ease-in-out infinite;
+}
+
+.tema-pasea {
+  animation: tema-pasear ease-in-out infinite;
+}
+
+.tema-aletea {
+  animation: tema-aletear 0.34s ease-in-out infinite;
+}
+
+.tema-tiembla {
+  animation: tema-temblar ease-in-out infinite;
+}
+
+.tema-crece {
+  transform-origin: bottom center;
+  animation: tema-crecer 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.tema-mece {
+  transform-origin: var(--origen, bottom center);
+  animation: tema-mecer 3s ease-in-out infinite;
+}
+
+.tema-chispa {
+  position: absolute;
+  left: -2px;
+  top: -5px;
+  width: 4px;
+  height: 10px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: tema-estallar ease-out infinite;
+}
+
+.tema-humo {
+  animation: tema-vapor 3.2s ease-out infinite;
+}
+
+.tema-rebota {
+  animation: tema-rebotar 1.1s infinite;
+}
+
+.tema-gira {
+  animation: tema-girar linear infinite;
+}
+
+/*
+  Quien pidió menos movimiento se queda con los adornos quietos: sin nada que
+  caiga, suba, cruce o estalle, y con lo demás en su sitio (los brotes ya
+  crecidos, las guirnaldas sin mecerse).
+*/
 @media (prefers-reduced-motion: reduce) {
   .tema-cae,
-  .tema-sube {
+  .tema-sube,
+  .tema-cruza,
+  .tema-chispa,
+  .tema-humo {
     display: none;
   }
 
   .tema-cuelga,
-  .tema-titila {
+  .tema-titila,
+  .tema-vaiven,
+  .tema-flota,
+  .tema-pasea,
+  .tema-aletea,
+  .tema-tiembla,
+  .tema-crece,
+  .tema-mece,
+  .tema-rebota,
+  .tema-gira {
     animation: none;
   }
 }

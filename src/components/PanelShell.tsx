@@ -368,7 +368,10 @@ export default function PanelShell({
     <div className="flex flex-1 flex-col lg:flex-row">
       {/* Menú fijo a la izquierda en pantallas grandes. */}
       {!menuOculto && (
-        <aside className="hidden border-r border-[var(--color-linea)] bg-[var(--color-papel)] lg:sticky lg:top-0 lg:block lg:h-dvh lg:w-[256px] lg:shrink-0 lg:overflow-y-auto">
+        // z-[65]: por encima del contenido (los temas de color se abren al lado
+        // del menú, encima de los mapas) y de los adornos de temporada (z 60),
+        // que pasan por detrás del menú en vez de taparle el texto.
+        <aside className="hidden border-r border-[var(--color-linea)] bg-[var(--color-papel)] lg:sticky lg:top-0 lg:z-[65] lg:block lg:h-dvh lg:w-[256px] lg:shrink-0 lg:overflow-y-auto">
           {menu(false)}
         </aside>
       )}

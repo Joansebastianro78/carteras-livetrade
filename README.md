@@ -132,21 +132,52 @@ terceros deshabilitadas— el visor tiene el botón **Abrir en Power BI**.
 
 ### Temas de temporada
 
-Adornos que salen solos en las fechas especiales: telarañas, araña y calabaza
-en Halloween; nieve y una tira de luces en Navidad; farolitos el Día de las
-Velitas; papelitos en Año Nuevo; corazones en Amor y Amistad.
+Adornos que salen solos en las fechas especiales. Hay 17, cada uno con un
+estilo propio:
+
+| Tema | Cuándo | Qué se ve |
+|---|---|---|
+| San Valentín | 13 y 14 de febrero | Guirnalda de corazones colgando |
+| Carnaval de Barranquilla | Del sábado al martes de Carnaval | Serpentinas, confeti redondo y un antifaz |
+| Día de la Mujer | 7 y 8 de marzo | Pétalos morados que caen meciéndose y una rama florecida |
+| Día de la Tierra | 22 de abril | Brotes que crecen abajo y hojas |
+| Día del Niño | Del jueves al último sábado de abril | Burbujas de jabón |
+| Día de la Madre | Del jueves al segundo domingo de mayo | Mariposas que cruzan y tulipanes |
+| Día del Padre | Del jueves al tercer domingo de junio | Guirnalda de corbatas |
+| Independencia | 18 al 20 de julio | Banderines tricolor y fuegos artificiales |
+| Mes de las cometas | Agosto | Cometas con cola y nubes a los lados |
+| Amor y amistad | 14 al 21 de septiembre | Corazones subiendo |
+| Día Internacional del Café | 1 de octubre | Taza humeando y granos cayendo |
+| Halloween | 24 de octubre al 2 de noviembre | Telarañas, araña y calabaza |
+| Navidad | 1 al 26 de diciembre | Nieve y una tira de luces |
+| Día de las Velitas | 7 y 8 de diciembre | Farolitos y luces que suben |
+| Año nuevo | 27 de diciembre al 6 de enero | Papelitos de colores |
+| Fútbol | Sin fecha | Franja tricolor y balones rebotando |
+| Celebración | Sin fecha | Globos subiendo |
 
 Los rangos de fechas viven en `src/lib/temas.ts`, no en la base: son los mismos
-todos los años y así nadie tiene que moverlos cada diciembre. Agregar una fecha
-nueva es añadir una entrada a ese arreglo con su rango y su adorno; el panel la
-recoge sola. En la tabla `tema` (una sola fila) queda solo lo que el
-administrador decide: el modo (automático, fijo o apagado) y qué temas apagó.
+todos los años y así nadie tiene que moverlos cada diciembre. Los que cambian
+cada año (Carnaval, Día del Niño, de la Madre y del Padre) llevan una regla y la
+fecha se calcula sola: el Carnaval a partir del domingo de Pascua, los demás
+con el día de la semana del mes. Fútbol y Celebración no tienen fecha: nunca
+salen solos y se ponen con «Dejar uno fijo» (o el botón «Dejarlo fijo» de su
+fila), por ejemplo para un partido de la Selección o el aniversario de la
+empresa. Si dos temas coinciden gana el primero del arreglo; el panel los
+muestra en orden de calendario.
+
+Agregar una fecha nueva es añadir una entrada a ese arreglo con su rango (o su
+regla) y su adorno en `src/components/DecoracionTema.tsx`; el panel la recoge
+sola. En la tabla `tema` (una sola fila) queda solo lo que el administrador
+decide: el modo (automático, fijo o apagado) y qué temas apagó. Los temas
+nuevos salen solos cuando llegan sus fechas; si alguno no se quiere, se
+deshabilita en Configuración › Temas.
 
 La capa de adornos es `position: fixed` con `pointer-events: none`, así que
 nunca tapa un botón; se anima con CSS y no con un bucle de JavaScript; en
 celular dibuja la mitad de las partículas y los adornos van más pequeños; y con
 `prefers-reduced-motion` las partículas desaparecen y los adornos se quedan
-quietos.
+quietos. En el panel, el menú lateral queda por encima de los adornos: pasan
+por detrás y nunca le tapan el texto.
 
 ### Usuarios del panel
 
@@ -332,6 +363,18 @@ colores son variables CSS en `src/app/globals.css`: el bloque
 `:root[data-modo="oscuro"]` define la versión oscura de cada una, y las piezas
 comunes del panel (`tarjeta`, `boton`, `chip`, `tabla`…) están ahí mismo. Los
 mapas conservan sus capas de siempre.
+
+**Temas de color.** Debajo de los tres botones de Apariencia, «Temas de color»
+abre 12 paletas más: seis claras (Arena, Menta, Lavanda, Cielo, Rosa y
+Terracota) y seis oscuras (Medianoche, Bosque, Café, Grafito, Vino y Alto
+contraste). Se guardan en la misma cookie y aplican donde aplica el modo: el
+panel, el BackOffice y su login. Cada tema parte del claro o del oscuro
+(`data-modo`) y cambia los colores encima (`data-paleta`), así que lo que el
+oscuro arregla en el mapa y en los avisos también vale para los temas oscuros.
+Los colores están en `src/app/globals.css`, después de los del modo oscuro, y
+los nombres y las muestras del selector en `src/lib/modo.ts`. Todos pasan las
+mismas pruebas de contraste: el texto principal 7:1 o más sobre el fondo y las
+tarjetas, y el texto secundario, los botones y los avisos 4,5:1 o más.
 
 **Inicio.** Lo primero al entrar: los puntos asignados (conteo general de
 toda la cartera, todos los ciclos, sin los LIBRE), los consultores con al
