@@ -11,7 +11,9 @@
 --
 -- Sin este archivo el panel funciona como antes, con los tres perfiles de
 -- siempre (superadmin, admin y backoffice) y sus permisos de siempre.
--- =====================================================================
+--BY Joan Rodriguez
+-- =======================================================================
+
 
 create table if not exists public.perfiles (
     clave        text primary key
