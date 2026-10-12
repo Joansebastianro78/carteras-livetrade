@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Check, ChevronDown, Monitor, Moon, Palette, Sun } from "lucide-react";
 import {
   baseDe,
@@ -54,6 +55,81 @@ export function useModoPanel(inicial: Modo): [Modo, (m: Modo) => void] {
   }, []);
 
   return [modo, elegir];
+}
+
+/** Si con ese modo el panel se ve oscuro ahora (en "auto", según el sistema). */
+function useSeVeOscuro(modo: Modo): boolean {
+  const [sistemaOscuro, setSistemaOscuro] = useState(false);
+  useEffect(() => {
+    const consulta = window.matchMedia("(prefers-color-scheme: dark)");
+    const leer = () => setSistemaOscuro(consulta.matches);
+    leer();
+    consulta.addEventListener("change", leer);
+    return () => consulta.removeEventListener("change", leer);
+  }, []);
+  const paleta = paletaDe(modo);
+  if (paleta) return paleta.base === "oscuro";
+  return modo === "oscuro" || (modo === "auto" && sistemaOscuro);
+}
+
+/**
+ * El interruptor de sol y luna del encabezado: pasa de claro a oscuro y al
+ * revés. El modo nuevo se abre en círculo desde el botón (View Transitions);
+ * donde el navegador no lo tiene, o si se pidió menos movimiento, cambia de
+ * una. Desde un tema de color, lleva al claro o al oscuro de siempre.
+ */
+export function BotonTema({ modo, onElegir }: { modo: Modo; onElegir: (m: Modo) => void }) {
+  const oscuro = useSeVeOscuro(modo);
+
+  function cambiar(e: React.MouseEvent<HTMLButtonElement>) {
+    const siguiente: Modo = oscuro ? "claro" : "oscuro";
+    const doc = document as Document & {
+      startViewTransition?: (cambio: () => void) => { ready: Promise<void> };
+    };
+    const quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || quieto) {
+      onElegir(siguiente);
+      return;
+    }
+    const caja = e.currentTarget.getBoundingClientRect();
+    const x = caja.left + caja.width / 2;
+    const y = caja.top + caja.height / 2;
+    const radio = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const transicion = doc.startViewTransition(() => {
+      flushSync(() => onElegir(siguiente));
+    });
+    transicion.ready
+      .then(() =>
+        document.documentElement.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radio}px at ${x}px ${y}px)`] },
+          { duration: 600, easing: "cubic-bezier(0.4, 0, 0.2, 1)", pseudoElement: "::view-transition-new(root)" }
+        )
+      )
+      .catch(() => {});
+  }
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={oscuro}
+      aria-label="Modo oscuro"
+      title={oscuro ? "Pasar a modo claro" : "Pasar a modo oscuro"}
+      onClick={cambiar}
+      className="relative inline-flex h-8 w-[58px] shrink-0 items-center rounded-full bg-[var(--color-relleno)] ring-1 ring-[var(--color-linea)] transition-colors hover:ring-[var(--color-acento)]"
+    >
+      <Sun size={13} aria-hidden className="absolute left-[9px] text-[var(--color-marcador)]" />
+      <Moon size={13} aria-hidden className="absolute right-[9px] text-[var(--color-marcador)]" />
+      <span
+        aria-hidden
+        className={`relative z-[1] grid h-6 w-6 place-items-center rounded-full bg-[var(--color-papel)] text-[var(--color-acento-tinta)] shadow-[0_2px_6px_var(--color-sombra)] transition-transform duration-300 ${
+          oscuro ? "translate-x-[30px]" : "translate-x-[4px]"
+        }`}
+      >
+        {oscuro ? <Moon size={13} /> : <Sun size={13} />}
+      </span>
+    </button>
+  );
 }
 
 /** Para pantallas del panel que no tienen selector, como el login. */

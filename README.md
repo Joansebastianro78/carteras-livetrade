@@ -363,6 +363,30 @@ módulos en Perfiles y permisos.
 Abajo del menú están el usuario con el nombre de su perfil, **Apariencia**,
 «Ver consulta» (en `/admin`) y Salir.
 
+**Diseño.** El panel, el BackOffice y su pantalla de acceso usan un diseño
+propio: acento índigo, tarjetas redondeadas con sombra suave, botones en
+píldora y la letra Plus Jakarta Sans (la consulta de los consultores sigue con
+IBM Plex Sans y sus colores de siempre). Las variables y las piezas están al
+final de `src/app/globals.css`, en «Diseño del panel»: `--color-acento` y sus
+variantes, `--color-fantasma` (fondo de las barras), `.tarjeta-heroe` (la
+tarjeta índigo), `.esfera` (la del asistente) y `.globo` (el dato de una barra
+al pasar el mouse). Con un tema de color, el acento es el color de barras de
+ese tema.
+
+- **Arriba a la derecha**, el interruptor de **sol y luna** pasa de claro a
+  oscuro y al revés; el modo nuevo se abre en círculo desde el botón (View
+  Transitions; donde el navegador no lo tiene, cambia de una). Queda en la
+  misma cookie que Apariencia. Al lado, la **campana** con lo pendiente: la
+  consulta en mantenimiento y los hallazgos por revisar (con un punto rojo), y
+  al abrirla también los puntos sin coordenadas, los LIBRE y las observaciones
+  del último cargue; cada aviso lleva a su sección.
+- **Pantalla de acceso**: panel índigo a la izquierda (una franja arriba en el
+  celular) y el formulario a la derecha. Al entrar, una cortina índigo cubre
+  la pantalla y el panel la retira hacia la izquierda; luego las tarjetas del
+  Inicio entran una tras otra y las barras crecen desde la base.
+- Quien tenga activado «reducir movimiento» en su sistema ve todo quieto: sin
+  cortina, sin entradas y sin el círculo del cambio de tema.
+
 **Modo claro, oscuro o automático.** Cada quien lo elige en **Apariencia**;
 «Auto» sigue al sistema operativo. Queda en una cookie de ese navegador
 (`cartera_modo`, un año), no en la cuenta. El servidor la lee y pinta la
@@ -387,14 +411,20 @@ los nombres y las muestras del selector en `src/lib/modo.ts`. Todos pasan las
 mismas pruebas de contraste: el texto principal 7:1 o más sobre el fondo y las
 tarjetas, y el texto secundario, los botones y los avisos 4,5:1 o más.
 
-**Inicio.** Lo primero al entrar: los puntos asignados (conteo general de
-toda la cartera, todos los ciclos, sin los LIBRE), los consultores con al
-menos un punto (usuario + cédula, como en el buscador del BackOffice), los
-puntos sin coordenadas y el último cargue; atajos;
-el resumen de la última auditoría de datos consultada desde ese navegador; la
-actividad reciente; los puntos por departamento; y «Para revisar», con las
-descargas de los puntos sin coordenadas y de los LIBRE, y las observaciones
-del último cargue. Todas las cifras, los departamentos y esas descargas son de
+**Inicio.** Saluda según la hora de Colombia y muestra, de arriba abajo:
+la tarjeta índigo con los **puntos asignados** (conteo general de toda la
+cartera, todos los ciclos, sin los LIBRE), con «Cargar» y «Descargar»; **La
+cartera hoy**: los consultores con al menos un punto (usuario + cédula, como
+en el buscador del BackOffice), los puntos sin coordenadas con su porcentaje
+y los hallazgos por revisar, y la hora del último cargue; **Revisados**, con
+una barra fina por día de las dos últimas semanas; **Auditoría de datos por
+motivo** (de la última consulta vista en ese navegador: en índigo lo que falta
+revisar, en claro lo ya revisado, y el porcentaje revisado); el **Asistente
+IA** con su esfera: las sugerencias lo abren con la pregunta escrita y lo que
+se escriba con «Enviar» se envía de una; la **actividad reciente** en tabla,
+con una etiqueta por tipo; **Para revisar**, con las descargas de los puntos
+sin coordenadas y de los LIBRE, y las observaciones del último cargue; los
+**puntos por departamento** y los **atajos**. Todas las cifras, los departamentos y esas descargas son de
 toda la cartera, todos los ciclos. La actividad junta las cargas (`cargas_cartera`), las
 ediciones y borrados (`auditoria_cartera`) y, con `supabase/panel.sql`, los
 cambios de usuarios, perfiles, mantenimiento, tableros y temas (`actividad_panel`).
@@ -685,11 +715,12 @@ observación; el buscador y el Excel también las incluyen.
 
 #### En el Inicio
 
-Debajo del resumen de la auditoría está la tarjeta **Hallazgos revisados**:
-cuántos van, cuántos hoy y en los últimos 7 días, el avance de la última
-consulta de la auditoría vista en ese navegador, una barra por día de las dos
-últimas semanas (hora de Colombia) y quién ha revisado más. Solo la ve quien
-tiene «Auditoría de datos».
+La tarjeta **Revisados** muestra cuántos van y una barra fina por día de las
+dos últimas semanas (hora de Colombia; al pasar el mouse, el número de ese
+día). La gráfica **Auditoría de datos por motivo** pone, por cada motivo, lo
+que falta revisar y lo ya revisado de la última consulta vista en ese
+navegador, con el porcentaje revisado. Las dos las ve solo quien tiene
+«Auditoría de datos».
 
 ### Auditoría de imágenes
 

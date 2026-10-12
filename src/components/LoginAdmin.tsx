@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import IlustracionRastreo from "@/components/IlustracionRastreo";
 import { AplicarModoPanel } from "@/components/ModoPanel";
+import { LLAVE_ENTRADA } from "@/lib/entrada";
+
+/** Lo que dura la cortina índigo al entrar (cortina-cubre en globals.css). */
+const DURACION_CORTINA_MS = 480;
 
 /** Por qué se cerró la sesión: llega en ?sesion= desde el middleware. */
 const MOTIVOS: Record<string, string> = {
@@ -34,6 +38,8 @@ export default function LoginAdmin({
   const [clave, setClave] = useState("");
   const [verClave, setVerClave] = useState(false);
   const [cargando, setCargando] = useState(false);
+  /** Entró bien: la cortina índigo cubre la pantalla antes de pasar al panel. */
+  const [entrando, setEntrando] = useState(false);
   const [error, setError] = useState<string | null>(
     motivo ? (MOTIVOS[motivo] ?? null) : null
   );
@@ -56,6 +62,18 @@ export default function LoginAdmin({
         return;
       }
 
+      // La cortina cubre la pantalla y el panel la retira al abrirse.
+      const quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      try {
+        if (!quieto) sessionStorage.setItem(LLAVE_ENTRADA, "1");
+      } catch {
+        // sin almacenamiento: se entra sin cortina
+      }
+      if (!quieto) {
+        setEntrando(true);
+        await new Promise((listo) => setTimeout(listo, DURACION_CORTINA_MS));
+      }
+
       // Un perfil BackOffice no tiene nada que hacer en /admin: se le lleva
       // directo a lo suyo en vez de esperar a que el middleware lo desvíe.
       if (json.rol === "backoffice") {
@@ -73,42 +91,65 @@ export default function LoginAdmin({
   }
 
   return (
-    <main className="fondo-acceso flex-1 px-4 py-6 md:py-10">
+    <main className="flex flex-1 flex-col bg-[var(--color-base)] md:flex-row">
       <AplicarModoPanel />
-      <div className="tarjeta-acceso mx-auto w-full max-w-3xl overflow-hidden rounded-[14px] border border-[var(--color-linea)] bg-[var(--color-papel)] md:grid md:grid-cols-[1fr_1fr]">
-        <aside className="panel-acceso hidden flex-col justify-between p-7 text-white md:flex">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9dc0cc]">
-              {rotulo}
-            </p>
-            <h2 className="mt-3 text-[22px] leading-[1.2] font-semibold tracking-tight">
-              {titulo}
-            </h2>
-          </div>
 
-          <IlustracionRastreo className="my-4 h-auto max-h-[30vh] w-full max-w-[240px] self-center" />
+      {entrando && (
+        <div
+          aria-hidden
+          className="cortina-cubre tarjeta-heroe pointer-events-none fixed inset-0 z-[120] rounded-none shadow-none"
+          style={{ ["--cortina-desde" as string]: "56%" }}
+        />
+      )}
 
-          <p className="flex items-start gap-3 text-[13px] leading-snug text-[#d7e3e7]">
-            <span
-              aria-hidden
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-[#9fd3e2]"
-            >
-              <ShieldCheck size={15} />
-            </span>
-            Acceso restringido. Cada ingreso queda registrado con el usuario que
-            entró.
+      {/* Panel índigo: en pantallas anchas ocupa la izquierda; en el celular, una franja arriba. */}
+      <aside className="tarjeta-heroe relative isolate flex flex-col overflow-hidden rounded-none px-6 py-6 shadow-none md:w-[44%] md:max-w-[620px] md:justify-between md:px-12 md:py-12">
+        <span aria-hidden className="absolute -top-24 -right-24 -z-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <span aria-hidden className="absolute -bottom-28 -left-16 -z-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="grid h-10 w-10 place-items-center rounded-[12px] bg-white/15 text-[14px] font-bold tracking-wide ring-1 ring-white/25"
+          >
+            LT
+          </span>
+          <span>
+            <span className="block text-[15px] font-semibold">{rotulo}</span>
+            <span className="block text-[12px] opacity-75">{titulo}</span>
+          </span>
+        </div>
+
+        <div className="hidden md:block">
+          <p className="max-w-[420px] text-[34px] leading-[1.12] font-semibold tracking-[-0.02em]">
+            Toda la cartera del equipo, en un solo lugar.
           </p>
-        </aside>
+          <p className="mt-3 max-w-[400px] text-[14px] leading-relaxed opacity-80">
+            Cargue, auditorías, tableros y el asistente, con los permisos de tu perfil.
+          </p>
+        </div>
 
-        <div className="p-6 sm:p-8">
-          <h1 className="text-[26px] leading-[1.15] font-semibold tracking-tight text-[var(--color-tinta)]">
+        <IlustracionRastreo className="my-6 hidden h-auto max-h-[34vh] w-full max-w-[260px] self-center md:block" />
+
+        <p className="hidden items-start gap-3 text-[13px] leading-snug opacity-85 md:flex">
+          <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15">
+            <ShieldCheck size={15} />
+          </span>
+          Acceso restringido. Cada ingreso queda registrado con el usuario que entró.
+        </p>
+      </aside>
+
+      <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
+        <div className="w-full max-w-[400px]">
+          <p className="text-[14px] font-medium text-[var(--color-acento-tinta)]">
+            Bienvenido de nuevo <span aria-hidden>👋</span>
+          </p>
+          <h1 className="mt-1.5 text-[30px] leading-[1.1] font-semibold tracking-[-0.02em] text-[var(--color-tinta)]">
             {titulo}
           </h1>
-          <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--color-tinta-suave)]">
-            {descripcion}
-          </p>
+          <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--color-tinta-suave)]">{descripcion}</p>
 
-          <form onSubmit={entrar} className="mt-6">
+          <form onSubmit={entrar} className="mt-7">
             <div className="space-y-4">
               <div>
                 <label htmlFor="usuario" className="campo-etiqueta">
@@ -148,11 +189,7 @@ export default function LoginAdmin({
                     title={verClave ? "Ocultar la clave" : "Ver la clave"}
                     className="absolute inset-y-0 right-0 grid w-11 place-items-center text-[var(--color-tinta-suave)] hover:text-[var(--color-tinta)]"
                   >
-                    {verClave ? (
-                      <EyeOff size={17} aria-hidden />
-                    ) : (
-                      <Eye size={17} aria-hidden />
-                    )}
+                    {verClave ? <EyeOff size={17} aria-hidden /> : <Eye size={17} aria-hidden />}
                   </button>
                 </div>
               </div>
@@ -161,7 +198,7 @@ export default function LoginAdmin({
             {error && (
               <p
                 role="alert"
-                className="mt-4 flex items-start gap-2 rounded-[4px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
+                className="mt-4 flex items-start gap-2 rounded-[12px] bg-[var(--color-alerta-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-alerta)]"
               >
                 <TriangleAlert size={15} className="mt-0.5 shrink-0" aria-hidden />
                 {error}
@@ -170,22 +207,22 @@ export default function LoginAdmin({
 
             <button
               type="submit"
-              disabled={cargando || !usuario || !clave}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-[6px] bg-[#1F6F8B] px-4 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#195b73] disabled:bg-[#9fb3bb] disabled:hover:bg-[#9fb3bb]"
+              disabled={cargando || entrando || !usuario || !clave}
+              className="boton boton-primario mt-6 min-h-[48px] w-full text-[15px]"
             >
-              {cargando && <Loader2 size={16} className="animate-spin" aria-hidden />}
+              {(cargando || entrando) && <Loader2 size={16} className="animate-spin" aria-hidden />}
               Entrar
             </button>
           </form>
+
+          <p className="mt-6 text-center text-[13px]">
+            {/* <a> y no <Link>: la consulta se carga de nuevo y queda sin modo oscuro. */}
+            <a href="/" className="text-[var(--color-tinta-suave)] underline underline-offset-2">
+              Volver a la consulta
+            </a>
+          </p>
         </div>
       </div>
-
-      <p className="mt-6 text-center text-[13px]">
-        {/* <a> y no <Link>: la consulta se carga de nuevo y queda sin modo oscuro. */}
-        <a href="/" className="text-[var(--color-tinta-suave)] underline underline-offset-2">
-          Volver a la consulta
-        </a>
-      </p>
     </main>
   );
 }

@@ -1468,3 +1468,357 @@ html .leaflet-container {
     animation: none;
   }
 }
+
+/* =====================================================================
+   Diseño del panel (índigo)
+   Todo esto pide data-modo en <html>, que solo tienen el panel, el
+   BackOffice y su pantalla de acceso: la consulta de los consultores se
+   queda como estaba. Los temas de color (data-paleta) conservan sus
+   colores y toman de aquí solo las formas; su acento es su color de barras.
+   ===================================================================== */
+:root[data-modo] {
+  /* Acento: botones principales, menú, barras y enlaces. */
+  --color-acento: #4338f0;
+  --color-acento-hondo: #2a21c9;
+  --color-acento-suave: #ecebfe;
+  --color-acento-tinta: #3a2fe0;
+  --color-sobre-acento: #ffffff;
+  /* Fondo de las barras (la escala) y el tramo de lo ya revisado. */
+  --color-fantasma: #eceef5;
+  --color-revisado: #c9cbe0;
+  /* La tarjeta principal del Inicio y el panel de la pantalla de acceso. */
+  --heroe-1: #7069ff;
+  --heroe-2: #4338f0;
+  --heroe-3: #2a21c9;
+  --heroe-texto: #ffffff;
+  --sombra-tarjeta: 0 1px 2px rgb(21 22 43 / 0.04), 0 14px 34px -22px rgb(21 22 43 / 0.22);
+}
+
+:root[data-modo="claro"]:not([data-paleta]),
+:root[data-modo="auto"]:not([data-paleta]) {
+  --color-base: #f2f3f8;
+  --color-papel: #ffffff;
+  --color-tinta: #15162b;
+  --color-tinta-suave: #5b5f78;
+  --color-marcador: #71768f;
+  --color-linea: #e4e6ef;
+  --color-relleno: #eef0f6;
+  --color-hover: #f5f6fb;
+  --color-seleccion: #ecebfd;
+  --color-sutil: #f8f9fc;
+  --color-barra: #4338f0;
+  --color-foco: rgb(67 56 240 / 0.16);
+  --color-sombra: rgb(21 22 43 / 0.16);
+  --color-velo: rgb(21 22 43 / 0.45);
+}
+
+:root[data-modo="oscuro"]:not([data-paleta]) {
+  --color-base: #07080f;
+  --color-papel: #10121d;
+  --color-tinta: #eef0fb;
+  --color-tinta-suave: #a0a5bf;
+  --color-marcador: #7f84a2;
+  --color-linea: #20233a;
+  --color-relleno: #1a1d2e;
+  --color-hover: #161928;
+  --color-seleccion: #201d4a;
+  --color-sutil: #0c0e18;
+  --color-mapa: #12141f;
+  --color-barra: #5b52ff;
+  --color-sobre-tinta: #07080f;
+  --color-acento: #5b52ff;
+  --color-acento-hondo: #3b30e6;
+  --color-acento-suave: #1e1b49;
+  --color-acento-tinta: #aaa4ff;
+  --color-fantasma: #1f2236;
+  --color-revisado: #eef0fb;
+  --color-foco: rgb(91 82 255 / 0.3);
+  --color-sombra: rgb(0 0 0 / 0.6);
+  --color-velo: rgb(0 0 0 / 0.6);
+  --sombra-tarjeta: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-modo="auto"]:not([data-paleta]) {
+    --color-base: #07080f;
+    --color-papel: #10121d;
+    --color-tinta: #eef0fb;
+    --color-tinta-suave: #a0a5bf;
+    --color-marcador: #7f84a2;
+    --color-linea: #20233a;
+    --color-relleno: #1a1d2e;
+    --color-hover: #161928;
+    --color-seleccion: #201d4a;
+    --color-sutil: #0c0e18;
+    --color-mapa: #12141f;
+    --color-barra: #5b52ff;
+    --color-sobre-tinta: #07080f;
+    --color-acento: #5b52ff;
+    --color-acento-hondo: #3b30e6;
+    --color-acento-suave: #1e1b49;
+    --color-acento-tinta: #aaa4ff;
+    --color-fantasma: #1f2236;
+    --color-revisado: #eef0fb;
+    --color-foco: rgb(91 82 255 / 0.3);
+    --color-sombra: rgb(0 0 0 / 0.6);
+    --color-velo: rgb(0 0 0 / 0.6);
+    --sombra-tarjeta: none;
+  }
+}
+
+/* Temas de color: el acento sale de su color de barras, que ya tiene buen
+   contraste con su fondo y con su texto claro u oscuro (revisado: 5,2:1 o más). */
+:root[data-modo][data-paleta] {
+  --color-acento: var(--color-barra);
+  --color-acento-hondo: color-mix(in srgb, var(--color-barra) 82%, var(--color-tinta));
+  --color-acento-suave: color-mix(in srgb, var(--color-barra) 14%, var(--color-papel));
+  --color-acento-tinta: var(--color-barra);
+  --color-sobre-acento: var(--color-sobre-tinta);
+  --color-fantasma: var(--color-relleno);
+  --color-revisado: color-mix(in srgb, var(--color-tinta-suave) 45%, var(--color-papel));
+  --heroe-1: color-mix(in srgb, var(--color-barra) 78%, var(--color-papel));
+  --heroe-2: var(--color-barra);
+  --heroe-3: color-mix(in srgb, var(--color-barra) 75%, var(--color-tinta));
+  --heroe-texto: var(--color-sobre-tinta);
+}
+
+/* En la cuadrícula del panel, la misma forma para todo: tarjetas redondeadas
+   con sombra suave, botones en píldora y el acento en lo elegido. Van en la
+   capa components para que una clase de Tailwind las pueda seguir ajustando
+   (por ejemplo, el botón partido de las descargas). */
+@layer components {
+  :root[data-modo] .tarjeta {
+    border-radius: 20px;
+    box-shadow: var(--sombra-tarjeta);
+  }
+
+  :root[data-modo] .boton {
+    border-radius: 9999px;
+  }
+
+  :root[data-modo] .boton-primario {
+    background: var(--color-acento);
+    color: var(--color-sobre-acento);
+    box-shadow: 0 10px 22px -14px var(--color-acento);
+  }
+
+  :root[data-modo] .boton-primario:hover:not(:disabled) {
+    background: var(--color-acento-hondo);
+  }
+
+  :root[data-modo] .boton-secundario:hover:not(:disabled) {
+    border-color: var(--color-acento);
+  }
+
+  :root[data-modo] .campo {
+    border-radius: 12px;
+  }
+
+  :root[data-modo] .campo:focus {
+    border-color: var(--color-acento);
+  }
+
+  :root[data-modo] .chip:hover {
+    border-color: var(--color-acento);
+  }
+
+  :root[data-modo] .chip[aria-pressed="true"] {
+    background: var(--color-acento);
+    border-color: var(--color-acento);
+    color: var(--color-sobre-acento);
+  }
+
+  :root[data-modo] .tabla th {
+    background: transparent;
+    color: var(--color-marcador);
+    font-weight: 500;
+  }
+
+  /* La tarjeta de color del Inicio y el panel de la pantalla de acceso. */
+  .tarjeta-heroe {
+    background: radial-gradient(130% 120% at 0% 0%, var(--heroe-1) 0%, var(--heroe-2) 42%, var(--heroe-3) 100%);
+    color: var(--heroe-texto);
+    box-shadow: 0 22px 44px -22px color-mix(in srgb, var(--heroe-2) 90%, transparent);
+  }
+
+  /* La esfera del asistente. */
+  .esfera {
+    border-radius: 9999px;
+    background: radial-gradient(
+      circle at 32% 28%,
+      #ffffff 0%,
+      color-mix(in srgb, var(--heroe-1) 25%, #ffffff) 13%,
+      var(--heroe-1) 38%,
+      var(--heroe-2) 64%,
+      color-mix(in srgb, var(--heroe-3) 70%, #000000) 100%
+    );
+    box-shadow:
+      0 22px 40px -14px color-mix(in srgb, var(--heroe-2) 75%, transparent),
+      inset -10px -12px 22px rgb(20 10 110 / 0.3);
+  }
+
+  /* Globo con el dato de una barra, al pasar el mouse o con el foco. */
+  .globo {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 10;
+    translate: -50% 4px;
+    padding: 6px 9px;
+    border-radius: 10px;
+    background: var(--color-tinta);
+    color: var(--color-sobre-tinta);
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.15s,
+      translate 0.15s;
+  }
+
+  .con-globo:hover > .globo,
+  .con-globo:focus-visible > .globo {
+    opacity: 1;
+    translate: -50% 0;
+  }
+
+  /* En las barras de los bordes, el globo se abre hacia adentro para no
+     salirse de la tarjeta (ni ensanchar la página en el celular). */
+  .globo-izq {
+    left: 0;
+    translate: 0 4px;
+  }
+
+  .globo-der {
+    left: auto;
+    right: 0;
+    translate: 0 4px;
+  }
+
+  .con-globo:hover > .globo-izq,
+  .con-globo:focus-visible > .globo-izq,
+  .con-globo:hover > .globo-der,
+  .con-globo:focus-visible > .globo-der {
+    translate: 0 0;
+  }
+}
+
+/* ------------------------------------------------------------ movimiento
+   Las tarjetas entran una tras otra (--i es su turno), las barras crecen
+   desde la base y la esfera flota. Quien pidió menos movimiento las ve
+   quietas desde el principio. */
+@keyframes panel-entra {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes panel-crece-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes panel-crece-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes panel-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.entra {
+  animation: panel-entra 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.crece-y {
+  transform-origin: bottom;
+  animation: panel-crece-y 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms + var(--desde, 250ms));
+}
+
+.crece-x {
+  transform-origin: left;
+  animation: panel-crece-x 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + var(--desde, 300ms));
+}
+
+.flota {
+  animation: panel-flota 4.5s ease-in-out infinite;
+}
+
+/* Al entrar al panel: la cortina índigo de la pantalla de acceso se va hacia
+   la izquierda y deja ver el panel. */
+@keyframes cortina-cubre {
+  from {
+    clip-path: inset(0 var(--cortina-desde, 55%) 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes cortina-sale {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.cortina-cubre {
+  animation: cortina-cubre 0.5s cubic-bezier(0.7, 0, 0.3, 1) both;
+}
+
+.cortina-sale {
+  animation: cortina-sale 0.65s cubic-bezier(0.7, 0, 0.3, 1) 0.1s both;
+}
+
+/* Cambio de claro a oscuro con el botón del encabezado: el modo nuevo se
+   abre en círculo desde el botón (lo anima ModoPanel con View Transitions). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entra,
+  .crece-y,
+  .crece-x,
+  .flota,
+  .cortina-cubre {
+    animation: none;
+  }
+
+  .cortina-sale {
+    display: none;
+  }
+
+  .globo {
+    transition: none;
+  }
+}

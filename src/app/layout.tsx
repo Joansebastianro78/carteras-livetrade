@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import { IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import PieDePagina from "@/components/PieDePagina";
 import DecoracionTema from "@/components/DecoracionTema";
@@ -13,6 +13,15 @@ const plex = IBM_Plex_Sans({
   weight: ["400", "500", "600"],
   display: "swap",
   variable: "--font-plex",
+});
+
+// La letra del panel y del BackOffice. La consulta de los consultores sigue
+// con IBM Plex Sans.
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-jakarta",
 });
 
 export const metadata: Metadata = {
@@ -43,13 +52,13 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={plex.variable}
+      className={`${plex.variable} ${jakarta.variable}`}
       data-modo={modo ? baseDe(modo) : undefined}
       data-paleta={modo ? paletaDe(modo)?.id : undefined}
     >
       <body
         className="flex min-h-dvh flex-col antialiased"
-        style={{ fontFamily: "var(--font-plex)" }}
+        style={{ fontFamily: enPanel ? "var(--font-jakarta, var(--font-plex))" : "var(--font-plex)" }}
       >
         {children}
         <PieDePagina />

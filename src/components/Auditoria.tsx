@@ -222,9 +222,10 @@ export default function Auditoria() {
   // Lo último que se vio queda como resumen para el Inicio, sin los revisados.
   useEffect(() => {
     if (fase.tipo === "listo" && filas.length > 0) {
-      guardarResumenAuditoria(resumirAuditoria(pendientes, info?.enviada ?? null, yaRevisados));
+      const revisadas = revisados.size ? filas.filter((f) => revisados.has(claveDe(f))) : [];
+      guardarResumenAuditoria(resumirAuditoria(pendientes, info?.enviada ?? null, revisadas));
     }
-  }, [fase.tipo, filas.length, pendientes, info, yaRevisados]);
+  }, [fase.tipo, filas, pendientes, info, revisados, claveDe]);
 
   const fechas = useMemo(() => resumirFechas(pendientes, (f) => f.dia, (f) => f.fecha), [pendientes]);
   const conRango = hayRango(rango);
@@ -656,7 +657,7 @@ export default function Auditoria() {
                         onClick={() => filtrar(setMotivo)(activo ? null : m.nombre)}
                         className={`flex w-full flex-col gap-1.5 rounded-[6px] px-2.5 py-2 text-left ${
                           activo
-                            ? "bg-[var(--color-tinta)] text-[var(--color-sobre-tinta)]"
+                            ? "bg-[var(--color-acento)] text-[var(--color-sobre-acento)]"
                             : "hover:bg-[var(--color-hover)]"
                         }`}
                       >
@@ -666,12 +667,12 @@ export default function Auditoria() {
                         </span>
                         <span
                           className={`block h-1.5 rounded-full ${
-                            activo ? "bg-[color-mix(in_srgb,var(--color-sobre-tinta)_25%,transparent)]" : "bg-[var(--color-relleno)]"
+                            activo ? "bg-[color-mix(in_srgb,var(--color-sobre-acento)_25%,transparent)]" : "bg-[var(--color-fantasma)]"
                           }`}
                         >
                           <span
                             className={`block h-1.5 rounded-full ${
-                              activo ? "bg-[var(--color-ambar)]" : "bg-[var(--color-tinta-suave)]"
+                              activo ? "bg-[var(--color-sobre-acento)]" : "bg-[var(--color-acento)]"
                             }`}
                             style={{
                               width: `${m.n === 0 ? 0 : Math.max(3, (m.n / (motivos[0]?.n || 1)) * 100)}%`,

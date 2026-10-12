@@ -15,8 +15,10 @@ import {
 import { fechaYHora } from "@/lib/fechas";
 import type { IdModulo } from "@/lib/permisos";
 import { COOKIE_MENU, DURACION_COOKIE_MODO_S, type Modo } from "@/lib/modo";
+import { LLAVE_ENTRADA } from "@/lib/entrada";
+import Campana from "./Campana";
 import EncabezadoPagina from "./EncabezadoPagina";
-import { SelectorModo, useModoPanel } from "./ModoPanel";
+import { BotonTema, SelectorModo, useModoPanel } from "./ModoPanel";
 
 /**
  * Estructura común del panel de administración y del BackOffice: menú
@@ -127,6 +129,19 @@ export default function PanelShell({
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [menuOculto, setMenuOculto] = useState(menuOcultoInicial);
   const [estado, setEstado] = useState<EstadoPagina | null>(null);
+  /** Recién entró desde la pantalla de acceso: la cortina índigo se retira. */
+  const [cortina, setCortina] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(LLAVE_ENTRADA)) {
+        sessionStorage.removeItem(LLAVE_ENTRADA);
+        setCortina(true);
+      }
+    } catch {
+      // sin almacenamiento: se entra sin cortina
+    }
+  }, []);
 
   /** Oculta o muestra el menú lateral y lo recuerda en este navegador. */
   const ocultarMenu = useCallback((ocultar: boolean) => {
@@ -226,16 +241,16 @@ export default function PanelShell({
       <div className="flex items-center gap-2.5 px-2">
         <span
           aria-hidden
-          className={`grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[6px] text-[13px] font-bold tracking-wide ${
+          className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[12px] text-[13px] font-bold tracking-wide ${
             panel === "admin"
-              ? "bg-[var(--color-tinta)] text-[var(--color-sobre-tinta)]"
+              ? "tarjeta-heroe"
               : "bg-[var(--color-ambar)] text-[var(--color-sobre-ambar)]"
           }`}
         >
           LT
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-semibold">Cartera LiveTrade</span>
+          <span className="block text-[14px] font-semibold tracking-[-0.01em] whitespace-nowrap">Cartera LiveTrade</span>
           <span className="block text-xs text-[var(--color-tinta-suave)]">
             {panel === "admin" ? "Administración" : "BackOffice"}
           </span>
@@ -275,9 +290,9 @@ export default function PanelShell({
                     href={`#${s.id}`}
                     aria-current={actual ? "page" : undefined}
                     onClick={() => setMenuAbierto(false)}
-                    className={`flex min-h-[38px] items-center gap-2.5 rounded-[6px] px-2.5 text-[14px] ${
+                    className={`relative flex min-h-[40px] items-center gap-3 rounded-[12px] px-3 text-[14px] transition-colors ${
                       actual
-                        ? "bg-[var(--color-relleno)] font-semibold text-[var(--color-tinta)]"
+                        ? "bg-[var(--color-acento-suave)] font-semibold text-[var(--color-acento-tinta)] before:absolute before:top-2.5 before:bottom-2.5 before:-left-3.5 before:w-[3px] before:rounded-r-full before:bg-[var(--color-acento)]"
                         : "text-[var(--color-tinta-suave)] hover:bg-[var(--color-hover)] hover:text-[var(--color-tinta)]"
                     } ${enCelular ? "min-h-[44px]" : ""}`}
                   >
@@ -392,7 +407,7 @@ export default function PanelShell({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-[var(--color-linea)] bg-[var(--color-papel)]">
+        <header className="sticky top-0 z-30 border-b border-[var(--color-linea)] bg-[color-mix(in_srgb,var(--color-base)_82%,transparent)] backdrop-blur-md lg:border-transparent">
           <div className="flex min-h-[60px] items-center gap-2 px-2 lg:hidden">
             <button
               type="button"
@@ -404,6 +419,8 @@ export default function PanelShell({
               <Menu size={22} aria-hidden />
             </button>
             <span className="min-w-0 flex-1 truncate text-[16px] font-semibold">{seccion.menu}</span>
+            <BotonTema modo={modo} onElegir={elegirModo} />
+            <Campana enMantenimiento={enMantenimiento} puede={puede} />
             {estado && (
               <span
                 className={`mr-3 h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -438,6 +455,8 @@ export default function PanelShell({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
+              <BotonTema modo={modo} onElegir={elegirModo} />
+              <Campana enMantenimiento={enMantenimiento} puede={puede} />
               <Reloj />
               {pildoraEstado}
             </div>
@@ -453,6 +472,13 @@ export default function PanelShell({
                 : "max-w-[1260px]"
           }`}
         >
+          {cortina && (
+            <div
+              aria-hidden
+              onAnimationEnd={() => setCortina(false)}
+              className="cortina-sale tarjeta-heroe pointer-events-none fixed inset-0 z-[120] rounded-none shadow-none"
+            />
+          )}
           {lista && (
             <>
               {!seccion.encabezadoPropio && (

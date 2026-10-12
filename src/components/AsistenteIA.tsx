@@ -18,6 +18,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import { tomarPregunta } from "@/lib/asistentePendiente";
 import { ACEPTA, pesoLegible, preparar, type TipoAdjunto } from "@/lib/archivosAsistente";
 
 /**
@@ -330,6 +331,23 @@ export default function AsistenteIA() {
     if (cargado) guardar(mensajes, modo);
   }, [mensajes, modo, cargado]);
 
+  // Lo que se escribió en el Asistente IA del Inicio: se envía de una vez o
+  // queda escrito para editarlo (las sugerencias).
+  const pendienteTomada = useRef(false);
+  useEffect(() => {
+    if (!cargado || pendienteTomada.current) return;
+    pendienteTomada.current = true;
+    const p = tomarPregunta();
+    if (!p) return;
+    if (p.enviar) enviar(p.texto);
+    else {
+      setTexto(p.texto);
+      campo.current?.focus();
+    }
+    // Solo una vez, al terminar de cargar la conversación de esta pestaña.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargado]);
+
   // Bajar sola mientras llega la respuesta, salvo que la persona haya subido a leer.
   useEffect(() => {
     const el = lista.current;
@@ -621,9 +639,7 @@ export default function AsistenteIA() {
         >
           {vacio ? (
             <div className="mx-auto flex h-full max-w-[560px] flex-col items-center justify-center text-center">
-              <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--color-ambar)] text-[var(--color-sobre-ambar)]">
-                <Sparkles size={22} aria-hidden />
-              </span>
+              <span aria-hidden className="esfera flota h-[72px] w-[72px]" />
               <p className="mt-3 text-[18px] font-semibold">¿En qué te ayudo?</p>
               <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
                 {MODOS.find((m) => m.id === modo)?.detalle}. Puedes arrastrar archivos aquí o pegar una imagen.
