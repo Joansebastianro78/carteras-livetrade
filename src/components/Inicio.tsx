@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { filasDesdeAthena, type FilaAuditoria } from "@/lib/auditoria";
 import { MODULOS, type IdModulo } from "@/lib/permisos";
+import { claveHallazgo, leerClavesRevisadas } from "@/lib/revisionHallazgos";
 import { cuando } from "@/lib/fechas";
 import { exportarTerritorio } from "@/lib/excel";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/resumenAuditoria";
 import type { PuntoTerritorio } from "@/lib/territorio";
 import EncabezadoPagina from "./EncabezadoPagina";
+import TarjetaRevisados from "./TarjetaRevisados";
 import { ProgresoConsulta, cifra, useConsultaAthena } from "./ConsultaAthena";
 import type { Navegacion } from "./PanelShell";
 
@@ -197,6 +199,23 @@ function describir(a: ItemActividad): { frase: string; detalle: string | null } 
     }
     case "perfil_eliminar":
       return { frase: `eliminó el perfil «${txt("nombre")}»`, detalle: null };
+    case "revisados_carga": {
+      const n = Number(d.hallazgos) || 0;
+      const pdv = Number(d.pdv) || 0;
+      return {
+        frase: `marcó ${n === 1 ? "1 hallazgo" : `${cifra(n)} hallazgos`} como revisados con una carga masiva`,
+        detalle: [txt("archivo"), pdv ? `${cifra(pdv)} PDV` : ""].filter(Boolean).join(" · ") || null,
+      };
+    }
+    case "revisados_deshacer": {
+      const n = Number(d.hallazgos) || 0;
+      return {
+        frase: "deshizo una carga masiva de revisados",
+        detalle: [txt("archivo"), `${n === 1 ? "1 hallazgo volvió" : `${cifra(n)} hallazgos volvieron`} a pendientes`]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
     default:
       return { frase: a.accion.replace(/_/g, " "), detalle: null };
   }
@@ -251,11 +270,20 @@ export default function Inicio({ nav }: { nav: Navegacion }) {
       .catch(() => setActividad([]));
   }, []);
 
+  // El resumen cuenta solo lo que falta revisar, igual que la auditoría.
   useEffect(() => {
     if (consulta.fase.tipo !== "listo") return;
-    const r = resumirAuditoria(consulta.filas, consulta.info?.enviada ?? null);
-    guardarResumenAuditoria(r);
-    setAuditoria(r);
+    let vivo = true;
+    leerClavesRevisadas().then(({ claves }) => {
+      if (!vivo) return;
+      const pendientes = claves.size ? consulta.filas.filter((f) => !claves.has(claveHallazgo(f))) : consulta.filas;
+      const r = resumirAuditoria(pendientes, consulta.info?.enviada ?? null, consulta.filas.length - pendientes.length);
+      guardarResumenAuditoria(r);
+      setAuditoria(r);
+    });
+    return () => {
+      vivo = false;
+    };
   }, [consulta.fase.tipo, consulta.filas, consulta.info]);
 
   async function descargarLista(tipo: "sin-ubicacion" | "libres") {
@@ -483,216 +511,220 @@ export default function Inicio({ nav }: { nav: Navegacion }) {
         </section>
       )}
 
-      <div
-        className={`grid grid-cols-1 items-start gap-5 ${
-          puede("auditoria") ? "xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
-        }`}
-      >
-        {/* ---------------------------------------------------------- auditoría */}
-        {puede("auditoria") && (
-          <section aria-labelledby="resumen-auditoria" className="tarjeta px-5 py-5 sm:px-6">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="resumen-auditoria" className="text-[15px] font-semibold">
-                Auditoría de datos
-              </h2>
-              {auditoria && (
-                <span className="text-xs text-[var(--color-tinta-suave)]">
-                  Consultada {cuando(auditoria.momento)}
-                </span>
-              )}
-            </div>
-
-            {consulta.trabajando || consulta.fase.tipo === "error" ? (
-              <div className="mt-4">
-                <ProgresoConsulta fase={consulta.fase} onReintentar={() => consulta.consultar(false)} />
-              </div>
-            ) : auditoria ? (
-              <>
-                <p className="cifras mt-1.5 text-[22px] font-semibold">
-                  {cifra(auditoria.total)} hallazgos{" "}
-                  <span className="text-[14px] font-normal text-[var(--color-tinta-suave)]">
-                    · {cifra(auditoria.consultores)} consultores
-                  </span>
-                </p>
-                <ul className="mt-4 space-y-3">
-                  {auditoria.motivos.slice(0, 5).map((m) => (
-                    <li key={m.nombre}>
-                      <div className="flex justify-between gap-3 text-[13px]">
-                        <span>{m.nombre}</span>
-                        <span className="cifras text-[var(--color-tinta-suave)]">{cifra(m.n)}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 rounded bg-[var(--color-relleno)]">
-                        <div
-                          className="h-2 rounded bg-[var(--color-tinta-suave)]"
-                          style={{ width: `${Math.max(2, (m.n / (auditoria.motivos[0]?.n || 1)) * 100)}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
-                Todavía no has consultado la auditoría desde este navegador. Al consultarla, aquí
-                queda cuántos hallazgos hay y de qué tipo.
-              </p>
-            )}
-
-            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <a href="#auditoria" className="inline-flex items-center gap-1.5 text-[14px] font-medium">
-                Abrir la auditoría
-                <ArrowRight size={15} aria-hidden />
-              </a>
-              <button
-                type="button"
-                onClick={() => consulta.consultar(true)}
-                disabled={consulta.trabajando}
-                className="text-[13px] text-[var(--color-tinta-suave)] underline underline-offset-2 hover:text-[var(--color-tinta)] disabled:opacity-50"
-              >
-                {auditoria ? "Actualizar el resumen" : "Consultar ahora"}
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* ---------------------------------------------------------- actividad */}
-        <section aria-labelledby="actividad" className="tarjeta px-5 py-5 sm:px-6">
-          <h2 id="actividad" className="text-[15px] font-semibold">
-            Actividad reciente
-          </h2>
-          {actividad === null ? (
-            <p className="mt-4 flex items-center gap-2 text-[13px] text-[var(--color-tinta-suave)]">
-              <Loader2 size={14} className="animate-spin" aria-hidden />
-              Cargando…
-            </p>
-          ) : actividad.length === 0 ? (
-            <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
-              Todavía no hay movimientos registrados.
-            </p>
-          ) : (
-            <ol className="mt-3">
-              {actividad.map((a, i) => {
-                const { frase, detalle } = describir(a);
-                return (
-                  <li
-                    key={`${a.momento}-${i}`}
-                    className="flex gap-3 border-b border-[var(--color-linea)] py-2.5 last:border-b-0"
-                  >
-                    <span
-                      aria-hidden
-                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                        a.accion === "cargar"
-                          ? "bg-[var(--color-tinta)]"
-                          : a.accion.startsWith("mantenimiento") || a.accion === "purgar"
-                            ? "bg-[var(--color-ambar)]"
-                            : "bg-[var(--color-marcador)]"
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[13px] leading-snug">
-                        <b className="font-semibold">{a.usuario ?? "Alguien"}</b> {frase}
-                      </p>
-                      <p className="cifras mt-0.5 truncate text-xs text-[var(--color-tinta-suave)]">
-                        {[detalle, cuando(a.momento)].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          {avisoActividad && (
-            <p className="mt-3 text-xs leading-relaxed text-[var(--color-tinta-suave)]">{avisoActividad}</p>
-          )}
-        </section>
-      </div>
-
+      {/* Dos columnas que bajan cada una a su ritmo: así no quedan huecos entre tarjetas. */}
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        {/* ---------------------------------------------------------- departamentos */}
-        <section aria-labelledby="departamentos" className="tarjeta px-5 py-5 sm:px-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="departamentos" className="text-[15px] font-semibold">
-              Puntos por departamento
-              {general && general.puntos > 0 && (
-                <span className="cifras font-normal text-[var(--color-tinta-suave)]">
-                  {" "}
-                  · {cifra(general.puntos)} en total
-                </span>
-              )}
-            </h2>
-            {deptos && deptos.length > 0 && puede("territorio") && (
-              <a href="#territorio" className="text-[13px] underline underline-offset-2">
-                Ver {deptos.length === 1 ? "el departamento" : `los ${deptos.length} departamentos`}
-              </a>
-            )}
-          </div>
-          {deptos === null ? (
-            <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
-              {resumen
-                ? "Para ver este resumen, ejecuta supabase/territorio.sql en el SQL Editor."
-                : "Cargando…"}
-            </p>
-          ) : deptos.length === 0 ? (
-            <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">No hay puntos cargados.</p>
-          ) : (
-            <div className="cifras mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] items-center gap-x-4 gap-y-2.5 text-[13px]">
-              {deptos.slice(0, 6).map((d) => (
-                <div key={d.nombre} className="contents">
-                  <span className="truncate" title={d.nombre}>
-                    {d.nombre}
-                  </span>
-                  <span className="h-2.5 rounded bg-[var(--color-relleno)]">
-                    <span
-                      className="block h-2.5 rounded bg-[var(--color-barra)]"
-                      style={{ width: `${Math.max(2, (d.puntos / maxDepto) * 100)}%` }}
-                    />
-                  </span>
-                  <span className="text-right">{cifra(d.puntos)}</span>
+        <div className="min-w-0 space-y-5">
+          {/* ---------------------------------------------------------- auditoría */}
+          {puede("auditoria") && (
+            <div className="space-y-5">
+              <section aria-labelledby="resumen-auditoria" className="tarjeta px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 id="resumen-auditoria" className="text-[15px] font-semibold">
+                    Auditoría de datos
+                  </h2>
+                  {auditoria && (
+                    <span className="text-xs text-[var(--color-tinta-suave)]">
+                      Consultada {cuando(auditoria.momento)}
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
 
-        {/* ---------------------------------------------------------- para revisar */}
-        <section aria-labelledby="revisar" className="tarjeta px-5 py-5 sm:px-6">
-          <h2 id="revisar" className="text-[15px] font-semibold">
-            Para revisar
-          </h2>
-          {!resumen ? (
-            <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">Cargando…</p>
-          ) : pendientes.length === 0 ? (
-            <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
-              Todo en orden: no hay nada pendiente.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2.5">
-              {pendientes.map((p) => (
-                <li key={p.id}>
-                  <div className={`flex items-start gap-3 rounded-[6px] px-3 py-3 ${TONO[p.tono]}`}>
-                    <p.Icono size={17} className="mt-0.5 shrink-0" aria-hidden />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold">{p.titulo}</p>
-                      <p className="mt-0.5 truncate text-xs opacity-90" title={p.detalle}>
-                        {p.detalle}
-                      </p>
-                    </div>
-                    {p.accion}
+                {consulta.trabajando || consulta.fase.tipo === "error" ? (
+                  <div className="mt-4">
+                    <ProgresoConsulta fase={consulta.fase} onReintentar={() => consulta.consultar(false)} />
                   </div>
-                  {p.id === "observaciones" && verObservaciones && ultima && (
-                    <ul className="cifras mt-2 max-h-48 space-y-1 overflow-y-auto px-1 text-xs text-[var(--color-tinta-suave)]">
-                      {ultima.detalle.map((o, i) => (
-                        <li key={i}>
-                          Fila {cifra(o.fila)}: {o.motivo}
+                ) : auditoria ? (
+                  <>
+                    <p className="cifras mt-1.5 text-[22px] font-semibold">
+                      {cifra(auditoria.total)} {auditoria.total === 1 ? "hallazgo" : "hallazgos"} por revisar{" "}
+                      <span className="text-[14px] font-normal text-[var(--color-tinta-suave)]">
+                        · {cifra(auditoria.consultores)} consultores
+                      </span>
+                    </p>
+                    <ul className="mt-4 space-y-3">
+                      {auditoria.motivos.slice(0, 5).map((m) => (
+                        <li key={m.nombre}>
+                          <div className="flex justify-between gap-3 text-[13px]">
+                            <span>{m.nombre}</span>
+                            <span className="cifras text-[var(--color-tinta-suave)]">{cifra(m.n)}</span>
+                          </div>
+                          <div className="mt-1.5 h-2 rounded bg-[var(--color-relleno)]">
+                            <div
+                              className="h-2 rounded bg-[var(--color-tinta-suave)]"
+                              style={{ width: `${Math.max(2, (m.n / (auditoria.motivos[0]?.n || 1)) * 100)}%` }}
+                            />
+                          </div>
                         </li>
                       ))}
                     </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </>
+                ) : (
+                  <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-tinta-suave)]">
+                    Todavía no has consultado la auditoría desde este navegador. Al consultarla, aquí
+                    queda cuántos hallazgos hay y de qué tipo.
+                  </p>
+                )}
+
+                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <a href="#auditoria" className="inline-flex items-center gap-1.5 text-[14px] font-medium">
+                    Abrir la auditoría
+                    <ArrowRight size={15} aria-hidden />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => consulta.consultar(true)}
+                    disabled={consulta.trabajando}
+                    className="text-[13px] text-[var(--color-tinta-suave)] underline underline-offset-2 hover:text-[var(--color-tinta)] disabled:opacity-50"
+                  >
+                    {auditoria ? "Actualizar el resumen" : "Consultar ahora"}
+                  </button>
+                </div>
+              </section>
+
+              {/* ---------------------------------------------------------- revisados */}
+              <TarjetaRevisados auditoria={auditoria} />
+            </div>
           )}
-        </section>
+
+          {/* ---------------------------------------------------------- departamentos */}
+          <section aria-labelledby="departamentos" className="tarjeta px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="departamentos" className="text-[15px] font-semibold">
+                Puntos por departamento
+                {general && general.puntos > 0 && (
+                  <span className="cifras font-normal text-[var(--color-tinta-suave)]">
+                    {" "}
+                    · {cifra(general.puntos)} en total
+                  </span>
+                )}
+              </h2>
+              {deptos && deptos.length > 0 && puede("territorio") && (
+                <a href="#territorio" className="text-[13px] underline underline-offset-2">
+                  Ver {deptos.length === 1 ? "el departamento" : `los ${deptos.length} departamentos`}
+                </a>
+              )}
+            </div>
+            {deptos === null ? (
+              <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
+                {resumen
+                  ? "Para ver este resumen, ejecuta supabase/territorio.sql en el SQL Editor."
+                  : "Cargando…"}
+              </p>
+            ) : deptos.length === 0 ? (
+              <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">No hay puntos cargados.</p>
+            ) : (
+              <div className="cifras mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] items-center gap-x-4 gap-y-2.5 text-[13px]">
+                {deptos.slice(0, 6).map((d) => (
+                  <div key={d.nombre} className="contents">
+                    <span className="truncate" title={d.nombre}>
+                      {d.nombre}
+                    </span>
+                    <span className="h-2.5 rounded bg-[var(--color-relleno)]">
+                      <span
+                        className="block h-2.5 rounded bg-[var(--color-barra)]"
+                        style={{ width: `${Math.max(2, (d.puntos / maxDepto) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="text-right">{cifra(d.puntos)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          {/* ---------------------------------------------------------- actividad */}
+          <section aria-labelledby="actividad" className="tarjeta px-5 py-5 sm:px-6">
+            <h2 id="actividad" className="text-[15px] font-semibold">
+              Actividad reciente
+            </h2>
+            {actividad === null ? (
+              <p className="mt-4 flex items-center gap-2 text-[13px] text-[var(--color-tinta-suave)]">
+                <Loader2 size={14} className="animate-spin" aria-hidden />
+                Cargando…
+              </p>
+            ) : actividad.length === 0 ? (
+              <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
+                Todavía no hay movimientos registrados.
+              </p>
+            ) : (
+              <ol className="mt-3">
+                {actividad.map((a, i) => {
+                  const { frase, detalle } = describir(a);
+                  return (
+                    <li
+                      key={`${a.momento}-${i}`}
+                      className="flex gap-3 border-b border-[var(--color-linea)] py-2.5 last:border-b-0"
+                    >
+                      <span
+                        aria-hidden
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                          a.accion === "cargar"
+                            ? "bg-[var(--color-tinta)]"
+                            : a.accion.startsWith("mantenimiento") || a.accion === "purgar"
+                              ? "bg-[var(--color-ambar)]"
+                              : "bg-[var(--color-marcador)]"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[13px] leading-snug">
+                          <b className="font-semibold">{a.usuario ?? "Alguien"}</b> {frase}
+                        </p>
+                        <p className="cifras mt-0.5 truncate text-xs text-[var(--color-tinta-suave)]">
+                          {[detalle, cuando(a.momento)].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            {avisoActividad && (
+              <p className="mt-3 text-xs leading-relaxed text-[var(--color-tinta-suave)]">{avisoActividad}</p>
+            )}
+          </section>
+
+          {/* ---------------------------------------------------------- para revisar */}
+          <section aria-labelledby="revisar" className="tarjeta px-5 py-5 sm:px-6">
+            <h2 id="revisar" className="text-[15px] font-semibold">
+              Para revisar
+            </h2>
+            {!resumen ? (
+              <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">Cargando…</p>
+            ) : pendientes.length === 0 ? (
+              <p className="mt-3 text-[13px] text-[var(--color-tinta-suave)]">
+                Todo en orden: no hay nada pendiente.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {pendientes.map((p) => (
+                  <li key={p.id}>
+                    <div className={`flex items-start gap-3 rounded-[6px] px-3 py-3 ${TONO[p.tono]}`}>
+                      <p.Icono size={17} className="mt-0.5 shrink-0" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold">{p.titulo}</p>
+                        <p className="mt-0.5 truncate text-xs opacity-90" title={p.detalle}>
+                          {p.detalle}
+                        </p>
+                      </div>
+                      {p.accion}
+                    </div>
+                    {p.id === "observaciones" && verObservaciones && ultima && (
+                      <ul className="cifras mt-2 max-h-48 space-y-1 overflow-y-auto px-1 text-xs text-[var(--color-tinta-suave)]">
+                        {ultima.detalle.map((o, i) => (
+                          <li key={i}>
+                            Fila {cifra(o.fila)}: {o.motivo}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

@@ -26,7 +26,9 @@ export type AccionPanel =
   | "tema_cambiar"
   | "perfil_crear"
   | "perfil_editar"
-  | "perfil_eliminar";
+  | "perfil_eliminar"
+  | "revisados_carga"
+  | "revisados_deshacer";
 
 let avisado = false;
 

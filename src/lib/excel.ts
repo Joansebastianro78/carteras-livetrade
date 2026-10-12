@@ -5,6 +5,7 @@ import { diaDe } from "./fechas";
 import type { PuntoCartera } from "./tipos";
 import { COLUMNAS_EXCEL_TERRITORIO, type PuntoTerritorio } from "./territorio";
 import { COLUMNAS_AUDITORIA, type FilaAuditoria } from "./auditoria";
+import type { HallazgoRevisado } from "./revisionHallazgos";
 import {
   aEntero,
   aFecha,
@@ -511,4 +512,86 @@ export function exportarObservaciones(
   XLSX.utils.book_append_sheet(libro, hoja, "Observaciones");
   const base = archivo.replace(/\.[^.]+$/, "");
   XLSX.writeFile(libro, `Observaciones_${base}.xlsx`);
+}
+
+/**
+ * Los hallazgos revisados: quién y cuándo los revisó, y lo que decía cada uno.
+ * La fecha de revisión va en hora de Colombia. Lo de la carga masiva trae su
+ * observación y el archivo; lo marcado uno por uno los deja vacíos.
+ */
+export function exportarRevisados(filas: HallazgoRevisado[], sufijo: string) {
+  const encabezados = [
+    "revisado_el",
+    "revisado_por",
+    "codigo_bavaria",
+    "pdv",
+    "consultor",
+    "departamento",
+    "ciudad",
+    "tipo_linea",
+    "pregunta",
+    "respuesta",
+    "motivo",
+    "fecha_hallazgo",
+    "observacion",
+    "archivo_carga_masiva",
+  ];
+  const anchos = [17, 26, 14, 34, 18, 18, 18, 22, 56, 32, 36, 17, 48, 30];
+  const formatos: (string | null)[][] = [];
+
+  const datos = filas.map((f) => {
+    const revisado = fechaHoraExcel(enBogota(f.revisado_en));
+    const hallazgo = f.fecha_hallazgo ? fechaHoraExcel(f.fecha_hallazgo) : null;
+    formatos.push([revisado?.formato ?? null, ...Array(10).fill(null), hallazgo?.formato ?? null]);
+    return [
+      revisado?.valor ?? f.revisado_en,
+      f.revisado_por,
+      f.codigo_bavaria,
+      f.pdv,
+      f.consultor,
+      f.departamento,
+      f.provincia,
+      f.tipo_linea,
+      f.pregunta,
+      f.respuesta,
+      f.motivo,
+      hallazgo?.valor ?? f.fecha_hallazgo,
+      f.observacion ?? null,
+      f.archivo ?? null,
+    ];
+  });
+
+  const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...datos]);
+  formatos.forEach((fila, i) =>
+    fila.forEach((formato, j) => {
+      if (!formato) return;
+      const celda = hoja[XLSX.utils.encode_cell({ r: i + 1, c: j })];
+      if (celda && celda.t === "n") celda.z = formato;
+    })
+  );
+  hoja["!cols"] = anchos.map((wch) => ({ wch }));
+  hoja["!autofilter"] = {
+    ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: datos.length, c: encabezados.length - 1 } }),
+  };
+
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Revisados");
+  XLSX.writeFile(libro, `Hallazgos_revisados_${sufijo}.xlsx`);
+}
+
+/** "2026-10-11 18:49:03" en hora de Colombia, a partir de un ISO en UTC. */
+function enBogota(iso: string): string {
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return iso;
+  // sv-SE escribe la fecha como AAAA-MM-DD HH:MM:SS.
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(fecha);
 }

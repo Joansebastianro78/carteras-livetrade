@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   ChartColumn,
+  CheckCheck,
   ClipboardCheck,
   House,
   Image as IconoImagen,
@@ -34,6 +35,7 @@ import PanelTableros from "./PanelTableros";
 import VisorTableros from "./VisorTableros";
 import AsistenteIA from "./AsistenteIA";
 import PanelPerfiles from "./PanelPerfiles";
+import HallazgosRevisados from "./HallazgosRevisados";
 
 /** Una sección del menú y el módulo que hay que tener para verla. */
 type Seccion = SeccionPanel & { modulo: IdModulo };
@@ -112,6 +114,18 @@ const SECCIONES: Seccion[] = [
     Icono: IconoImagen,
     encabezadoPropio: true,
     render: () => <AuditoriaImagenes />,
+  },
+  {
+    // Lo que se marcó como revisado en la auditoría de datos: lo ve quien ve
+    // esa auditoría.
+    id: "revisados",
+    modulo: "auditoria",
+    menu: "Revisados",
+    titulo: "Hallazgos revisados",
+    grupo: "Auditorías",
+    Icono: CheckCheck,
+    encabezadoPropio: true,
+    render: () => <HallazgosRevisados />,
   },
   // Los tableros tienen dos versiones: quien los administra los agrega y
   // publica; quien solo los ve, ve los publicados.

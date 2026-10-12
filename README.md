@@ -25,7 +25,8 @@ autorizarlo o hospedar el tarball internamente.
 1. Crear el proyecto en supabase.com.
 2. Abrir **SQL Editor** y ejecutar, en orden: `supabase/schema.sql`,
    `supabase/admins.sql`, `supabase/roles.sql`, `supabase/gestion.sql`,
-   `supabase/territorio.sql`, `supabase/panel.sql` y `supabase/perfiles.sql`.
+   `supabase/territorio.sql`, `supabase/panel.sql`, `supabase/perfiles.sql` y
+   `supabase/hallazgos.sql`.
 
    En un proyecto que ya estaba andando basta con ejecutar `supabase/panel.sql`
    una vez. Crea dos tablas: `actividad_panel` (la actividad reciente del
@@ -41,6 +42,15 @@ autorizarlo o hospedar el tarball internamente.
    tenga que existir en ella. Se puede volver a correr: no pisa los permisos
    que ya se hayan cambiado. Mientras no se ejecute, el panel funciona como
    antes, con los tres perfiles fijos, y la pantalla de perfiles lo avisa.
+
+   Para marcar hallazgos de la auditoría de datos como **revisados** hay que
+   ejecutar `supabase/hallazgos.sql` una vez. Crea la tabla
+   `revision_hallazgos`. Se puede volver a correr sin problema. Mientras no se
+   ejecute, la auditoría se ve completa, como antes, sin el botón «Revisado», y
+   lo avisa en pantalla. **Si ya lo habías ejecutado antes de la carga
+   masiva, ejecútalo otra vez**: le agrega las columnas `observacion` y
+   `archivo` sin tocar lo ya revisado. Mientras tanto, marcar uno por uno
+   sigue funcionando y la carga masiva avisa qué falta.
 3. En **Project Settings → API**, copiar la *Project URL* y la **service_role**
    key hacia `.env.local`.
 
@@ -78,6 +88,7 @@ directo con la base.
 | `POST/GET /api/admin/auditoria` | Lanza la consulta de auditoría en Athena, informa su estado y entrega los resultados en páginas de 1000. Módulo «Auditoría de datos». |
 | `POST/GET /api/admin/auditoria-imagenes` | Lo mismo, con la consulta de las fotos de inicio de visita. Módulo «Auditoría de imágenes». |
 | `GET/POST /api/admin/revision-fotos` | Las marcas «Correcta» y «Para revisar» de la auditoría de imágenes, con quién las puso. Módulo «Auditoría de imágenes». |
+| `GET/POST/DELETE /api/admin/revision-hallazgos` | Hallazgos de la auditoría de datos marcados como revisados: listarlos (o solo sus claves, o el resumen por día para el Inicio con `?campos=resumen`), marcarlos (uno o la carga masiva, con observación y archivo) y devolverlos a pendientes. Módulo «Auditoría de datos». |
 | `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?corto=1`, solo el encabezado: lo lee cualquiera con sesión. Las cifras piden «Inicio» o «Cargar plantilla»; `?lista=sin-ubicacion` o `?lista=libres` (las descargas de «Para revisar»), «Inicio». |
 | `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Módulo «Inicio». |
 | `POST /api/admin/asistente` | Asistente IA: responde con Gemini, DeepSeek o las dos combinadas, en vivo (una línea de JSON por evento). Módulo «Asistente IA». |
@@ -617,6 +628,68 @@ variables van con `ATHENA_` y no con `AWS_` porque Vercel reserva esos nombres.
 - Si se cambia la consulta, revisar `motivoAuditoria()` en
   `src/lib/auditoria.ts`, que explica en pantalla qué regla hizo salir cada
   fila.
+
+### Hallazgos revisados
+
+Cada hallazgo de **Auditorías → Datos** trae un botón **Revisado**. Al
+tocarlo sale de la lista (y de las cifras, las barras por motivo y los dos
+Excel, que quedan con lo que falta revisar) y pasa a **Auditorías →
+Revisados**. Durante unos segundos aparece abajo «Deshacer», por si fue sin
+querer. Arriba de la tabla dice cuántos de esa consulta ya están revisados,
+con un enlace a la sección.
+
+En **Revisados** está cada hallazgo con quién lo revisó y cuándo, con filtro
+por fecha de revisión, motivo, quién lo revisó y un buscador; un Excel con lo
+que se ve; y el botón **Devolver**, que lo saca de ahí y lo hace salir otra vez
+en la auditoría. La lista sale de la base, no de Athena: queda aunque el dato
+ya se haya corregido y el hallazgo no vuelva a salir en la consulta.
+
+La marca es de todos, no de un navegador: lo que revisa una persona deja de
+salirle a las demás (al volver a consultar). Si dos lo marcan a la vez, queda
+el primero. Se guarda en `revision_hallazgos` (`supabase/hallazgos.sql`), con
+una copia de lo que decía el hallazgo. Cada hallazgo se reconoce por su
+actividad, el punto, la pregunta, la respuesta y la fecha
+(`src/lib/revisionHallazgos.ts`): si la respuesta se corrige y sigue mal, es
+otro hallazgo y vuelve a salir como pendiente. El resumen de la auditoría del
+Inicio también cuenta solo lo que falta revisar. Marcar y ver los revisados
+pide el módulo «Auditoría de datos».
+
+#### Carga masiva
+
+El botón **Carga masiva** de Auditorías → Datos marca muchos hallazgos de una
+vez con un Excel. La ventana tiene tres pasos:
+
+1. **Archivo.** Se descarga la plantilla (`plantilla_hallazgos_revisados.xlsx`,
+   se arma en `src/lib/cargaRevisados.ts` con los motivos de la auditoría) y
+   se sube llena, hasta 5.000 filas. Columnas: `CODIGO BAVARIA` (obligatoria,
+   en formato texto para no perder los ceros), `MOTIVO` (lista desplegable;
+   vacío = todos los hallazgos del PDV), `FECHA` (día del hallazgo; vacía =
+   cualquier día) y `OBSERVACION` (hasta 300 caracteres, queda guardada).
+2. **Revisar.** Todavía no se guarda nada. Se ve cuántos hallazgos y PDV se
+   van a marcar, el detalle por PDV y cada fila que no se usa con el porqué
+   (PDV sin hallazgos en la consulta, ya revisados, motivo que no existe,
+   fecha que no se entiende, falta el código, fila repetida). Esas filas se
+   descargan en un Excel con las mismas columnas para corregirlas y volver a
+   subirlas.
+3. **Listo.** Se marcan por lotes de 500. Quedan a nombre de quien cargó, con
+   la observación de su fila y el nombre del archivo, y salen de la auditoría.
+   **Deshacer esta carga** devuelve a pendientes solo lo que marcó esa carga.
+
+El archivo se cruza con los hallazgos pendientes de la consulta abierta (los
+filtros de la pantalla no cuentan). El código se busca tal cual y, si no
+aparece, sin ceros a la izquierda (por si Excel lo guardó como número). Si
+dos filas tocan el mismo hallazgo, vale la primera. La carga y el deshacer
+quedan en la actividad del Inicio, una línea por carga. En **Revisados**, lo
+que entró por carga masiva lleva la etiqueta «Carga masiva» y su
+observación; el buscador y el Excel también las incluyen.
+
+#### En el Inicio
+
+Debajo del resumen de la auditoría está la tarjeta **Hallazgos revisados**:
+cuántos van, cuántos hoy y en los últimos 7 días, el avance de la última
+consulta de la auditoría vista en ese navegador, una barra por día de las dos
+últimas semanas (hora de Colombia) y quién ha revisado más. Solo la ve quien
+tiene «Auditoría de datos».
 
 ### Auditoría de imágenes
 

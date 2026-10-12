@@ -40,7 +40,7 @@ export const MODULOS: Modulo[] = [
   { id: "editar", nombre: "Editar cartera", grupo: "Cartera", detalle: "Corregir o borrar puntos, y borrar la cartera de un ciclo o de un archivo." },
   { id: "consultores", nombre: "Consultores", grupo: "Cartera", detalle: "Ver la cartera de un consultor con su mapa y descargarla." },
   { id: "territorio", nombre: "Departamento y ciudad", grupo: "Cartera", detalle: "Filtrar los puntos por región y bajarlos en Excel." },
-  { id: "auditoria", nombre: "Auditoría de datos", grupo: "Auditorías", detalle: "Hallazgos de los formularios y el Excel limpio." },
+  { id: "auditoria", nombre: "Auditoría de datos", grupo: "Auditorías", detalle: "Hallazgos de los formularios, el Excel limpio y marcarlos como revisados." },
   { id: "imagenes", nombre: "Auditoría de imágenes", grupo: "Auditorías", detalle: "Fotos de inicio de visita y marcarlas como correctas o para revisar." },
   { id: "tableros", nombre: "Ver tableros", grupo: "Reportes", detalle: "Los tableros de Power BI publicados." },
   { id: "tableros_admin", nombre: "Administrar tableros", grupo: "Reportes", detalle: "Agregar, editar, publicar u ocultar tableros de Power BI." },
@@ -123,6 +123,7 @@ export function modulosDeRuta(
   if (es("/api/admin/consultores") || es("/api/admin/vendedores")) return ["consultores"];
   if (es("/api/admin/territorio")) return ["territorio"];
   if (es("/api/admin/auditoria-imagenes") || es("/api/admin/revision-fotos")) return ["imagenes"];
+  if (es("/api/admin/revision-hallazgos")) return ["auditoria"];
   if (es("/api/admin/auditoria")) return ["auditoria"];
   if (es("/api/admin/tableros")) return lectura ? ["tableros", "tableros_admin"] : ["tableros_admin"];
   // Análisis de tableros con Gemini: era solo de administradores y así sigue.

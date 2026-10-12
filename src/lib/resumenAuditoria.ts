@@ -13,11 +13,13 @@ export type ResumenAuditoria = {
   total: number;
   consultores: number;
   motivos: { nombre: string; n: number }[];
+  /** Cuántos de esa consulta ya estaban revisados (no viene en resúmenes viejos). */
+  revisados?: number;
 };
 
 const LLAVE = "cartera.resumen-auditoria";
 
-export function resumirAuditoria(filas: FilaAuditoria[], momento: string | null): ResumenAuditoria {
+export function resumirAuditoria(filas: FilaAuditoria[], momento: string | null, revisados = 0): ResumenAuditoria {
   const conteo = new Map<string, number>();
   for (const f of filas) conteo.set(f.motivo, (conteo.get(f.motivo) ?? 0) + 1);
   return {
@@ -28,6 +30,7 @@ export function resumirAuditoria(filas: FilaAuditoria[], momento: string | null)
       .map(([nombre, n]) => ({ nombre, n }))
       .sort((a, b) => b.n - a.n)
       .slice(0, 6),
+    revisados,
   };
 }
 

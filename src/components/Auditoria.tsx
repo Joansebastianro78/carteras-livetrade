@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowRight,
+  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -9,6 +11,8 @@ import {
   SlidersHorizontal,
   Sheet,
   TriangleAlert,
+  Undo2,
+  Upload,
 } from "lucide-react";
 import { exportarAuditoria } from "@/lib/excel";
 import {
@@ -25,6 +29,8 @@ import {
 import { escribirExcel, limpiarAuditoria, limpiarTexto } from "@/lib/limpiadorAuditoria";
 import { filasDesdeAthena, type FilaAuditoria } from "@/lib/auditoria";
 import { guardarResumenAuditoria, resumirAuditoria } from "@/lib/resumenAuditoria";
+import { claveHallazgo, copiaDelHallazgo, leerClavesRevisadas } from "@/lib/revisionHallazgos";
+import CargaMasivaRevisados from "./CargaMasivaRevisados";
 import EncabezadoPagina from "./EncabezadoPagina";
 import FiltrosActivos, { type FiltroActivo } from "./FiltrosActivos";
 import RangoFechas from "./RangoFechas";
@@ -153,8 +159,38 @@ export default function Auditoria() {
   const [masFiltros, setMasFiltros] = useState(false);
   const inicioTabla = useRef<HTMLDivElement>(null);
 
+  // ------------------------------------------------------------ revisados
+  /** Claves de los hallazgos que alguien ya revisó: no salen en la lista. */
+  const [revisados, setRevisados] = useState<Set<string>>(() => new Set());
+  /** Falta la tabla (hallazgos.sql): se ve todo y no se puede marcar. */
+  const [sinRevision, setSinRevision] = useState<string | null>(null);
+  /** El último marcado, para poder deshacerlo. */
+  const [deshacer, setDeshacer] = useState<{ claves: string[]; nombre: string } | null>(null);
+  /** El guardado en curso: deshacer espera a que termine. */
+  const guardando = useRef<Promise<unknown>>(Promise.resolve());
+  /** La ventana de carga masiva. */
+  const [cargaMasiva, setCargaMasiva] = useState(false);
+
+  function cargarRevisados() {
+    leerClavesRevisadas().then(({ claves, aviso }) => {
+      setRevisados(claves);
+      setSinRevision(aviso);
+    });
+  }
+
+  useEffect(cargarRevisados, []);
+
+  // El aviso de deshacer se va solo.
+  useEffect(() => {
+    if (!deshacer) return;
+    const reloj = window.setTimeout(() => setDeshacer(null), 9000);
+    return () => window.clearTimeout(reloj);
+  }, [deshacer]);
+
   /** Nueva consulta: se limpian los filtros de la anterior. */
   function reconsultar(fresca: boolean) {
+    // Lo que otros hayan revisado mientras tanto también sale de la lista.
+    cargarRevisados();
     setAviso(null);
     setRango(SIN_RANGO);
     setConsultor("");
@@ -172,22 +208,32 @@ export default function Auditoria() {
     };
   }
 
-  // Lo último que se vio queda como resumen para el Inicio.
+  // ------------------------------------------------------------ derivados
+  const claves = useMemo(() => new Map(filas.map((f) => [f, claveHallazgo(f)])), [filas]);
+  const claveDe = useCallback((f: FilaAuditoria) => claves.get(f) ?? claveHallazgo(f), [claves]);
+
+  /** Lo que falta revisar: de aquí sale todo lo que se ve y los dos Excel. */
+  const pendientes = useMemo(
+    () => (revisados.size === 0 ? filas : filas.filter((f) => !revisados.has(claves.get(f) ?? ""))),
+    [filas, revisados, claves]
+  );
+  const yaRevisados = filas.length - pendientes.length;
+
+  // Lo último que se vio queda como resumen para el Inicio, sin los revisados.
   useEffect(() => {
     if (fase.tipo === "listo" && filas.length > 0) {
-      guardarResumenAuditoria(resumirAuditoria(filas, info?.enviada ?? null));
+      guardarResumenAuditoria(resumirAuditoria(pendientes, info?.enviada ?? null, yaRevisados));
     }
-  }, [fase.tipo, filas, info]);
+  }, [fase.tipo, filas.length, pendientes, info, yaRevisados]);
 
-  // ------------------------------------------------------------ derivados
-  const fechas = useMemo(() => resumirFechas(filas, (f) => f.dia, (f) => f.fecha), [filas]);
+  const fechas = useMemo(() => resumirFechas(pendientes, (f) => f.dia, (f) => f.fecha), [pendientes]);
   const conRango = hayRango(rango);
   const alReves = rangoAlReves(rango);
 
-  /** Los hallazgos de las fechas, en el orden de la consulta: van a los dos Excel. */
+  /** Los hallazgos pendientes de las fechas, en el orden de la consulta: van a los dos Excel. */
   const enRango = useMemo(
-    () => (conRango ? filas.filter((f) => dentroDelRango(f.dia, rango)) : filas),
-    [filas, conRango, rango]
+    () => (conRango ? pendientes.filter((f) => dentroDelRango(f.dia, rango)) : pendientes),
+    [pendientes, conRango, rango]
   );
 
   const indice = useMemo(
@@ -218,7 +264,7 @@ export default function Auditoria() {
   const opciones = useMemo(() => {
     const porConsultor = new Map<string, number>();
     const porLinea = new Map<string, number>();
-    for (const f of filas) {
+    for (const f of pendientes) {
       porConsultor.set(usuarioDe(f), 0);
       porLinea.set(lineaDe(f), 0);
     }
@@ -229,7 +275,7 @@ export default function Auditoria() {
     const ordenar = (m: Map<string, number>) =>
       [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
     return { consultores: ordenar(porConsultor), lineas: ordenar(porLinea) };
-  }, [filas, enRango]);
+  }, [pendientes, enRango]);
 
   const q = sinTildes(busqueda.trim());
 
@@ -277,6 +323,90 @@ export default function Auditoria() {
     setPagina(n);
     inicioTabla.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ------------------------------------------------------------ marcar revisado
+  /** Lo marca como revisado: sale de la lista enseguida y se guarda detrás. */
+  function marcarRevisado(f: FilaAuditoria) {
+    const clave = claves.get(f) ?? claveHallazgo(f);
+    setAviso(null);
+    setRevisados((antes) => new Set(antes).add(clave));
+    setDeshacer({ claves: [clave], nombre: pdvDe(f) });
+
+    guardando.current = (async () => {
+      try {
+        const r = await fetch("/api/admin/revision-hallazgos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hallazgos: [copiaDelHallazgo(f, clave)] }),
+        });
+        if (r.ok) return;
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error ?? "No se pudo marcar como revisado.");
+      } catch (e) {
+        // No quedó guardado: vuelve a la lista.
+        setRevisados((antes) => {
+          const s = new Set(antes);
+          s.delete(clave);
+          return s;
+        });
+        setDeshacer(null);
+        setAviso((e as Error).message || "No se pudo marcar como revisado.");
+      }
+    })();
+  }
+
+  /** Devuelve a pendientes lo último que se marcó. */
+  async function deshacerUltimo() {
+    if (!deshacer) return;
+    const { claves: devolver } = deshacer;
+    setDeshacer(null);
+    await guardando.current;
+    setRevisados((antes) => {
+      const s = new Set(antes);
+      devolver.forEach((c) => s.delete(c));
+      return s;
+    });
+    try {
+      const r = await fetch("/api/admin/revision-hallazgos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claves: devolver }),
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      setRevisados((antes) => new Set([...antes, ...devolver]));
+      setAviso("No se pudo deshacer. Puedes devolverlo desde Revisados.");
+    }
+  }
+
+  /** Lo que marcó o devolvió la carga masiva sale o vuelve a la lista. */
+  const alMarcarEnBloque = useCallback((marcadas: string[]) => {
+    setAviso(null);
+    setDeshacer(null);
+    setRevisados((antes) => new Set([...antes, ...marcadas]));
+  }, []);
+  const alDevolverEnBloque = useCallback((devueltas: string[]) => {
+    setRevisados((antes) => {
+      const s = new Set(antes);
+      devueltas.forEach((c) => s.delete(c));
+      return s;
+    });
+  }, []);
+
+  /** El botón de cada hallazgo. */
+  const botonRevisado = (f: FilaAuditoria, ancho = false) =>
+    !sinRevision && (
+      <button
+        type="button"
+        onClick={() => marcarRevisado(f)}
+        title="Marcar como revisado: sale de esta lista y pasa a Revisados"
+        aria-label={`Marcar como revisado: ${pdvDe(f)}, ${f.motivo}`}
+        className={`boton boton-secundario boton-chico ${ancho ? "w-full" : ""}`}
+      >
+        <CheckCheck size={14} aria-hidden />
+        Revisado
+      </button>
+    );
 
   // ------------------------------------------------------------ descargas
   /**
@@ -363,6 +493,12 @@ export default function Auditoria() {
         acciones={
           <>
             <BotonReconsultar trabajando={trabajando} onConsultar={() => reconsultar(true)} />
+            {listo && !sinRevision && (
+              <button type="button" onClick={() => setCargaMasiva(true)} className="boton boton-secundario">
+                <Upload size={16} aria-hidden />
+                Carga masiva
+              </button>
+            )}
             {listo && (
               <BotonDescargas
                 armando={armando}
@@ -466,8 +602,8 @@ export default function Auditoria() {
                         ? enRango.length === 1
                           ? "el hallazgo de estas fechas"
                           : `los ${cifra(enRango.length)} hallazgos de estas fechas`
-                        : `los ${cifra(filas.length)} hallazgos`
-                    }; los demás filtros solo cambian lo que ves.`
+                        : `los ${cifra(pendientes.length)} hallazgos`
+                    }${yaRevisados > 0 ? " sin revisar" : ""}; los demás filtros solo cambian lo que ves.`
               }
             />
           </section>
@@ -478,7 +614,7 @@ export default function Auditoria() {
               {
                 nombre: "Hallazgos",
                 valor: cifra(vista.length),
-                extra: vista.length !== filas.length ? `de ${cifra(filas.length)}` : null,
+                extra: vista.length !== pendientes.length ? `de ${cifra(pendientes.length)}` : null,
               },
               { nombre: "Consultores", valor: cifra(cuentas.consultores), extra: null },
               { nombre: "PDV con hallazgos", valor: cifra(cuentas.pdv), extra: null },
@@ -558,22 +694,38 @@ export default function Auditoria() {
                 <h2 id="hallazgos" className="text-[15px] font-semibold">
                   Hallazgos
                 </h2>
-                <span className="text-xs text-[var(--color-tinta-suave)]">
+                <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
                   Del más reciente al más antiguo
+                  {yaRevisados > 0 && (
+                    <a href="#revisados" className="inline-flex items-center gap-1 font-medium text-[var(--color-tinta)] underline underline-offset-2">
+                      {yaRevisados === 1 ? "1 ya revisado" : `${cifra(yaRevisados)} ya revisados`}
+                      <ArrowRight size={12} aria-hidden />
+                    </a>
+                  )}
                 </span>
               </div>
 
+              {sinRevision && (
+                <p className="border-b border-[var(--color-linea)] bg-[var(--color-aviso-fondo)] px-4 py-2.5 text-xs leading-snug text-[var(--color-aviso-tinta)] sm:px-5">
+                  {sinRevision}
+                </p>
+              )}
+
               {vista.length === 0 ? (
                 <p className="px-4 py-8 text-center text-[13px] text-[var(--color-tinta-suave)]">
-                  {enRango.length === 0
-                    ? "No hay hallazgos en esas fechas."
-                    : "Ningún hallazgo coincide con esos filtros."}
+                  {pendientes.length === 0
+                    ? "Todos los hallazgos de esta consulta ya están revisados."
+                    : enRango.length === 0
+                      ? yaRevisados > 0
+                        ? "No hay hallazgos sin revisar en esas fechas."
+                        : "No hay hallazgos en esas fechas."
+                      : "Ningún hallazgo coincide con esos filtros."}
                 </p>
               ) : (
                 <>
                   {/* Tabla en pantallas medianas y grandes. */}
                   <div className="hidden overflow-x-auto md:block">
-                    <table className="tabla min-w-[700px]">
+                    <table className="tabla min-w-[800px]">
                       <thead>
                         <tr>
                           <th scope="col">PDV</th>
@@ -581,11 +733,16 @@ export default function Auditoria() {
                           <th scope="col">Respuesta</th>
                           <th scope="col">Motivo</th>
                           <th scope="col">Consultor y fecha</th>
+                          {!sinRevision && (
+                            <th scope="col">
+                              <span className="sr-only">Revisión</span>
+                            </th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
                         {visibles.map((f, i) => (
-                          <tr key={`${pag}-${i}`}>
+                          <tr key={`${claves.get(f)}-${pag}-${i}`}>
                             <td className="max-w-[200px]">
                               <span className="block font-medium">{pdvDe(f)}</span>
                               <span className="cifras block text-xs text-[var(--color-tinta-suave)]">
@@ -611,6 +768,7 @@ export default function Auditoria() {
                                 {fechaLegible(f.fecha) ?? "Sin fecha"}
                               </span>
                             </td>
+                            {!sinRevision && <td className="w-[1%] whitespace-nowrap text-right">{botonRevisado(f)}</td>}
                           </tr>
                         ))}
                       </tbody>
@@ -620,7 +778,7 @@ export default function Auditoria() {
                   {/* Tarjetas en el celular. */}
                   <ul className="divide-y divide-[var(--color-linea)] md:hidden">
                     {visibles.map((f, i) => (
-                      <li key={`${pag}-${i}`} className="px-4 py-3">
+                      <li key={`${claves.get(f)}-${pag}-${i}`} className="px-4 py-3">
                         <p className="flex items-baseline justify-between gap-3">
                           <span className="min-w-0 text-[14px] font-semibold">{pdvDe(f)}</span>
                           <span className="cifras shrink-0 text-xs text-[var(--color-tinta-suave)]">
@@ -654,6 +812,7 @@ export default function Auditoria() {
                             </span>
                           )}
                         </p>
+                        {!sinRevision && <div className="mt-3">{botonRevisado(f, true)}</div>}
                       </li>
                     ))}
                   </ul>
@@ -690,6 +849,39 @@ export default function Auditoria() {
               )}
             </section>
           </div>
+
+          {cargaMasiva && (
+            <CargaMasivaRevisados
+              filas={filas}
+              revisados={revisados}
+              claveDe={claveDe}
+              pendientes={pendientes.length}
+              onMarcados={alMarcarEnBloque}
+              onDevueltos={alDevolverEnBloque}
+              onCerrar={() => setCargaMasiva(false)}
+            />
+          )}
+
+          {/* Lo último que se marcó, con la opción de deshacerlo. */}
+          {deshacer && (
+            <div
+              role="status"
+              className="fixed inset-x-4 bottom-24 z-[70] mx-auto flex max-w-md flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] bg-[var(--color-tinta)] px-4 py-3 text-[13px] text-[var(--color-sobre-tinta)] shadow-[0_8px_24px_var(--color-sombra)] sm:bottom-6"
+            >
+              <CheckCheck size={16} aria-hidden className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                Revisado: <b className="font-semibold">{deshacer.nombre}</b>. Pasó a Revisados.
+              </span>
+              <button
+                type="button"
+                onClick={deshacerUltimo}
+                className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-2"
+              >
+                <Undo2 size={14} aria-hidden />
+                Deshacer
+              </button>
+            </div>
+          )}
 
           {/* Barra del celular: más filtros y la descarga, siempre a la mano. */}
           <div className="sticky bottom-0 z-20 -mx-4 flex gap-2.5 border-t border-[var(--color-linea)] bg-[var(--color-papel)] px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_var(--color-sombra)] sm:hidden">
