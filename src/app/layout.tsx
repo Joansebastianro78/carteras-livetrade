@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import { IBM_Plex_Sans, Plus_Jakarta_Sans } from "next/font/google";
+import { Archivo, IBM_Plex_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import PieDePagina from "@/components/PieDePagina";
 import DecoracionTema from "@/components/DecoracionTema";
@@ -22,6 +22,16 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-jakarta",
+});
+
+// La letra de la pantalla de acceso (la credencial). Sin precarga: solo la
+// baja esa pantalla.
+const archivo = Archivo({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  preload: false,
+  variable: "--font-archivo",
 });
 
 export const metadata: Metadata = {
@@ -52,7 +62,7 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={`${plex.variable} ${jakarta.variable}`}
+      className={`${plex.variable} ${jakarta.variable} ${archivo.variable}`}
       data-modo={modo ? baseDe(modo) : undefined}
       data-paleta={modo ? paletaDe(modo)?.id : undefined}
     >

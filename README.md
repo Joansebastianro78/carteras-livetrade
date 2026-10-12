@@ -380,12 +380,20 @@ ese tema.
   consulta en mantenimiento y los hallazgos por revisar (con un punto rojo), y
   al abrirla también los puntos sin coordenadas, los LIBRE y las observaciones
   del último cargue; cada aviso lleva a su sección.
-- **Pantalla de acceso**: panel índigo a la izquierda (una franja arriba en el
-  celular) y el formulario a la derecha. Al entrar, una cortina índigo cubre
-  la pantalla y el panel la retira hacia la izquierda; luego las tarjetas del
-  Inicio entran una tras otra y las barras crecen desde la base.
-- Quien tenga activado «reducir movimiento» en su sistema ve todo quieto: sin
-  cortina, sin entradas y sin el círculo del cambio de tema.
+- **Pantalla de acceso** (`src/components/LoginAdmin.tsx`, la misma para
+  `/admin` y `/backoffice`): una **credencial** que cuelga de su cinta y se
+  mece al llegar, con el usuario y la clave adentro; a la izquierda, el título
+  («Tu credencial para el panel.» o «… para el BackOffice.») y el aviso de
+  que cada ingreso queda registrado. En el celular queda el logo arriba, la
+  credencial a lo ancho y «Volver a la consulta» al pie. Es la única pantalla
+  con la letra **Archivo** (se descarga solo ahí, sin precarga). Sus piezas
+  son las clases `.credencial-*` de `globals.css` y toman los colores del modo
+  y del tema. Al entrar, la cinta se ensancha hasta cubrir la pantalla (la
+  cortina índigo) y el panel la retira hacia la izquierda; luego las tarjetas
+  del Inicio entran una tras otra y las barras crecen desde la base.
+- Quien tenga activado «reducir movimiento» en su sistema ve todo quieto: la
+  credencial ya colgada, sin cortina, sin entradas y sin el círculo del cambio
+  de tema.
 
 **Modo claro, oscuro o automático.** Cada quien lo elige en **Apariencia**;
 «Auto» sigue al sistema operativo. Queda en una cookie de ese navegador
