@@ -22,7 +22,7 @@ import { tomarPregunta } from "@/lib/asistentePendiente";
 import { ACEPTA, pesoLegible, preparar, type TipoAdjunto } from "@/lib/archivosAsistente";
 
 /**
- * Asistente IA: chat con Gemini y DeepSeek. Pregunta lo que sea y adjunta
+ * Asistente IA: chat con Groq (principal) y Gemini. Pregunta lo que sea y adjunta
  * imágenes, PDF, Word, Excel, PowerPoint o texto.
  *
  * La conversación vive en esta pestaña del navegador (se conserva al cambiar
@@ -30,8 +30,8 @@ import { ACEPTA, pesoLegible, preparar, type TipoAdjunto } from "@/lib/archivosA
  * la base.
  */
 
-type Modo = "combinado" | "gemini" | "deepseek";
-type IA = "gemini" | "deepseek";
+type Modo = "combinado" | "groq" | "gemini";
+type IA = "groq" | "gemini";
 
 type Adjunto = {
   id: string;
@@ -42,7 +42,7 @@ type Adjunto = {
   /** Imagen o PDF ya en Gemini. */
   uri?: string;
   mime?: string;
-  /** Imagen reducida en base64, para DeepSeek; solo hasta enviarse. */
+  /** Imagen reducida en base64, para Groq; solo hasta enviarse. */
   base64?: string;
   miniatura?: string;
   /** Texto sacado del documento. */
@@ -70,12 +70,14 @@ type Mensaje = {
 };
 
 const MODOS: { id: Modo; nombre: string; detalle: string }[] = [
-  { id: "combinado", nombre: "Gemini + DeepSeek", detalle: "Las dos responden y se combina lo mejor" },
-  { id: "gemini", nombre: "Solo Gemini", detalle: "Más rápido; ve imágenes y PDF" },
-  { id: "deepseek", nombre: "Solo DeepSeek", detalle: "Más rápido; ve imágenes, no PDF" },
+  { id: "combinado", nombre: "Groq + Gemini", detalle: "Las dos responden y Groq combina lo mejor" },
+  { id: "groq", nombre: "Solo Groq", detalle: "Más rápido; si falla o hay un PDF, responde Gemini" },
+  { id: "gemini", nombre: "Solo Gemini", detalle: "Ve imágenes y PDF; si falla, responde Groq" },
 ];
 
-const NOMBRE_IA: Record<IA, string> = { gemini: "Gemini", deepseek: "DeepSeek" };
+const NOMBRE_IA: Record<IA, string> = { groq: "Groq", gemini: "Gemini" };
+/** Para respuestas viejas de esta pestaña, de cuando estaba DeepSeek. */
+const nombreIA = (ia: string) => NOMBRE_IA[ia as IA] ?? (ia === "deepseek" ? "DeepSeek" : ia);
 
 const SUGERENCIAS = [
   "Resume este documento en cinco puntos",
@@ -96,6 +98,8 @@ function leerGuardado(): { mensajes: Mensaje[]; modo: Modo } {
     const crudo = sessionStorage.getItem(LLAVE);
     if (crudo) {
       const g = JSON.parse(crudo) as { mensajes: Mensaje[]; modo: Modo };
+      // Un modo que ya no existe (antes estaba «Solo DeepSeek») vuelve al combinado.
+      if (!MODOS.some((m) => m.id === g.modo)) g.modo = "combinado";
       // Una respuesta que quedó a medias al recargar ya no va a terminar.
       g.mensajes = g.mensajes.map((m) => (m.estado === "trabajando" ? { ...m, estado: "detenido" } : m));
       return g;
@@ -219,7 +223,10 @@ function BotonCopiar({ texto }: { texto: string }) {
 
 function Respuesta({ m }: { m: Mensaje }) {
   const trabajando = m.estado === "trabajando";
-  const borradores = Object.entries(m.borradores ?? {}) as [IA, { texto?: string; error?: string }][];
+  // Primero el de Groq, la principal.
+  const borradores = (Object.entries(m.borradores ?? {}) as [IA, { texto?: string; error?: string }][]).sort(
+    ([a], [b]) => (a === "groq" ? 0 : 1) - (b === "groq" ? 0 : 1)
+  );
   return (
     <div className="flex gap-3">
       <span
@@ -268,7 +275,7 @@ function Respuesta({ m }: { m: Mensaje }) {
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-relleno)] px-2 py-0.5">
               <Sparkles size={11} aria-hidden />
-              {(m.fuentes ?? []).map((f) => NOMBRE_IA[f]).join(" + ")}
+              {(m.fuentes ?? []).map((f) => nombreIA(f)).join(" + ")}
             </span>
             <BotonCopiar texto={m.texto} />
           </div>
@@ -283,7 +290,7 @@ function Respuesta({ m }: { m: Mensaje }) {
             <div className="mt-2 grid gap-3 lg:grid-cols-2">
               {borradores.map(([ia, b]) => (
                 <div key={ia} className="min-w-0 rounded-[6px] border border-[var(--color-linea)] bg-[var(--color-sutil)] px-3.5 py-3">
-                  <p className="rotulo mb-1.5">{NOMBRE_IA[ia]}</p>
+                  <p className="rotulo mb-1.5">{nombreIA(ia)}</p>
                   {b.texto ? (
                     <div className="text-[13px]">
                       <Markdown texto={b.texto} />
@@ -423,9 +430,9 @@ export default function AsistenteIA() {
             base64: listo.tipo === "imagen" && listo.base64 ? listo.base64 : undefined,
           };
           if (uri) return { ...base, estado: "listo", uri };
-          // Sin Gemini, una imagen todavía la puede ver DeepSeek en este mensaje.
+          // Sin Gemini, una imagen todavía la puede ver Groq en este mensaje.
           if (listo.tipo === "imagen" && base.base64) {
-            return { ...base, estado: "listo", error: `Solo la verá DeepSeek: ${error}` };
+            return { ...base, estado: "listo", error: `Solo la verá Groq: ${error}` };
           }
           return { ...base, estado: "error", error };
         })

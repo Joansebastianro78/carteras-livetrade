@@ -44,7 +44,7 @@ export const MODULOS: Modulo[] = [
   { id: "imagenes", nombre: "Auditoría de imágenes", grupo: "Auditorías", detalle: "Fotos de inicio de visita y marcarlas como correctas o para revisar." },
   { id: "tableros", nombre: "Ver tableros", grupo: "Reportes", detalle: "Los tableros de Power BI publicados." },
   { id: "tableros_admin", nombre: "Administrar tableros", grupo: "Reportes", detalle: "Agregar, editar, publicar u ocultar tableros de Power BI." },
-  { id: "asistente", nombre: "Asistente IA", grupo: "Herramientas", detalle: "Chat con Gemini y DeepSeek, con imágenes y documentos." },
+  { id: "asistente", nombre: "Asistente IA", grupo: "Herramientas", detalle: "Chat con Groq y Gemini, con imágenes y documentos." },
   { id: "mantenimiento", nombre: "Mantenimiento", grupo: "Configuración", detalle: "Cerrar y abrir la página de consulta de los consultores." },
   { id: "temas", nombre: "Temas", grupo: "Configuración", detalle: "Adornos de temporada de la página." },
   { id: "usuarios", nombre: "Administradores", grupo: "Configuración", detalle: "Crear usuarios del panel, cambiarles la clave o el perfil y desactivarlos. Solo puede dar perfiles con permisos que él también tenga." },

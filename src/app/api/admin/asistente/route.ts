@@ -32,7 +32,8 @@ const MAX_TEXTO_ADJUNTOS = 400_000;
 const MAX_IMAGENES = 6;
 /** Base64 de una imagen ya comprimida en el navegador. */
 const MAX_IMAGEN = 3_500_000;
-const MIMES_IMAGEN_DEEPSEEK = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+/** Imágenes que también van en base64 a Groq. */
+const MIMES_IMAGEN_GROQ = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 /**
  * Límite por usuario. Cada mensaje en modo combinado son tres llamadas que se
@@ -62,7 +63,7 @@ function texto(v: unknown, largo: number): string {
 function limpiar(body: Record<string, unknown>):
   | { ok: true; modo: Modo; mensajes: Mensaje[]; imagenes: ImagenActual[] }
   | { ok: false; error: string } {
-  const modo: Modo = body.modo === "gemini" || body.modo === "deepseek" ? body.modo : "combinado";
+  const modo: Modo = body.modo === "groq" || body.modo === "gemini" ? body.modo : "combinado";
 
   const crudos = Array.isArray(body.mensajes) ? body.mensajes.slice(-MAX_MENSAJES) : [];
   let textoAdjuntos = 0;
@@ -109,7 +110,7 @@ function limpiar(body: Record<string, unknown>):
   for (const i of (Array.isArray(body.imagenes) ? body.imagenes.slice(0, MAX_IMAGENES) : []) as Record<string, unknown>[]) {
     const mime = texto(i?.mime, 40);
     const datos = texto(i?.datos, MAX_IMAGEN + 1);
-    if (!MIMES_IMAGEN_DEEPSEEK.includes(mime) || datos.length > MAX_IMAGEN || !/^[A-Za-z0-9+/=]+$/.test(datos)) continue;
+    if (!MIMES_IMAGEN_GROQ.includes(mime) || datos.length > MAX_IMAGEN || !/^[A-Za-z0-9+/=]+$/.test(datos)) continue;
     imagenes.push({ nombre: texto(i.nombre, 200), mime, datos });
   }
 

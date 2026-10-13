@@ -91,7 +91,7 @@ directo con la base.
 | `GET/POST/DELETE /api/admin/revision-hallazgos` | Hallazgos de la auditoría de datos marcados como revisados: listarlos (o solo sus claves, o el resumen por día para el Inicio con `?campos=resumen`), marcarlos (uno o la carga masiva, con observación y archivo) y devolverlos a pendientes. Módulo «Auditoría de datos». |
 | `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?corto=1`, solo el encabezado: lo lee cualquiera con sesión. Las cifras piden «Inicio» o «Cargar plantilla»; `?lista=sin-ubicacion` o `?lista=libres` (las descargas de «Para revisar»), «Inicio». |
 | `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Módulo «Inicio». |
-| `POST /api/admin/asistente` | Asistente IA: responde con Gemini, DeepSeek o las dos combinadas, en vivo (una línea de JSON por evento). Módulo «Asistente IA». |
+| `POST /api/admin/asistente` | Asistente IA: responde con Groq, Gemini o las dos combinadas, en vivo (una línea de JSON por evento). Módulo «Asistente IA». |
 | `POST /api/admin/asistente/archivo` | Sube una imagen o un PDF del asistente a la Files API de Gemini. Módulo «Asistente IA». |
 | `GET/POST/PATCH/DELETE /api/admin/perfiles` | Perfiles y permisos: la lista con cuántos usuarios tiene cada uno, crear, cambiar nombre, descripción y módulos, y borrar. Módulo «Perfiles y permisos». |
 | `POST /api/admin/upload/previa` | Antes de aplicar una carga: cuántas filas del archivo ya existen y cuántas son nuevas. No cambia nada. |
@@ -791,20 +791,23 @@ los perfiles con ese módulo (de entrada, los tres de siempre). Es un chat: se l
 adjuntar imágenes (también pegadas o arrastradas), PDF, Word (.docx), Excel,
 PowerPoint (.pptx), CSV y texto.
 
-**Cómo usa las dos IA.** En el modo **Gemini + DeepSeek** (el de siempre) las
-dos escriben un borrador al mismo tiempo; después Gemini, que también ve los
-archivos, compara los dos y escribe la respuesta final, corrigiendo lo que no
-cuadre. Debajo de cada respuesta está «Ver lo que respondió cada IA». Si una
-de las dos falla, responde la otra y la pantalla lo avisa. Los modos «Solo
-Gemini» y «Solo DeepSeek» son más rápidos (una sola llamada). La respuesta va
-apareciendo mientras se escribe, y «Detener» la corta.
+**Cómo usa las dos IA.** **Groq** es la principal y **Gemini** la secundaria.
+En el modo **Groq + Gemini** (el de siempre) las dos escriben un borrador al
+mismo tiempo; después Groq compara los dos y escribe la respuesta final,
+corrigiendo lo que no cuadre. Si en la conversación hay algo que Groq no ve
+(un PDF, o una imagen de un mensaje anterior), la respuesta final la escribe
+Gemini, que sí lo ve. Debajo de cada respuesta está «Ver lo que respondió cada
+IA». Los modos «Solo Groq» y «Solo Gemini» son más rápidos (una sola llamada).
+En cualquier modo, si una IA falla (por ejemplo, Gemini saturado), responde la
+otra y la pantalla dice por qué. En «Solo Groq», una pregunta sobre un PDF la
+responde Gemini. La respuesta va apareciendo mientras se escribe, y «Detener»
+la corta.
 
 **Archivos.**
 - Imágenes: se reducen en el navegador (máximo 1600 px) y se suben a la Files
-  API de Gemini; en la pregunta siguiente viajan como referencia. DeepSeek ve
-  las imágenes del mensaje en que se adjuntan.
-- PDF: se suben a Gemini tal cual. DeepSeek no abre PDF; en el modo combinado
-  Gemini es quien los lee.
+  API de Gemini; en la pregunta siguiente viajan como referencia. Groq ve las
+  imágenes del mensaje en que se adjuntan (hasta 3) con su modelo de visión.
+- PDF: se suben a Gemini tal cual. Groq no abre PDF: los lee Gemini.
 - Word, Excel, PowerPoint, CSV y texto: el texto se saca en el navegador y lo
   reciben las dos IA (hasta 150.000 caracteres por documento).
 - Tope de **4 MB por archivo**: es el límite de Vercel para un envío. Gemini
@@ -813,15 +816,23 @@ apareciendo mientras se escribe, y «Detener» la corta.
 **Configuración** (en `.env.local` y en Vercel, y volver a desplegar):
 
 ```
+GROQ_API_KEY=gsk_...
 GEMINI_API_KEY=...
-DEEPSEEK_API_KEY=sk-...
 ```
 
-Opcionales: `GEMINI_MODELO_CHAT` (por defecto `gemini-3.8-flash`),
-`DEEPSEEK_MODELO` (por defecto `deepseek-flash`, que acepta imágenes) y
-`DEEPSEEK_PENSAR=si` para que DeepSeek razone antes de responder (mejor en
-problemas difíciles, más lento). Con una sola llave el módulo funciona con esa
-IA y lo dice en cada respuesta.
+La de Groq se crea en console.groq.com → API Keys. Opcionales:
+`GROQ_MODELO` (por defecto `openai/gpt-oss-120b`, solo texto),
+`GROQ_MODELO_VISION` (por defecto `qwen/qwen3.8-27b`, el único de Groq que ve
+imágenes; está en vista previa y Groq puede retirarlo), `GROQ_ESFUERZO`
+(`low` por defecto; `medium` o `high` para que razone más, más lento),
+`GROQ_MAX_TOKENS` (4096 por defecto) y `GEMINI_MODELO_CHAT` (por defecto
+`gemini-3.8-flash`). Con una sola llave el módulo funciona con esa IA y lo dice
+en cada respuesta.
+
+El plan gratis de Groq tiene topes bajos (del orden de 30 preguntas y 8.000
+tokens por minuto, y 1.000 preguntas al día por modelo). Cuando se pasan, Groq
+responde «llegó a su límite» y contesta Gemini; si pasa seguido, conviene
+subir al plan Developer de Groq.
 
 Las llaves nuevas de Google empiezan por «AQ.». La documentación las manda en
 la cabecera `x-goog-api-key`, pero hay cuentas en las que esa vía responde 401
@@ -832,11 +843,11 @@ pantalla lo explica.
 **Seguridad y costo.** Las llaves solo viven en el servidor. El navegador
 nunca manda direcciones de archivos que no sean de la Files API de Gemini.
 Cada usuario tiene un tope de 60 preguntas y 60 archivos por hora, porque cada
-pregunta combinada son tres llamadas que se pagan. La conversación vive en esa
+pregunta combinada son tres llamadas (y cuentan en los topes de Groq). La conversación vive en esa
 pestaña del navegador (sobrevive a cambiar de sección o recargar) y no se
 guarda en la base; «Nueva» la borra.
 
-El código está en `src/lib/asistenteIA.ts` (servidor: las dos IA, la
+El código está en `src/lib/asistenteIA.ts` (servidor: Groq y Gemini, la
 combinación y la subida a Gemini), `src/lib/archivosAsistente.ts` (navegador:
 reducir imágenes y sacar texto de documentos), las rutas
 `/api/admin/asistente` y `/api/admin/asistente/archivo`, y la pantalla
