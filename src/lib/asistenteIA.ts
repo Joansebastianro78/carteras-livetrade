@@ -1,7 +1,9 @@
 /**
- * Asistente IA del panel: Groq (principal) y Gemini (secundaria). SOLO SERVIDOR.
+ * Asistente IA del panel: Groq (principal), Gemini (secundaria) y GPT-4o por
+ * OpenRouter (respaldo). SOLO SERVIDOR.
  *
- * Las llaves viven en el entorno (GROQ_API_KEY y GEMINI_API_KEY) y nunca
+ * Las llaves viven en el entorno (GROQ_API_KEY, GEMINI_API_KEY y
+ * OPENROUTER_API_KEY) y nunca
  * llegan al navegador: si estuvieran en el cliente, cualquiera las sacaría del
  * código de la página y las gastaría por su cuenta.
  *
@@ -10,32 +12,48 @@
  *   2. Groq los compara y escribe la respuesta final: toma lo mejor de cada
  *      uno y corrige lo que no cuadre. Si en la conversación hay algo que Groq
  *      no ve (un PDF, una imagen de un mensaje anterior), la escribe Gemini.
- * Si una de las dos falla, la respuesta sale de la otra y se avisa. Lo mismo
- * en «Solo Groq» y «Solo Gemini»: si la elegida falla, responde la otra.
+ * Si una de las dos falla, la respuesta sale de la otra y se avisa; si fallan
+ * las dos, responde GPT-4o. En «Solo Groq», «Solo Gemini» y «Solo GPT-4o», si
+ * la elegida falla, responden las demás en ese orden.
  */
+
+import {
+  ahoraLegible,
+  consultasPara,
+  diaBogota,
+  ejecutarConsulta,
+  sumarDias,
+  type ConsultaPanel,
+  type PermisosPanel,
+  type ResultadoConsulta,
+} from "./datosPanel";
 
 const URL_GEMINI = "https://generativelanguage.googleapis.com";
 const URL_GROQ = "https://api.groq.com/openai/v1";
+const URL_OPENROUTER = "https://openrouter.ai/api/v1";
 
 /** Prefijo de los archivos subidos a Gemini: es lo único que se acepta como archivo. */
 export const PREFIJO_ARCHIVO_GEMINI = `${URL_GEMINI}/v1beta/files/`;
 
 /**
  * Modelos por defecto (octubre de 2026). Se cambian sin tocar código con
- * GEMINI_MODELO_CHAT, GROQ_MODELO y GROQ_MODELO_VISION.
+ * GEMINI_MODELO_CHAT, GROQ_MODELO, GROQ_MODELO_VISION y OPENROUTER_MODELO.
  * - openai/gpt-oss-120b: el modelo de producción más capaz de Groq (solo texto).
  * - qwen/qwen3.8-27b: el único de Groq que ve imágenes (está en vista previa).
  */
 export const MODELO_GEMINI = "gemini-3.8-flash";
 export const MODELO_GROQ = "openai/gpt-oss-120b";
 export const MODELO_GROQ_VISION = "qwen/qwen3.8-27b";
-/** Groq acepta hasta 3 imágenes por mensaje. */
+/** El de OpenRouter se cambia con OPENROUTER_MODELO (en la pantalla sigue diciendo GPT-4o). */
+export const MODELO_OPENROUTER = "openai/gpt-4o";
+/** Groq acepta hasta 3 imágenes por mensaje; GPT-4o, las del mensaje (hasta 6). */
 const MAX_IMAGENES_GROQ = 3;
+const MAX_IMAGENES_OPENROUTER = 6;
 
-export type Modo = "combinado" | "groq" | "gemini";
-export type IA = "groq" | "gemini";
+export type Modo = "combinado" | "groq" | "gemini" | "openrouter";
+export type IA = "groq" | "gemini" | "openrouter";
 
-const NOMBRE: Record<IA, string> = { groq: "Groq", gemini: "Gemini" };
+const NOMBRE: Record<IA, string> = { groq: "Groq", gemini: "Gemini", openrouter: "GPT-4o" };
 
 export type Adjunto =
   /** Imagen o PDF ya subido a Gemini (vence a las 48 horas). */
@@ -60,6 +78,8 @@ export type Evento =
   | { t: "borrador"; ia: IA; texto?: string; error?: string }
   | { t: "texto"; texto: string }
   | { t: "fin"; fuentes: IA[]; aviso?: string }
+  /** Qué se consultó del panel para responder. */
+  | { t: "datos"; consultas: { titulo: string; ok: boolean; error?: string }[] }
   | { t: "error"; mensaje: string };
 
 // ------------------------------------------------------------------ instrucciones
@@ -72,7 +92,21 @@ function hoy(): string {
   }).format(new Date());
 }
 
-function instruccionBase(): string {
+/**
+ * consultables: los títulos de lo que el perfil puede consultar del panel;
+ * null si esta conversación no consulta el panel.
+ */
+function instruccionBase(consultables: string[] | null = null): string {
+  const panel =
+    consultables === null
+      ? ""
+      : `
+- Datos del panel: si el mensaje trae un bloque «Datos del panel (consultados…)», son cifras reales del sistema consultadas en ese momento. Úsalas exactas, di de qué módulo salen y cuándo se consultaron; si conviene, en una tabla corta. Nunca inventes cifras del panel.
+- ${
+          consultables.length
+            ? `Con el perfil de este usuario se puede consultar: ${consultables.join(", ")}. Si pide cifras de otro módulo, dile que su perfil no tiene acceso a ese módulo.`
+            : "El perfil de este usuario no tiene módulos del panel para consultar: si pide cifras del panel, díselo."
+        }`;
   return `Eres el asistente de inteligencia artificial del equipo de Overall Colombia que maneja la cartera LiveTrade (puntos de venta, consultores de campo, rutas, auditorías y tableros de Power BI). Ayudas con cualquier tema: preguntas generales, redacción, Excel, SQL, Python, cálculos, ideas y análisis de documentos e imágenes.
 
 Hoy es ${hoy()} (hora de Colombia).
@@ -82,7 +116,7 @@ Cómo respondes:
 - Con Markdown cuando ayuda a leer: títulos cortos, listas, tablas, y bloques de código con su lenguaje.
 - Si hay archivos adjuntos, te basas en lo que dicen: cita cifras y textos exactos; si algo no se lee o no está, lo dices.
 - No inventas datos, cifras, fuentes ni enlaces. Si no sabes algo o no estás seguro, lo dices.
-- No repites números de cédula, teléfonos ni datos personales completos de terceros si no hace falta para la tarea.`;
+- No repites números de cédula, teléfonos ni datos personales completos de terceros si no hace falta para la tarea.${panel}`;
 }
 
 const INSTRUCCION_SINTESIS = `
@@ -278,22 +312,95 @@ async function geminiEnVivo(
   return todo.trim() ? { ok: true, texto: todo } : { ok: false, error: motivoVacioGemini(ultimo) };
 }
 
-// ------------------------------------------------------------------ Groq
+// ------------------------------------------------------------------ Groq y OpenRouter
 
-type ParteGroq = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+/**
+ * Groq y OpenRouter hablan el mismo formato (el de OpenAI): mismos mensajes,
+ * mismas imágenes en base64, mismo flujo en vivo y mismas llamadas a
+ * funciones. Cambian la dirección, la llave, los modelos, algunos ajustes y
+ * cómo explican sus errores.
+ */
+type IAOpenAI = "groq" | "openrouter";
 
-/** Las imágenes del último mensaje que sí van a Groq (hasta 3). */
-function imagenesGroq(imagenes: ImagenActual[]): ImagenActual[] {
-  return imagenes.slice(0, MAX_IMAGENES_GROQ);
+type Proveedor = {
+  ia: IAOpenAI;
+  url: string;
+  llave: () => string;
+  cabeceras: () => Record<string, string>;
+  /** Cuántas imágenes del último mensaje acepta. */
+  maxImagenes: number;
+  modelo: (conImagenes: boolean) => string;
+  /** Lo que cada uno agrega al cuerpo: tope de tokens, razonamiento… */
+  ajustar: (cuerpo: Record<string, unknown>, modelo: string, uso: "respuesta" | "plan") => void;
+  error: (respuesta: Response, modelo: string) => Promise<string>;
+};
+
+/** Un tope de tokens del entorno, o el de por defecto. */
+function tope(variable: string, porDefecto: number): number {
+  const n = Number(process.env[variable]);
+  return Number.isFinite(n) && n >= 256 ? Math.min(n, 32_768) : porDefecto;
+}
+
+const GROQ: Proveedor = {
+  ia: "groq",
+  url: URL_GROQ,
+  llave: () => process.env.GROQ_API_KEY ?? "",
+  cabeceras: () => ({}),
+  maxImagenes: MAX_IMAGENES_GROQ,
+  modelo: (conImagenes) =>
+    conImagenes ? process.env.GROQ_MODELO_VISION || MODELO_GROQ_VISION : process.env.GROQ_MODELO || MODELO_GROQ,
+  ajustar(cuerpo, modelo, uso) {
+    // El plan gratis de Groq cuenta tokens por minuto: un tope moderado deja
+    // espacio para la pregunta y los documentos.
+    cuerpo.max_completion_tokens = uso === "plan" ? 1024 : tope("GROQ_MAX_TOKENS", 4096);
+    if (/^openai\/gpt-oss/.test(modelo)) {
+      // Razona antes de responder; el razonamiento no se pide de vuelta.
+      // GROQ_ESFUERZO=medium o high: mejor en problemas difíciles, más lento.
+      const esfuerzo = (process.env.GROQ_ESFUERZO ?? "").toLowerCase();
+      cuerpo.include_reasoning = false;
+      cuerpo.reasoning_effort = uso === "plan" ? "low" : ["low", "medium", "high"].includes(esfuerzo) ? esfuerzo : "low";
+    } else if (/^qwen\//.test(modelo)) {
+      cuerpo.reasoning_format = "hidden";
+    }
+  },
+  error: errorGroq,
+};
+
+const OPENROUTER: Proveedor = {
+  ia: "openrouter",
+  url: URL_OPENROUTER,
+  llave: () => process.env.OPENROUTER_API_KEY ?? "",
+  cabeceras: () => ({
+    // Opcionales: con qué nombre sale la app en las estadísticas de OpenRouter.
+    "X-Title": "Cartera LiveTrade",
+    ...(process.env.OPENROUTER_SITIO ? { "HTTP-Referer": process.env.OPENROUTER_SITIO } : {}),
+  }),
+  maxImagenes: MAX_IMAGENES_OPENROUTER,
+  modelo: () => process.env.OPENROUTER_MODELO || MODELO_OPENROUTER,
+  ajustar(cuerpo, _modelo, uso) {
+    // OpenRouter cobra por token: el tope evita respuestas larguísimas.
+    cuerpo.max_tokens = uso === "plan" ? 1024 : tope("OPENROUTER_MAX_TOKENS", 4096);
+  },
+  error: errorOpenRouter,
+};
+
+const PROVEEDOR: Record<IAOpenAI, Proveedor> = { groq: GROQ, openrouter: OPENROUTER };
+
+type ParteOpenAI = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
+/** Las imágenes del último mensaje que sí le llegan a ese proveedor. */
+function imagenesDe(p: Proveedor, imagenes: ImagenActual[]): ImagenActual[] {
+  return imagenes.slice(0, p.maxImagenes);
 }
 
 /**
- * Los archivos de la conversación que Groq no ve: los PDF, las imágenes de
- * mensajes anteriores (solo le llegan las del último) y las que pasan de 3.
+ * Los archivos de la conversación que ese proveedor no ve: los PDF, las
+ * imágenes de mensajes anteriores (solo le llegan las del último en base64) y
+ * las que pasan de su tope.
  */
-function ciegosGroq(mensajes: Mensaje[], imagenes: ImagenActual[]): Set<Adjunto> {
+function ciegosDe(p: Proveedor, mensajes: Mensaje[], imagenes: ImagenActual[]): Set<Adjunto> {
   const ultimo = mensajes.length - 1;
-  const vistas = new Set(imagenesGroq(imagenes).map((i) => i.nombre));
+  const vistas = new Set(imagenesDe(p, imagenes).map((i) => i.nombre));
   const ciegos = new Set<Adjunto>();
   mensajes.forEach((m, i) => {
     for (const a of m.adjuntos ?? []) {
@@ -304,15 +411,15 @@ function ciegosGroq(mensajes: Mensaje[], imagenes: ImagenActual[]): Set<Adjunto>
 }
 
 /**
- * La conversación en el formato de Groq (el de OpenAI). Groq no abre PDF ni
- * las imágenes ya subidas a Gemini: ve las imágenes del último mensaje (vienen
- * en base64) y el texto de Word, Excel y demás.
+ * La conversación en el formato de OpenAI. Groq y GPT-4o no abren PDF ni las
+ * imágenes ya subidas a Gemini: ven las imágenes del último mensaje (vienen en
+ * base64) y el texto de Word, Excel y demás.
  */
-function mensajesGroq(mensajes: Mensaje[], imagenes: ImagenActual[], instruccion: string, extra?: string) {
-  const salida: { role: string; content: string | ParteGroq[] }[] = [{ role: "system", content: instruccion }];
+function mensajesOpenAI(p: Proveedor, mensajes: Mensaje[], imagenes: ImagenActual[], instruccion: string, extra?: string) {
+  const salida: { role: string; content: string | ParteOpenAI[] }[] = [{ role: "system", content: instruccion }];
   const ultimo = mensajes.length - 1;
-  const vistas = imagenesGroq(imagenes);
-  const ciegos = ciegosGroq(mensajes, imagenes);
+  const vistas = imagenesDe(p, imagenes);
+  const ciegos = ciegosDe(p, mensajes, imagenes);
 
   mensajes.forEach((m, i) => {
     if (m.rol === "asistente") {
@@ -351,33 +458,15 @@ function mensajesGroq(mensajes: Mensaje[], imagenes: ImagenActual[], instruccion
   return salida;
 }
 
-function modeloGroq(conImagenes: boolean) {
-  return conImagenes
-    ? process.env.GROQ_MODELO_VISION || MODELO_GROQ_VISION
-    : process.env.GROQ_MODELO || MODELO_GROQ;
-}
-
-function cuerpoGroq(mensajes: Mensaje[], imagenes: ImagenActual[], instruccion: string, enVivo: boolean, extra?: string) {
-  const modelo = modeloGroq(imagenesGroq(imagenes).length > 0);
-  const tope = Number(process.env.GROQ_MAX_TOKENS);
+function cuerpoOpenAI(p: Proveedor, mensajes: Mensaje[], imagenes: ImagenActual[], instruccion: string, enVivo: boolean, extra?: string) {
+  const modelo = p.modelo(imagenesDe(p, imagenes).length > 0);
   const cuerpo: Record<string, unknown> = {
     model: modelo,
-    messages: mensajesGroq(mensajes, imagenes, instruccion, extra),
+    messages: mensajesOpenAI(p, mensajes, imagenes, instruccion, extra),
     stream: enVivo,
-    // El plan gratis de Groq cuenta tokens por minuto: un tope moderado deja
-    // espacio para la pregunta y los documentos.
-    max_completion_tokens: Number.isFinite(tope) && tope >= 256 ? Math.min(tope, 32_768) : 4096,
     temperature: 0.5,
   };
-  if (/^openai\/gpt-oss/.test(modelo)) {
-    // Razona antes de responder; el razonamiento no se pide de vuelta.
-    // GROQ_ESFUERZO=medium o high: mejor en problemas difíciles, más lento.
-    const esfuerzo = (process.env.GROQ_ESFUERZO ?? "").toLowerCase();
-    cuerpo.include_reasoning = false;
-    cuerpo.reasoning_effort = ["low", "medium", "high"].includes(esfuerzo) ? esfuerzo : "low";
-  } else if (/^qwen\//.test(modelo)) {
-    cuerpo.reasoning_format = "hidden";
-  }
+  p.ajustar(cuerpo, modelo, "respuesta");
   return { modelo, cuerpo: JSON.stringify(cuerpo) };
 }
 
@@ -408,12 +497,35 @@ async function errorGroq(respuesta: Response, modelo: string): Promise<string> {
   return `Groq respondió con un error: ${detalle}`;
 }
 
-function pedirGroq(cuerpo: string, signal: AbortSignal) {
-  return fetch(`${URL_GROQ}/chat/completions`, {
+/** Explica en palabras un error de OpenRouter. */
+async function errorOpenRouter(respuesta: Response, modelo: string): Promise<string> {
+  const json = await respuesta.json().catch(() => null);
+  const detalle: string = json?.error?.message ?? `HTTP ${respuesta.status}`;
+  console.error("[asistente openrouter]", respuesta.status, detalle);
+
+  if (respuesta.status === 401) {
+    return "OpenRouter rechazó la llave (OPENROUTER_API_KEY). Revisa que esté bien copiada y activa en openrouter.ai/keys.";
+  }
+  if (respuesta.status === 402) return "La cuenta de OpenRouter se quedó sin saldo. Recárgala en openrouter.ai/credits.";
+  if (respuesta.status === 403) return "OpenRouter no dejó pasar el mensaje por sus filtros de contenido.";
+  if (respuesta.status === 404) {
+    return `OpenRouter no tiene el modelo «${modelo}». Cambia OPENROUTER_MODELO por uno de openrouter.ai/models.`;
+  }
+  if (respuesta.status === 408) return "GPT-4o se demoró demasiado en responder. Intenta de nuevo.";
+  if (respuesta.status === 413) return "El mensaje es demasiado grande para GPT-4o. Adjunta menos texto.";
+  if (respuesta.status === 429) return "OpenRouter está recibiendo demasiadas consultas. Espera un momento.";
+  if (respuesta.status === 400 && /image/i.test(detalle)) return "GPT-4o no pudo leer la imagen.";
+  if (respuesta.status >= 500) return "GPT-4o está fallando en este momento. Intenta de nuevo en un rato.";
+  return `OpenRouter respondió con un error: ${detalle}`;
+}
+
+function pedirOpenAI(p: Proveedor, cuerpo: string, signal: AbortSignal) {
+  return fetch(`${p.url}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY ?? ""}`,
+      Authorization: `Bearer ${p.llave()}`,
+      ...p.cabeceras(),
     },
     body: cuerpo,
     signal,
@@ -426,27 +538,31 @@ function sinPensamiento(texto: string): string {
   return texto.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, "");
 }
 
-async function groq(
+/** Respuesta completa, de una vez. */
+async function respuestaOpenAI(
+  p: Proveedor,
   mensajes: Mensaje[],
   imagenes: ImagenActual[],
   instruccion: string,
   signal: AbortSignal
 ): Promise<Resultado> {
-  const { modelo, cuerpo } = cuerpoGroq(mensajes, imagenes, instruccion, false);
+  const { modelo, cuerpo } = cuerpoOpenAI(p, mensajes, imagenes, instruccion, false);
   let respuesta: Response;
   try {
-    respuesta = await pedirGroq(cuerpo, signal);
+    respuesta = await pedirOpenAI(p, cuerpo, signal);
   } catch (e) {
-    console.error("[asistente groq] red", e);
-    return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Groq." };
+    console.error(`[asistente ${p.ia}] red`, e);
+    return { ok: false, error: signal.aborted ? "Se canceló." : `No se pudo contactar a ${NOMBRE[p.ia]}.` };
   }
-  if (!respuesta.ok) return { ok: false, error: await errorGroq(respuesta, modelo) };
+  if (!respuesta.ok) return { ok: false, error: await p.error(respuesta, modelo) };
   const json = await respuesta.json().catch(() => null);
   const texto = sinPensamiento(String(json?.choices?.[0]?.message?.content ?? "")).trim();
-  return texto ? { ok: true, texto } : { ok: false, error: "Groq no devolvió texto." };
+  return texto ? { ok: true, texto } : { ok: false, error: `${NOMBRE[p.ia]} no devolvió texto.` };
 }
 
-async function groqEnVivo(
+/** Respuesta por partes, a medida que la escribe. */
+async function enVivoOpenAI(
+  p: Proveedor,
   mensajes: Mensaje[],
   imagenes: ImagenActual[],
   instruccion: string,
@@ -454,15 +570,15 @@ async function groqEnVivo(
   alEscribir: (texto: string) => void,
   signal: AbortSignal
 ): Promise<Resultado> {
-  const { modelo, cuerpo } = cuerpoGroq(mensajes, imagenes, instruccion, true, extra);
+  const { modelo, cuerpo } = cuerpoOpenAI(p, mensajes, imagenes, instruccion, true, extra);
   let respuesta: Response;
   try {
-    respuesta = await pedirGroq(cuerpo, signal);
+    respuesta = await pedirOpenAI(p, cuerpo, signal);
   } catch (e) {
-    console.error("[asistente groq] red", e);
-    return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Groq." };
+    console.error(`[asistente ${p.ia}] red`, e);
+    return { ok: false, error: signal.aborted ? "Se canceló." : `No se pudo contactar a ${NOMBRE[p.ia]}.` };
   }
-  if (!respuesta.ok || !respuesta.body) return { ok: false, error: await errorGroq(respuesta, modelo) };
+  if (!respuesta.ok || !respuesta.body) return { ok: false, error: await p.error(respuesta, modelo) };
 
   let todo = "";
   // Si el modelo empieza pensando en voz alta (<think>…</think>), eso no se muestra.
@@ -506,10 +622,10 @@ async function groqEnVivo(
     if (pensando === null && retenido) soltar(retenido);
   } catch (e) {
     if (signal.aborted) return { ok: false, error: "Se canceló." };
-    console.error("[asistente groq] corte", e);
-    if (!todo) return { ok: false, error: "Groq cortó la respuesta. Intenta de nuevo." };
+    console.error(`[asistente ${p.ia}] corte`, e);
+    if (!todo) return { ok: false, error: `${NOMBRE[p.ia]} cortó la respuesta. Intenta de nuevo.` };
   }
-  return todo.trim() ? { ok: true, texto: todo } : { ok: false, error: "Groq no devolvió texto." };
+  return todo.trim() ? { ok: true, texto: todo } : { ok: false, error: `${NOMBRE[p.ia]} no devolvió texto.` };
 }
 
 // ------------------------------------------------------------------ SSE
@@ -537,6 +653,241 @@ async function* eventosSSE(cuerpo: ReadableStream<Uint8Array>): AsyncGenerator<s
   if (resto.startsWith("data:") && resto.slice(5).trim()) yield resto.slice(5).trim();
 }
 
+// ------------------------------------------------------------------ datos del panel
+
+/** Hasta cuántas consultas del panel por pregunta. */
+const MAX_CONSULTAS = 4;
+/** Lo más largo que va a las IA de cada consulta. */
+const MAX_JSON_CONSULTA = 7000;
+
+/** Marca con la que empiezan los datos dentro del mensaje (la reconocen las pruebas). */
+export const ENCABEZADO_DATOS = "Datos del panel (consultados";
+
+/**
+ * Si la pregunta puede necesitar datos del panel. Es un filtro amplio para no
+ * gastar una llamada en «redacta un correo» o «una fórmula de Excel»: si pasa,
+ * la IA decide de verdad si consulta algo. Mira también la pregunta anterior,
+ * por si la última es «¿y ayer?».
+ */
+const PALABRAS_PANEL =
+  /cartera|punto|pdv|asign|libre|auditor|hallazg|revis|pendient|consultor|vendedor|carga|cargu|cargo|ciclo|departament|ciudad|municipio|region|territori|actividad|foto|imagen|panel|ruta|coordenad|ubicaci|cuant|como va|como esta|como vamos|avance|estado|hoy|ayer|semana|mes\b|resumen|cifra|total|ranking|quien/;
+
+function pareceDelPanel(mensajes: Mensaje[]): boolean {
+  const usuario = mensajes.filter((m) => m.rol === "usuario").slice(-2);
+  const texto = usuario
+    .map((m) => m.texto)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  return PALABRAS_PANEL.test(texto);
+}
+
+function instruccionConsultas(): string {
+  const hoyDia = diaBogota(new Date());
+  const lunes = (() => {
+    const d = new Date(`${hoyDia}T12:00:00Z`).getUTCDay(); // 0 domingo
+    return sumarDias(hoyDia, -((d + 6) % 7));
+  })();
+  return `Eres el planificador de consultas del asistente del panel de cartera LiveTrade (Overall Colombia). Hoy es ${hoy()}, hora de Colombia.
+Decide si para responder el ÚLTIMO mensaje del usuario hacen falta datos del panel que traen las funciones disponibles.
+- Si hacen falta, llama de una vez a todas las funciones necesarias (máximo ${MAX_CONSULTAS}), con fechas en formato AAAA-MM-DD: hoy = ${hoyDia}, ayer = ${sumarDias(hoyDia, -1)}, esta semana = desde el lunes ${lunes} hasta hoy, este mes = desde ${hoyDia.slice(0, 8)}01.
+- Si la pregunta no necesita datos del panel (saludos, redacción, fórmulas, explicaciones, preguntas generales o lo que se responde con los archivos adjuntos), no llames ninguna función y responde solo «sin consultas».
+- No inventes funciones ni parámetros.`;
+}
+
+/** La conversación para el planificador: solo el texto de los últimos mensajes. */
+function conversacionCorta(mensajes: Mensaje[]) {
+  return mensajes.slice(-6).map((m, i, todos) => ({
+    rol: m.rol,
+    texto: (m.texto || (m.rol === "usuario" ? "(Sin texto: mira los archivos.)" : "…")).slice(0, i === todos.length - 1 ? 4000 : 1500),
+  }));
+}
+
+type Pedido = { nombre: string; args: Record<string, unknown> };
+
+function argumentos(crudo: unknown): Record<string, unknown> {
+  if (crudo && typeof crudo === "object" && !Array.isArray(crudo)) return crudo as Record<string, unknown>;
+  if (typeof crudo === "string") {
+    try {
+      const j = JSON.parse(crudo || "{}");
+      return j && typeof j === "object" && !Array.isArray(j) ? j : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/** Groq o GPT-4o eligen las consultas (llamadas a funciones, formato OpenAI). */
+async function planOpenAI(
+  p: Proveedor,
+  mensajes: Mensaje[],
+  consultas: ConsultaPanel[],
+  signal: AbortSignal
+): Promise<{ ok: true; pedidos: Pedido[] } | { ok: false; error: string }> {
+  const modelo = p.modelo(false);
+  const cuerpo: Record<string, unknown> = {
+    model: modelo,
+    messages: [
+      { role: "system", content: instruccionConsultas() },
+      ...conversacionCorta(mensajes).map((m) => ({ role: m.rol === "usuario" ? "user" : "assistant", content: m.texto })),
+    ],
+    tools: consultas.map((c) => ({
+      type: "function",
+      function: { name: c.nombre, description: c.descripcion, parameters: c.parametros },
+    })),
+    tool_choice: "auto",
+    temperature: 0.1,
+  };
+  p.ajustar(cuerpo, modelo, "plan");
+  let respuesta: Response;
+  try {
+    respuesta = await pedirOpenAI(p, JSON.stringify(cuerpo), signal);
+  } catch (e) {
+    console.error(`[asistente plan ${p.ia}] red`, e);
+    return { ok: false, error: signal.aborted ? "Se canceló." : `No se pudo contactar a ${NOMBRE[p.ia]}.` };
+  }
+  if (!respuesta.ok) return { ok: false, error: await p.error(respuesta, modelo) };
+  const json = await respuesta.json().catch(() => null);
+  const llamadas = (json?.choices?.[0]?.message?.tool_calls ?? []) as { function?: { name?: string; arguments?: unknown } }[];
+  return {
+    ok: true,
+    pedidos: llamadas
+      .filter((l) => typeof l.function?.name === "string")
+      .map((l) => ({ nombre: l.function!.name!, args: argumentos(l.function!.arguments) })),
+  };
+}
+
+/** Gemini elige las consultas (function calling). */
+async function planGemini(mensajes: Mensaje[], consultas: ConsultaPanel[], signal: AbortSignal): Promise<{ ok: true; pedidos: Pedido[] } | { ok: false; error: string }> {
+  const modelo = modeloGemini();
+  const cuerpo = {
+    systemInstruction: { parts: [{ text: instruccionConsultas() }] },
+    contents: conversacionCorta(mensajes).map((m) => ({ role: m.rol === "usuario" ? "user" : "model", parts: [{ text: m.texto }] })),
+    tools: [
+      {
+        functionDeclarations: consultas.map((c) =>
+          // Gemini no acepta un objeto de parámetros vacío: sin parámetros, se omite.
+          Object.keys(c.parametros.properties).length === 0
+            ? { name: c.nombre, description: c.descripcion }
+            : { name: c.nombre, description: c.descripcion, parameters: c.parametros }
+        ),
+      },
+    ],
+    toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+  };
+  let respuesta: Response;
+  try {
+    respuesta = await pedirGemini(`/v1beta/models/${modelo}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+      signal,
+    });
+  } catch (e) {
+    console.error("[asistente plan gemini] red", e);
+    return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Gemini." };
+  }
+  if (!respuesta.ok) return { ok: false, error: await errorGemini(respuesta, modelo) };
+  const json = await respuesta.json().catch(() => null);
+  const partes = (json?.candidates?.[0]?.content?.parts ?? []) as { functionCall?: { name?: string; args?: unknown } }[];
+  return {
+    ok: true,
+    pedidos: partes
+      .filter((p) => typeof p.functionCall?.name === "string")
+      .map((p) => ({ nombre: p.functionCall!.name!, args: argumentos(p.functionCall!.args) })),
+  };
+}
+
+/** Lo que salió de consultar el panel para una pregunta. */
+type DatosConsultados = {
+  /** El texto que se agrega a la pregunta para las IA; null si no se consultó nada. */
+  bloque: string | null;
+  resumen: { titulo: string; ok: boolean; error?: string }[];
+};
+
+/**
+ * Antes de responder: una IA decide qué consultas del panel hacen falta
+ * (Groq; si falla, Gemini y después GPT-4o), se ejecutan aquí con los
+ * permisos del usuario y los datos se agregan a su pregunta para que las IA
+ * respondan con cifras reales.
+ */
+async function consultarPanel(
+  mensajes: Mensaje[],
+  permisos: PermisosPanel,
+  consultas: ConsultaPanel[],
+  orden: IA[],
+  emitir: (e: Evento) => void,
+  signal: AbortSignal
+): Promise<DatosConsultados> {
+  emitir({ t: "estado", texto: "Revisando si hacen falta datos del panel…" });
+
+  let pedidos: Pedido[] | null = null;
+  const fallas: string[] = [];
+  for (const ia of orden) {
+    const plan =
+      ia === "gemini" ? await planGemini(mensajes, consultas, signal) : await planOpenAI(PROVEEDOR[ia], mensajes, consultas, signal);
+    if (signal.aborted) return { bloque: null, resumen: [] };
+    if (plan.ok) {
+      pedidos = plan.pedidos;
+      break;
+    }
+    fallas.push(plan.error);
+  }
+
+  if (pedidos === null) {
+    // Sin quién decida, se responde sin datos, pero las IA lo saben y no inventan cifras.
+    return {
+      bloque: `${ENCABEZADO_DATOS} ahora, ${ahoraLegible()}):\nNo se pudieron consultar los datos del panel (${fallas.join(" ")}). Si la pregunta necesita cifras del panel, dile al usuario que no se pudieron consultar y que intente de nuevo; no inventes cifras.`,
+      resumen: [{ titulo: "Datos del panel", ok: false, error: "No se pudo decidir qué consultar." }],
+    };
+  }
+
+  // Sin repetir la misma consulta con los mismos parámetros, y con tope.
+  const vistos = new Set<string>();
+  const unicos = pedidos
+    .filter((p) => {
+      const llave = `${p.nombre}:${JSON.stringify(p.args)}`;
+      if (vistos.has(llave)) return false;
+      vistos.add(llave);
+      return true;
+    })
+    .slice(0, MAX_CONSULTAS);
+  if (unicos.length === 0) return { bloque: null, resumen: [] };
+
+  const titulos = unicos.map((p) => consultas.find((c) => c.nombre === p.nombre)?.titulo ?? p.nombre);
+  emitir({ t: "estado", texto: `Consultando el panel: ${titulos.join(", ")}…` });
+  const resultados: ResultadoConsulta[] = await Promise.all(
+    unicos.map((p, i) =>
+      ejecutarConsulta(p.nombre, p.args, {
+        ...permisos,
+        signal,
+        avisar: (texto) => emitir({ t: "estado", texto: `${titulos[i]}: ${texto}` }),
+      })
+    )
+  );
+  if (signal.aborted) return { bloque: null, resumen: [] };
+
+  const partes = resultados.map((r) => {
+    const parametros = Object.keys(r.args).length ? ` ${JSON.stringify(r.args)}` : "";
+    const cuerpo = r.ok ? JSON.stringify(r.datos) : JSON.stringify({ error: r.error });
+    const recortado = cuerpo.length > MAX_JSON_CONSULTA ? `${cuerpo.slice(0, MAX_JSON_CONSULTA)}… (recortado)` : cuerpo;
+    return `### ${r.titulo} (${r.nombre}${parametros})\n${recortado}`;
+  });
+  return {
+    bloque: `${ENCABEZADO_DATOS} ahora, ${ahoraLegible()}, hora de Colombia, con los permisos de ${permisos.usuario}). Son datos reales del sistema, en JSON: respóndele al usuario con estas cifras exactas y di de qué módulo salen. Si una consulta trae "error", explícale que esa parte no se pudo consultar. No inventes cifras que no estén aquí.\n\n${partes.join("\n\n")}`,
+    resumen: resultados.map((r) => (r.ok ? { titulo: r.titulo, ok: true } : { titulo: r.titulo, ok: false, error: r.error })),
+  };
+}
+
+/** La misma conversación, con los datos del panel al final de la última pregunta. */
+function conDatos(mensajes: Mensaje[], bloque: string): Mensaje[] {
+  const ultimo = mensajes[mensajes.length - 1];
+  return [...mensajes.slice(0, -1), { ...ultimo, texto: `${ultimo.texto || "(Sin texto.)"}\n\n---\n${bloque}` }];
+}
+
 // ------------------------------------------------------------------ conversación
 
 export function hayGemini() {
@@ -545,6 +896,21 @@ export function hayGemini() {
 export function hayGroq() {
   return Boolean(process.env.GROQ_API_KEY);
 }
+export function hayOpenRouter() {
+  return Boolean(process.env.OPENROUTER_API_KEY);
+}
+
+const LLAVE: Record<IA, string> = { groq: "GROQ_API_KEY", gemini: "GEMINI_API_KEY", openrouter: "OPENROUTER_API_KEY" };
+
+/**
+ * En qué orden responden en cada modo de una sola IA: la elegida y, si falla,
+ * las demás. Groq es la principal, Gemini la secundaria y GPT-4o el respaldo.
+ */
+const ORDEN: Record<Exclude<Modo, "combinado">, IA[]> = {
+  groq: ["groq", "gemini", "openrouter"],
+  gemini: ["gemini", "groq", "openrouter"],
+  openrouter: ["openrouter", "groq", "gemini"],
+};
 
 /**
  * Responde el último mensaje de la conversación según el modo, y va contando
@@ -555,79 +921,103 @@ export async function conversar(
   imagenes: ImagenActual[],
   modoPedido: Modo,
   emitir: (e: Evento) => void,
-  signal: AbortSignal
+  signal: AbortSignal,
+  /** Con quién se habla: decide qué datos del panel se pueden consultar. Sin esto, no se consulta nada. */
+  permisos?: PermisosPanel
 ): Promise<void> {
-  const conGroq = hayGroq();
-  const conGemini = hayGemini();
+  const hay: Record<IA, boolean> = { groq: hayGroq(), gemini: hayGemini(), openrouter: hayOpenRouter() };
 
-  if (!conGroq && !conGemini) {
+  if (!hay.groq && !hay.gemini && !hay.openrouter) {
     emitir({
       t: "error",
-      mensaje: "Faltan las llaves de las IA. Agrega GROQ_API_KEY y GEMINI_API_KEY en el entorno del proyecto y vuelve a desplegar.",
+      mensaje:
+        "Faltan las llaves de las IA. Agrega GROQ_API_KEY, GEMINI_API_KEY u OPENROUTER_API_KEY en el entorno del proyecto y vuelve a desplegar.",
     });
     return;
   }
 
   const hayPdf = mensajes.some((m) => (m.adjuntos ?? []).some((a) => a.tipo === "archivo" && a.mime === "application/pdf"));
-  const groqVeTodo = ciegosGroq(mensajes, imagenes).size === 0;
-  const PDF_SIN_GROQ = "Groq no abre PDF: la respuesta no tiene en cuenta el PDF.";
+  /** Si esa IA ve todos los archivos de la conversación (Gemini los ve todos). */
+  const veTodo = (ia: IA) => ia === "gemini" || ciegosDe(PROVEEDOR[ia], mensajes, imagenes).size === 0;
+  const pdfSin = (ia: IA) => (hayPdf && ia !== "gemini" ? `${NOMBRE[ia]} no abre PDF: la respuesta no tiene en cuenta el PDF.` : "");
+  const juntar = (...partes: (string | undefined)[]) => partes.filter(Boolean).join(" ") || undefined;
 
   let modo = modoPedido;
   let aviso: string | undefined;
-
-  if (modo === "combinado" && !conGemini) {
-    modo = "groq";
-    aviso = "Respondió solo Groq: falta GEMINI_API_KEY.";
-  } else if (modo === "combinado" && !conGroq) {
-    modo = "gemini";
-    aviso = "Respondió solo Gemini: falta GROQ_API_KEY.";
-  } else if (modo === "groq" && !conGroq) {
-    modo = "gemini";
-    aviso = "Respondió Gemini: falta GROQ_API_KEY.";
-  } else if (modo === "gemini" && !conGemini) {
-    modo = "groq";
-    aviso = "Respondió Groq: falta GEMINI_API_KEY.";
-  } else if (modo === "groq" && hayPdf && conGemini) {
-    // Groq no abre PDF: ese lo lee Gemini.
-    modo = "gemini";
-    aviso = "Groq no abre PDF: respondió Gemini.";
+  if (modo === "combinado" && !(hay.groq && hay.gemini)) {
+    // Sin una de las dos, responde la que haya (o GPT-4o).
+    if (hay.groq) {
+      modo = "groq";
+      aviso = "Respondió solo Groq: falta GEMINI_API_KEY.";
+    } else if (hay.gemini) {
+      modo = "gemini";
+      aviso = "Respondió solo Gemini: falta GROQ_API_KEY.";
+    } else {
+      modo = "openrouter";
+      aviso = "Respondió solo GPT-4o: faltan GROQ_API_KEY y GEMINI_API_KEY.";
+    }
   }
-  if (modo === "groq" && hayPdf) aviso = [aviso, PDF_SIN_GROQ].filter(Boolean).join(" ");
 
-  const base = instruccionBase();
   const escribir = (texto: string) => emitir({ t: "texto", texto });
-  const hay = (ia: IA) => (ia === "groq" ? conGroq : conGemini);
+
+  // ---------------------------------------------------------- datos del panel
+  const consultas = permisos ? consultasPara(permisos.rol, permisos.modulos) : [];
+  const base = instruccionBase(permisos ? consultas.map((c) => c.titulo) : null);
+  let conversacion = mensajes;
+  if (permisos && consultas.length > 0 && pareceDelPanel(mensajes)) {
+    const orden = (modo === "combinado" ? ORDEN.groq : ORDEN[modo]).filter((ia) => hay[ia]);
+    const datos = await consultarPanel(mensajes, permisos, consultas, orden, emitir, signal);
+    if (signal.aborted) return;
+    if (datos.resumen.length > 0) emitir({ t: "datos", consultas: datos.resumen });
+    if (datos.bloque) conversacion = conDatos(mensajes, datos.bloque);
+  }
+
   const enVivo = (ia: IA, instruccion: string, extra?: string) =>
-    ia === "groq"
-      ? groqEnVivo(mensajes, imagenes, instruccion, extra, escribir, signal)
-      : geminiEnVivo(mensajes, instruccion, extra, escribir, signal);
+    ia === "gemini"
+      ? geminiEnVivo(conversacion, instruccion, extra, escribir, signal)
+      : enVivoOpenAI(PROVEEDOR[ia], conversacion, imagenes, instruccion, extra, escribir, signal);
 
   // ---------------------------------------------------------- una sola IA
-  if (modo === "groq" || modo === "gemini") {
-    const ia: IA = modo;
-    emitir({ t: "estado", texto: `${NOMBRE[ia]} está respondiendo…` });
-    const r = await enVivo(ia, base);
-    if (r.ok) return emitir({ t: "fin", fuentes: [ia], aviso });
-    if (signal.aborted) return;
+  if (modo !== "combinado") {
+    const pedida = modo;
+    let cadena = ORDEN[pedida];
+    let avisoPrevio = aviso;
+    if (hayPdf && pedida !== "gemini" && hay.gemini) {
+      // Groq y GPT-4o no abren PDF: ese lo lee Gemini.
+      cadena = ["gemini", ...cadena.filter((ia) => ia !== "gemini")];
+      avisoPrevio = juntar(avisoPrevio, `${NOMBRE[pedida]} no abre PDF: respondió Gemini.`);
+    }
+    const disponibles = cadena.filter((ia) => hay[ia]);
+    const errores: string[] = hay[pedida] ? [] : [`falta ${LLAVE[pedida]}.`];
 
-    // La elegida falló sin escribir nada: responde la otra.
-    const otra: IA = ia === "groq" ? "gemini" : "groq";
-    if (!hay(otra)) return emitir({ t: "error", mensaje: r.error });
-    emitir({ t: "estado", texto: `${NOMBRE[ia]} no pudo responder. Ahora responde ${NOMBRE[otra]}…` });
-    const r2 = await enVivo(otra, base);
-    if (!r2.ok) return signal.aborted ? undefined : emitir({ t: "error", mensaje: `${r.error} ${r2.error}` });
-    const ciego = otra === "groq" && hayPdf ? ` ${PDF_SIN_GROQ}` : "";
-    return emitir({ t: "fin", fuentes: [otra], aviso: `Respondió ${NOMBRE[otra]}: ${r.error}${ciego}` });
+    for (const [i, ia] of disponibles.entries()) {
+      emitir({
+        t: "estado",
+        texto: i === 0 ? `${NOMBRE[ia]} está respondiendo…` : `${NOMBRE[disponibles[i - 1]]} no pudo responder. Ahora responde ${NOMBRE[ia]}…`,
+      });
+      const r = await enVivo(ia, base);
+      if (r.ok) {
+        const primera = i === 0 && errores.length === 0;
+        return emitir({
+          t: "fin",
+          fuentes: [ia],
+          aviso: primera ? juntar(avisoPrevio, ia === pedida ? pdfSin(ia) : "") : juntar(`Respondió ${NOMBRE[ia]}:`, ...errores, pdfSin(ia)),
+        });
+      }
+      if (signal.aborted) return;
+      errores.push(r.error);
+    }
+    return emitir({ t: "error", mensaje: errores.filter((e) => !e.startsWith("falta ")).join(" ") || errores.join(" ") });
   }
 
-  // ---------------------------------------------------------- las dos juntas
+  // ---------------------------------------------------------- Groq y Gemini juntas
   emitir({ t: "estado", texto: "Groq y Gemini están respondiendo…" });
   const [deGroq, deGemini] = await Promise.all([
-    groq(mensajes, imagenes, base, signal).then((r) => {
+    respuestaOpenAI(GROQ, conversacion, imagenes, base, signal).then((r) => {
       emitir({ t: "borrador", ia: "groq", ...(r.ok ? { texto: r.texto } : { error: r.error }) });
       return r;
     }),
-    gemini(mensajes, base, signal).then((r) => {
+    gemini(conversacion, base, signal).then((r) => {
       emitir({ t: "borrador", ia: "gemini", ...(r.ok ? { texto: r.texto } : { error: r.error }) });
       return r;
     }),
@@ -636,7 +1026,13 @@ export async function conversar(
   if (signal.aborted) return;
 
   if (!deGroq.ok && !deGemini.ok) {
-    return emitir({ t: "error", mensaje: `${deGroq.error} ${deGemini.error}` });
+    // Las dos fallaron: responde GPT-4o, el respaldo.
+    if (!hay.openrouter) return emitir({ t: "error", mensaje: `${deGroq.error} ${deGemini.error}` });
+    emitir({ t: "estado", texto: "Groq y Gemini no pudieron responder. Ahora responde GPT-4o…" });
+    const r = await enVivo("openrouter", base);
+    if (signal.aborted) return;
+    if (!r.ok) return emitir({ t: "error", mensaje: `${deGroq.error} ${deGemini.error} ${r.error}` });
+    return emitir({ t: "fin", fuentes: ["openrouter"], aviso: juntar("Respondió GPT-4o:", deGroq.error, deGemini.error, pdfSin("openrouter")) });
   }
 
   // Si una falló, la respuesta es la de la otra, tal cual.
@@ -645,13 +1041,12 @@ export async function conversar(
     const buena = (deGroq.ok ? deGroq : deGemini) as { ok: true; texto: string };
     const mala = (deGroq.ok ? deGemini : deGroq) as { ok: false; error: string };
     escribir(buena.texto);
-    const ciego = fuente === "groq" && hayPdf ? ` ${PDF_SIN_GROQ}` : "";
-    return emitir({ t: "fin", fuentes: [fuente], aviso: `Respondió solo ${NOMBRE[fuente]}: ${mala.error}${ciego}` });
+    return emitir({ t: "fin", fuentes: [fuente], aviso: juntar(`Respondió solo ${NOMBRE[fuente]}:`, mala.error, pdfSin(fuente)) });
   }
 
   // Groq escribe la respuesta final. Si hay algo que Groq no ve (un PDF, una
   // imagen de antes), la escribe Gemini, que sí lo ve.
-  const editor: IA = groqVeTodo ? "groq" : "gemini";
+  const editor: IA = veTodo("groq") ? "groq" : "gemini";
   emitir({ t: "estado", texto: "Combinando las dos respuestas…" });
   const borradores = `--- Borrador A ---\n${deGroq.texto}\n\n--- Borrador B ---\n${deGemini.texto}\n\n--- Fin de los borradores ---\nEscribe ahora la respuesta final al último mensaje del usuario.`;
   const final = await enVivo(editor, base + INSTRUCCION_SINTESIS, borradores);

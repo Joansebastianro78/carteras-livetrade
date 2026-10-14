@@ -2,8 +2,8 @@
  * Archivos del Asistente IA, del lado del navegador.
  *
  * - Imágenes: se reducen (máximo 1600 px, JPEG) para que pesen poco y se
- *   suben a Gemini; la copia reducida va también a Groq en ese mensaje.
- * - PDF: se suben tal cual a Gemini (Groq no abre PDF).
+ *   suben a Gemini; la copia reducida va también a Groq y a GPT-4o en ese mensaje.
+ * - PDF: se suben tal cual a Gemini (Groq y GPT-4o no abren PDF).
  * - Word, Excel, PowerPoint, CSV y texto: se les saca el texto aquí mismo y
  *   viaja como texto a las dos IA.
  */
@@ -17,7 +17,7 @@ export type Preparado =
       nombre: string;
       mime: string;
       blob: Blob;
-      /** Base64 sin el prefijo data:, para Groq. */
+      /** Base64 sin el prefijo data:, para Groq y GPT-4o. */
       base64: string;
       /** Miniatura chica para mostrar en la conversación. */
       miniatura: string;

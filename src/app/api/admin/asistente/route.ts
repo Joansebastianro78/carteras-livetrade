@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
+import { sesionConPermisos } from "@/lib/perfilesServidor";
 import {
   conversar,
   PREFIJO_ARCHIVO_GEMINI,
@@ -22,7 +21,11 @@ export const maxDuration = 300;
  *
  *   POST { modo, mensajes, imagenes? }
  *   → texto plano, una línea de JSON por evento (ver Evento en lib/asistenteIA):
- *     estado, borrador de cada IA, pedazos de la respuesta, fin o error.
+ *     estado, datos del panel consultados, borrador de cada IA, pedazos de la
+ *     respuesta, fin o error.
+ *
+ * Las consultas del panel (lib/datosPanel.ts) salen con los módulos del perfil
+ * de quien pregunta: el asistente no ve nada que esa persona no vea.
  */
 
 const MAX_MENSAJES = 40;
@@ -32,7 +35,7 @@ const MAX_TEXTO_ADJUNTOS = 400_000;
 const MAX_IMAGENES = 6;
 /** Base64 de una imagen ya comprimida en el navegador. */
 const MAX_IMAGEN = 3_500_000;
-/** Imágenes que también van en base64 a Groq. */
+/** Imágenes que también van en base64 a Groq y a GPT-4o. */
 const MIMES_IMAGEN_GROQ = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 /**
@@ -63,7 +66,8 @@ function texto(v: unknown, largo: number): string {
 function limpiar(body: Record<string, unknown>):
   | { ok: true; modo: Modo; mensajes: Mensaje[]; imagenes: ImagenActual[] }
   | { ok: false; error: string } {
-  const modo: Modo = body.modo === "groq" || body.modo === "gemini" ? body.modo : "combinado";
+  const modo: Modo =
+    body.modo === "groq" || body.modo === "gemini" || body.modo === "openrouter" ? body.modo : "combinado";
 
   const crudos = Array.isArray(body.mensajes) ? body.mensajes.slice(-MAX_MENSAJES) : [];
   let textoAdjuntos = 0;
@@ -118,8 +122,7 @@ function limpiar(body: Record<string, unknown>):
 }
 
 export async function POST(req: Request) {
-  const store = await cookies();
-  const sesion = await leerSesion(store.get(COOKIE_ADMIN)?.value, process.env.ADMIN_SECRET);
+  const sesion = await sesionConPermisos();
   if (!sesion) return NextResponse.json({ error: "Sesión no válida." }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -151,7 +154,11 @@ export async function POST(req: Request) {
         }
       };
       try {
-        await conversar(limpio.mensajes, limpio.imagenes, limpio.modo, emitir, control.signal);
+        await conversar(limpio.mensajes, limpio.imagenes, limpio.modo, emitir, control.signal, {
+          usuario: sesion.usuario,
+          rol: sesion.rol,
+          modulos: sesion.modulos,
+        });
       } catch (e) {
         console.error("[asistente]", e);
         emitir({ t: "error", mensaje: "Algo falló al responder. Intenta de nuevo." });

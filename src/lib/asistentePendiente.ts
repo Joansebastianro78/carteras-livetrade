@@ -15,7 +15,7 @@ export type PreguntaPendiente = {
 export const SUGERENCIAS_INICIO: { corta: string; texto: string }[] = [
   { corta: "Mensaje para un consultor", texto: "Redacta un mensaje para un consultor que no ha cargado sus visitas" },
   { corta: "Fórmula de Excel", texto: "Escribe una fórmula de Excel que busque un código en otra hoja" },
-  { corta: "Resumir un documento", texto: "Resume este documento en cinco puntos" },
+  { corta: "Puntos asignados hoy", texto: "¿Cuántos puntos se asignaron hoy y a qué consultores?" },
 ];
 
 export function dejarPregunta(p: PreguntaPendiente) {

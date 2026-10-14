@@ -91,7 +91,7 @@ directo con la base.
 | `GET/POST/DELETE /api/admin/revision-hallazgos` | Hallazgos de la auditoría de datos marcados como revisados: listarlos (o solo sus claves, o el resumen por día para el Inicio con `?campos=resumen`), marcarlos (uno o la carga masiva, con observación y archivo) y devolverlos a pendientes. Módulo «Auditoría de datos». |
 | `GET /api/admin/resumen` | Cifras del Inicio y estado del encabezado (si la consulta está en mantenimiento). Con `?corto=1`, solo el encabezado: lo lee cualquiera con sesión. Las cifras piden «Inicio» o «Cargar plantilla»; `?lista=sin-ubicacion` o `?lista=libres` (las descargas de «Para revisar»), «Inicio». |
 | `GET /api/admin/actividad` | Actividad reciente del Inicio: cargas, ediciones y borrados, y lo de `actividad_panel`. Módulo «Inicio». |
-| `POST /api/admin/asistente` | Asistente IA: responde con Groq, Gemini o las dos combinadas, en vivo (una línea de JSON por evento). Módulo «Asistente IA». |
+| `POST /api/admin/asistente` | Asistente IA: responde con Groq, Gemini o las dos combinadas (GPT-4o de respaldo), en vivo (una línea de JSON por evento), y consulta los datos de los módulos del perfil cuando la pregunta los necesita. Módulo «Asistente IA». |
 | `POST /api/admin/asistente/archivo` | Sube una imagen o un PDF del asistente a la Files API de Gemini. Módulo «Asistente IA». |
 | `GET/POST/PATCH/DELETE /api/admin/perfiles` | Perfiles y permisos: la lista con cuántos usuarios tiene cada uno, crear, cambiar nombre, descripción y módulos, y borrar. Módulo «Perfiles y permisos». |
 | `POST /api/admin/upload/previa` | Antes de aplicar una carga: cuántas filas del archivo ya existen y cuántas son nuevas. No cambia nada. |
@@ -791,23 +791,26 @@ los perfiles con ese módulo (de entrada, los tres de siempre). Es un chat: se l
 adjuntar imágenes (también pegadas o arrastradas), PDF, Word (.docx), Excel,
 PowerPoint (.pptx), CSV y texto.
 
-**Cómo usa las dos IA.** **Groq** es la principal y **Gemini** la secundaria.
+**Cómo usa las IA.** **Groq** es la principal, **Gemini** la secundaria y
+**GPT-4o** (por OpenRouter) el respaldo.
 En el modo **Groq + Gemini** (el de siempre) las dos escriben un borrador al
 mismo tiempo; después Groq compara los dos y escribe la respuesta final,
 corrigiendo lo que no cuadre. Si en la conversación hay algo que Groq no ve
 (un PDF, o una imagen de un mensaje anterior), la respuesta final la escribe
 Gemini, que sí lo ve. Debajo de cada respuesta está «Ver lo que respondió cada
-IA». Los modos «Solo Groq» y «Solo Gemini» son más rápidos (una sola llamada).
-En cualquier modo, si una IA falla (por ejemplo, Gemini saturado), responde la
-otra y la pantalla dice por qué. En «Solo Groq», una pregunta sobre un PDF la
+IA». Si Groq y Gemini fallan a la vez, responde GPT-4o. Los modos «Solo Groq»,
+«Solo Gemini» y «Solo GPT-4o» son más rápidos (una sola llamada); si la elegida
+falla, responden las demás (Groq, luego Gemini, luego GPT-4o) y la pantalla
+dice por qué. En «Solo Groq» y «Solo GPT-4o», una pregunta sobre un PDF la
 responde Gemini. La respuesta va apareciendo mientras se escribe, y «Detener»
 la corta.
 
 **Archivos.**
 - Imágenes: se reducen en el navegador (máximo 1600 px) y se suben a la Files
   API de Gemini; en la pregunta siguiente viajan como referencia. Groq ve las
-  imágenes del mensaje en que se adjuntan (hasta 3) con su modelo de visión.
-- PDF: se suben a Gemini tal cual. Groq no abre PDF: los lee Gemini.
+  imágenes del mensaje en que se adjuntan (hasta 3) con su modelo de visión, y
+  GPT-4o todas las de ese mensaje.
+- PDF: se suben a Gemini tal cual. Groq y GPT-4o no abren PDF: los lee Gemini.
 - Word, Excel, PowerPoint, CSV y texto: el texto se saca en el navegador y lo
   reciben las dos IA (hasta 150.000 caracteres por documento).
 - Tope de **4 MB por archivo**: es el límite de Vercel para un envío. Gemini
@@ -818,6 +821,7 @@ la corta.
 ```
 GROQ_API_KEY=gsk_...
 GEMINI_API_KEY=...
+OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
 La de Groq se crea en console.groq.com → API Keys. Opcionales:
@@ -825,9 +829,17 @@ La de Groq se crea en console.groq.com → API Keys. Opcionales:
 `GROQ_MODELO_VISION` (por defecto `qwen/qwen3.8-27b`, el único de Groq que ve
 imágenes; está en vista previa y Groq puede retirarlo), `GROQ_ESFUERZO`
 (`low` por defecto; `medium` o `high` para que razone más, más lento),
-`GROQ_MAX_TOKENS` (4096 por defecto) y `GEMINI_MODELO_CHAT` (por defecto
-`gemini-3.8-flash`). Con una sola llave el módulo funciona con esa IA y lo dice
-en cada respuesta.
+`GROQ_MAX_TOKENS` (4096 por defecto), `GEMINI_MODELO_CHAT` (por defecto
+`gemini-3.8-flash`), `OPENROUTER_MODELO` (por defecto `openai/gpt-4o`; la
+pantalla lo sigue llamando GPT-4o), `OPENROUTER_MAX_TOKENS` (4096) y
+`OPENROUTER_SITIO` (opcional: la dirección del panel, para las estadísticas de
+OpenRouter). Con una sola llave el módulo funciona con esa IA y lo dice en cada
+respuesta.
+
+La llave de OpenRouter se crea en openrouter.ai/keys y gasta el saldo de esa
+cuenta (GPT-4o cobra por token de entrada y de salida). Como es el respaldo,
+solo se usa cuando Groq y Gemini fallan o cuando alguien elige «Solo GPT-4o».
+Si se queda sin saldo, la pantalla lo dice y responden las otras.
 
 El plan gratis de Groq tiene topes bajos (del orden de 30 preguntas y 8.000
 tokens por minuto, y 1.000 preguntas al día por modelo). Cuando se pasan, Groq
@@ -840,6 +852,49 @@ la cabecera `x-goog-api-key`, pero hay cuentas en las que esa vía responde 401
 `Authorization: Bearer` y se queda con la que funcione. Si las dos fallan, la
 pantalla lo explica.
 
+**Datos del panel.** El asistente también responde con datos reales de los
+demás módulos: «¿cuántos puntos se asignaron hoy?», «¿cómo va la auditoría de
+datos?», «¿cuántos hallazgos se revisaron esta semana y quién?», «busca al
+consultor BAV006», «¿cuántos puntos hay en Cundinamarca?». Antes de responder,
+Groq decide si la pregunta necesita datos y cuáles (si Groq falla, decide
+Gemini, y si también falla, GPT-4o); el servidor corre esas consultas y se las pasa a las IA junto con la
+pregunta. Debajo de la respuesta queda «Datos del panel: …» con lo que se
+consultó, y si algo no se pudo consultar, el aviso dice por qué.
+
+Las consultas son fijas y de solo lectura (`src/lib/datosPanel.ts`): la IA no
+escribe SQL ni puede cambiar nada, solo elige una consulta y sus fechas. Cada
+una pide los mismos módulos que la pantalla de donde salen sus datos, así que
+el asistente de cada quien ve solo lo que su perfil ve:
+
+| Consulta | Qué trae | Módulos |
+|---|---|---|
+| Cartera | Ciclo actual, puntos, asignados, LIBRE, consultores, sin coordenadas, por ciclo y departamento, últimas cargas y si la consulta está abierta | Inicio o Cargar plantilla |
+| Asignaciones de puntos | En un rango de días (por defecto hoy): puntos nuevos (con consultor y LIBRE), puntos que ya existían y se actualizaron, por consultor, ciclo y archivo, cargas de Excel y ediciones a mano | Inicio, Cargar plantilla o Editar cartera |
+| Actividad del panel | Lo último que se hizo, quién y cuándo | Inicio |
+| Hallazgos revisados | Total, hoy, últimos 7 días, por día, persona, motivo y departamento, carga masiva o uno por uno | Auditoría de datos |
+| Auditoría de datos | Corre la consulta de Athena y la cruza con lo revisado: hallazgos, pendientes, revisados, avance, por motivo, departamento, consultor y día | Auditoría de datos |
+| Auditoría de imágenes | Corre su consulta de Athena: visitas, con y sin foto, correctas, para revisar, sin mirar, quién revisó | Auditoría de imágenes |
+| Consultores | Busca por usuario, nombre o cédula: puntos, ciclos, ruta, sin coordenadas (no devuelve la cédula) | Consultores |
+| Departamento y ciudad | Puntos por departamento, o por ciudad de un departamento, opcional por ciclo | Departamento y ciudad |
+
+«Asignados» en la cartera es lo que tiene consultor (no LIBRE). En
+Asignaciones, «actualizados» es cualquier cambio de un punto que ya existía
+(reasignación, corrección o una carga que lo reescribió): la base no guarda
+cuál campo cambió. Las dos auditorías corren su consulta de Athena, que puede
+tardar hasta un minuto; si alguien la corrió en los últimos minutos, se
+reutiliza ese resultado (`ATHENA_REUSO_MINUTOS`).
+
+Para no gastar llamadas, la decisión de consultar solo se pide cuando la
+pregunta suena al panel (habla de puntos, cartera, auditoría, consultores,
+cifras, fechas…); «redacta un correo» va directo a responder. Cada consulta
+suma tokens en Groq: con el plan gratis, si se hacen muchas preguntas de datos
+seguidas en modo combinado, Groq puede llegar a su límite por minuto y
+contesta Gemini.
+
+Para agregar una consulta: un objeto más en `CONSULTAS` de
+`src/lib/datosPanel.ts`, con su nombre, título, descripción para la IA,
+parámetros, módulos y la función que lee los datos.
+
 **Seguridad y costo.** Las llaves solo viven en el servidor. El navegador
 nunca manda direcciones de archivos que no sean de la Files API de Gemini.
 Cada usuario tiene un tope de 60 preguntas y 60 archivos por hora, porque cada
@@ -848,7 +903,9 @@ pestaña del navegador (sobrevive a cambiar de sección o recargar) y no se
 guarda en la base; «Nueva» la borra.
 
 El código está en `src/lib/asistenteIA.ts` (servidor: Groq y Gemini, la
-combinación y la subida a Gemini), `src/lib/archivosAsistente.ts` (navegador:
+combinación, el respaldo con GPT-4o, la subida a Gemini y la decisión de qué
+datos consultar),
+`src/lib/datosPanel.ts` (las consultas del panel), `src/lib/archivosAsistente.ts` (navegador:
 reducir imágenes y sacar texto de documentos), las rutas
 `/api/admin/asistente` y `/api/admin/asistente/archivo`, y la pantalla
 `src/components/AsistenteIA.tsx`.

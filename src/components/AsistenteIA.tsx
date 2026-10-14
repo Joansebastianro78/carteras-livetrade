@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Database,
   FileText,
   ImageIcon,
   Loader2,
@@ -22,16 +23,19 @@ import { tomarPregunta } from "@/lib/asistentePendiente";
 import { ACEPTA, pesoLegible, preparar, type TipoAdjunto } from "@/lib/archivosAsistente";
 
 /**
- * Asistente IA: chat con Groq (principal) y Gemini. Pregunta lo que sea y adjunta
- * imágenes, PDF, Word, Excel, PowerPoint o texto.
+ * Asistente IA: chat con Groq (principal), Gemini y GPT-4o (respaldo, por
+ * OpenRouter). Pregunta lo que sea y adjunta
+ * imágenes, PDF, Word, Excel, PowerPoint o texto. También consulta los datos
+ * del panel que el perfil puede ver (cartera, asignaciones, auditorías…): el
+ * servidor decide qué consultar y la respuesta dice de dónde salieron.
  *
  * La conversación vive en esta pestaña del navegador (se conserva al cambiar
  * de sección o recargar, y se borra con «Nueva conversación»). No se guarda en
  * la base.
  */
 
-type Modo = "combinado" | "groq" | "gemini";
-type IA = "groq" | "gemini";
+type Modo = "combinado" | "groq" | "gemini" | "openrouter";
+type IA = "groq" | "gemini" | "openrouter";
 
 type Adjunto = {
   id: string;
@@ -42,7 +46,7 @@ type Adjunto = {
   /** Imagen o PDF ya en Gemini. */
   uri?: string;
   mime?: string;
-  /** Imagen reducida en base64, para Groq; solo hasta enviarse. */
+  /** Imagen reducida en base64, para Groq y GPT-4o; solo hasta enviarse. */
   base64?: string;
   miniatura?: string;
   /** Texto sacado del documento. */
@@ -65,23 +69,26 @@ type Mensaje = {
   avance?: string;
   borradores?: Partial<Record<IA, { texto?: string; error?: string }>>;
   fuentes?: IA[];
+  /** Lo que se consultó del panel para responder. */
+  datos?: { titulo: string; ok: boolean; error?: string }[];
   aviso?: string;
   error?: string;
 };
 
 const MODOS: { id: Modo; nombre: string; detalle: string }[] = [
-  { id: "combinado", nombre: "Groq + Gemini", detalle: "Las dos responden y Groq combina lo mejor" },
-  { id: "groq", nombre: "Solo Groq", detalle: "Más rápido; si falla o hay un PDF, responde Gemini" },
-  { id: "gemini", nombre: "Solo Gemini", detalle: "Ve imágenes y PDF; si falla, responde Groq" },
+  { id: "combinado", nombre: "Groq + Gemini", detalle: "Las dos responden y Groq combina lo mejor; si fallan, responde GPT-4o" },
+  { id: "groq", nombre: "Solo Groq", detalle: "Más rápido; si falla o hay un PDF, responde otra IA" },
+  { id: "gemini", nombre: "Solo Gemini", detalle: "Ve imágenes y PDF; si falla, responde Groq o GPT-4o" },
+  { id: "openrouter", nombre: "Solo GPT-4o", detalle: "GPT-4o por OpenRouter; ve imágenes. Si falla o hay un PDF, responde otra IA" },
 ];
 
-const NOMBRE_IA: Record<IA, string> = { groq: "Groq", gemini: "Gemini" };
+const NOMBRE_IA: Record<IA, string> = { groq: "Groq", gemini: "Gemini", openrouter: "GPT-4o" };
 /** Para respuestas viejas de esta pestaña, de cuando estaba DeepSeek. */
 const nombreIA = (ia: string) => NOMBRE_IA[ia as IA] ?? (ia === "deepseek" ? "DeepSeek" : ia);
 
 const SUGERENCIAS = [
   "Resume este documento en cinco puntos",
-  "¿Qué ves en esta imagen?",
+  "¿Cómo va la auditoría de datos?",
   "Escribe una fórmula de Excel que busque un código en otra hoja",
   "Redacta un mensaje para un consultor que no ha cargado sus visitas",
 ];
@@ -271,12 +278,37 @@ function Respuesta({ m }: { m: Mensaje }) {
           </p>
         )}
 
+        {(m.datos ?? []).some((d) => !d.ok) && !trabajando && (
+          <p className="mt-2 flex items-start gap-2 rounded-[6px] bg-[var(--color-aviso-fondo)] px-3 py-2 text-xs text-[var(--color-aviso-tinta)]">
+            <TriangleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+            <span>
+              {(m.datos ?? [])
+                .filter((d) => !d.ok)
+                .map((d) => `No se pudo consultar ${d.titulo}: ${d.error ?? "sin motivo"}`)
+                .join(" ")}
+            </span>
+          </p>
+        )}
+
         {m.estado === "listo" && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-relleno)] px-2 py-0.5">
               <Sparkles size={11} aria-hidden />
               {(m.fuentes ?? []).map((f) => nombreIA(f)).join(" + ")}
             </span>
+            {(m.datos ?? []).some((d) => d.ok) && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-acento-suave,var(--color-relleno))] px-2 py-0.5 text-[var(--color-acento-tinta,var(--color-tinta))]"
+                title="Datos del panel consultados para esta respuesta"
+              >
+                <Database size={11} aria-hidden />
+                Datos del panel:{" "}
+                {(m.datos ?? [])
+                  .filter((d) => d.ok)
+                  .map((d) => d.titulo)
+                  .join(" · ")}
+              </span>
+            )}
             <BotonCopiar texto={m.texto} />
           </div>
         )}
@@ -430,9 +462,9 @@ export default function AsistenteIA() {
             base64: listo.tipo === "imagen" && listo.base64 ? listo.base64 : undefined,
           };
           if (uri) return { ...base, estado: "listo", uri };
-          // Sin Gemini, una imagen todavía la puede ver Groq en este mensaje.
+          // Sin Gemini, una imagen todavía la pueden ver Groq y GPT-4o en este mensaje.
           if (listo.tipo === "imagen" && base.base64) {
-            return { ...base, estado: "listo", error: `Solo la verá Groq: ${error}` };
+            return { ...base, estado: "listo", error: `Solo la verán Groq y GPT-4o: ${error}` };
           }
           return { ...base, estado: "error", error };
         })
@@ -525,6 +557,7 @@ export default function AsistenteIA() {
               ...m,
               borradores: { ...m.borradores, [e.ia]: { texto: e.texto, error: e.error } },
             }));
+          else if (e.t === "datos") cambiarMensaje(respuesta.id, (m) => ({ ...m, datos: e.consultas }));
           else if (e.t === "fin") {
             terminado = true;
             cambiarMensaje(respuesta.id, (m) => ({ ...m, estado: "listo", fuentes: e.fuentes, aviso: e.aviso, avance: undefined }));
@@ -649,7 +682,8 @@ export default function AsistenteIA() {
               <span aria-hidden className="esfera flota h-[72px] w-[72px]" />
               <p className="mt-3 text-[18px] font-semibold">¿En qué te ayudo?</p>
               <p className="mt-1 text-[13px] text-[var(--color-tinta-suave)]">
-                {MODOS.find((m) => m.id === modo)?.detalle}. Puedes arrastrar archivos aquí o pegar una imagen.
+                {MODOS.find((m) => m.id === modo)?.detalle}. Puedes arrastrar archivos aquí o pegar una imagen, y
+                preguntar por los datos del panel: la cartera, las asignaciones o cómo van las auditorías.
               </p>
               <div className="mt-5 grid w-full gap-2 sm:grid-cols-2">
                 {SUGERENCIAS.map((s) => (
