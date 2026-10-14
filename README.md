@@ -72,7 +72,7 @@ directo con la base.
 | Ruta | Qué hace |
 |---|---|
 | `/` | Formulario, mapa y lista. Descarga en Excel (columnas A–G) o en imagen. |
-| `/admin` | Login y panel, con menú lateral: Inicio, cargar, editar, consultores, departamento y ciudad, las dos auditorías, tableros, asistente IA, mantenimiento, temas, usuarios y perfiles. Cada quien ve solo los módulos de su perfil. |
+| `/admin` | Login y panel, con menú lateral: Inicio, cargar, editar, consultores, departamento y ciudad, las dos auditorías, tableros, asistente IA, generador de rutas, mantenimiento, temas, usuarios y perfiles. Cada quien ve solo los módulos de su perfil. |
 | `/backoffice` | El mismo panel, con el nombre y el login de BackOffice. También muestra solo los módulos del perfil. |
 | `POST /api/cartera` | Devuelve los puntos de un `usuario` + `cedula`. |
 | `POST /api/admin/login` | Valida contra `public.admins`, deja cookie firmada (8 h). |
@@ -271,8 +271,8 @@ las auditorías) y asignarlos en **Administradores**, como cualquier otro.
 
 Los módulos son las secciones del panel: Inicio, Cargar plantilla, Editar
 cartera, Consultores, Departamento y ciudad, Auditoría de datos, Auditoría de
-imágenes, Ver tableros, Administrar tableros, Asistente IA, Mantenimiento,
-Temas, Administradores y Perfiles y permisos. El catálogo está en
+imágenes, Ver tableros, Administrar tableros, Asistente IA, Generador Rutas,
+Mantenimiento, Temas, Administradores y Perfiles y permisos. El catálogo está en
 `src/lib/permisos.ts` (`MODULOS`), y ahí mismo `modulosDeRuta` dice qué módulo
 pide cada ruta de `/api/admin`.
 
@@ -910,7 +910,66 @@ reducir imágenes y sacar texto de documentos), las rutas
 `/api/admin/asistente` y `/api/admin/asistente/archivo`, y la pantalla
 `src/components/AsistenteIA.tsx`.
 
-## 11. Pendientes conocidos
+## 11. Generador Rutas
+
+Sección **Herramientas → Generador Rutas**, para los perfiles con ese módulo
+(se marca en **Configuración › Perfiles y permisos**). Es `cluster_rutas.py`
+dentro del panel: reparte los puntos de un Excel entre personas por cercanía.
+
+1. Se sube el Excel (con columnas LATITUD y LONGITUD en la fila 1; también
+   valen LAT, LON, LNG, LATITUDE, LONGITUDE). Si tiene varias hojas, se elige
+   cuál; por defecto la primera que no sea Resumen_Rutas. El mapa muestra los
+   puntos y cuántos tienen coordenadas válidas.
+2. Se pone la cantidad de **personas** (rutas) y de **puntos por persona**
+   (máximo), si el reparto es **parejo** (todas con la misma cantidad ±1) y,
+   si se quiere, los **nombres** de las personas, uno por línea (vacío =
+   PERSONA 1, PERSONA 2…). Antes de generar dice cuántos cupos hay y si van
+   a quedar puntos SIN ASIGNAR (los más alejados, cuando los puntos no caben).
+3. **Generar rutas** las arma y las muestra en el mapa: cada ruta con su color,
+   su contorno y su número en el centro; tocar una ruta en la lista la deja
+   sola. Cada vez que se genera puede salir un reparto un poco distinto (el
+   algoritmo arranca al azar, como el script), igual de cercano.
+4. **Descargar Excel** entrega el mismo archivo (`<nombre>_RUTAS.xlsx`) con
+   NUM_RUTA y PERSONA (SIN ASIGNAR o SIN COORDENADAS si no le tocó ruta) en
+   las dos columnas que siguen a la última con datos, y la hoja
+   Resumen_Rutas: puntos, centro y distancia promedio y máxima de cada ruta,
+   totales y parámetros. Las demás columnas, hojas y formatos quedan como
+   venían.
+
+Todo pasa en el navegador: el Excel no se sube al servidor ni a Supabase, y
+no hay ruta de API para esto. El algoritmo está en `src/lib/rutas.ts`, igual
+que el script paso por paso: corrige las coordenadas (coma decimal, signo de
+la longitud perdido, latitud y longitud al revés, números sin punto
+decimal), agrupa con k-means++ y en cada vuelta asigna con capacidad (entre el
+mínimo y el máximo de puntos por ruta, con la menor distancia total), y
+numera las rutas de norte a sur. La asignación con capacidad, que en el
+script hace `linear_sum_assignment` de scipy, aquí es un flujo de costo mínimo
+que da exactamente el mismo resultado y corre rápido en el navegador; se
+probó contra scipy con casos al azar. Corre en segundo plano
+(`src/lib/rutas.worker.ts`) para que la pantalla no se congele con miles de
+puntos. El Excel se lee y se escribe con exceljs en `src/lib/rutasExcel.ts`;
+la pantalla es `src/components/GeneradorRutas.tsx` y el mapa
+`src/components/MapaRutas.tsx`.
+
+Dónde van NUM_RUTA y PERSONA: el script los escribía siempre en AH y AI, y
+con un archivo que termina en AF (LONGITUD, como el de Cali) dejaba la AG
+vacía. Ahora van pegadas a los datos:
+
+- Si el archivo termina en AF, quedan en AG y AH. La pantalla dice en qué
+  columnas van antes de generar.
+- Si ya trae las columnas de ruta (NUM RUTA o NUM DE RUTA) y PERSONA justo
+  después de los datos, como la plantilla de la cartera, se escriben ahí y
+  se dejan sus encabezados; lo que haya después (ccuser, user, nom) no se
+  toca.
+- Si esas columnas están más lejos, con columnas vacías en medio (un archivo
+  que ya pasó por el script viejo), se pasan a las que siguen a los datos y
+  las viejas quedan vacías.
+
+En una instalación que ya existía, el perfil Administrador no lo trae marcado:
+el superadministrador lo marca en Perfiles y permisos (o con la línea que
+está comentada al final de `supabase/perfiles.sql`).
+
+## 12. Pendientes conocidos
 
 - El limitador de intentos vive en memoria del proceso. Con varias instancias en
   Vercel, cada una lleva su propia cuenta. Para algo serio, Upstash Redis.

@@ -21,6 +21,7 @@ export type IdModulo =
   | "tableros"
   | "tableros_admin"
   | "asistente"
+  | "rutas"
   | "mantenimiento"
   | "temas"
   | "usuarios"
@@ -45,6 +46,7 @@ export const MODULOS: Modulo[] = [
   { id: "tableros", nombre: "Ver tableros", grupo: "Reportes", detalle: "Los tableros de Power BI publicados." },
   { id: "tableros_admin", nombre: "Administrar tableros", grupo: "Reportes", detalle: "Agregar, editar, publicar u ocultar tableros de Power BI." },
   { id: "asistente", nombre: "Asistente IA", grupo: "Herramientas", detalle: "Chat con Groq, Gemini y GPT-4o, con imágenes y documentos. Consulta los datos de los demás módulos que tenga el perfil." },
+  { id: "rutas", nombre: "Generador Rutas", grupo: "Herramientas", detalle: "Repartir los puntos de un Excel entre personas por cercanía, verlos en el mapa y descargar el Excel con la ruta de cada punto." },
   { id: "mantenimiento", nombre: "Mantenimiento", grupo: "Configuración", detalle: "Cerrar y abrir la página de consulta de los consultores." },
   { id: "temas", nombre: "Temas", grupo: "Configuración", detalle: "Adornos de temporada de la página." },
   { id: "usuarios", nombre: "Administradores", grupo: "Configuración", detalle: "Crear usuarios del panel, cambiarles la clave o el perfil y desactivarlos. Solo puede dar perfiles con permisos que él también tenga." },

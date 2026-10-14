@@ -32,12 +32,12 @@ insert into public.perfiles (clave, nombre, descripcion, modulos, sistema) value
   ('superadmin', 'Superadministrador',
    'Todo el panel. Es el único que puede tocar a otro superadministrador.',
    array['inicio','cargar','editar','consultores','territorio','auditoria','imagenes',
-         'tableros','tableros_admin','asistente','mantenimiento','temas','usuarios','perfiles'],
+         'tableros','tableros_admin','asistente','rutas','mantenimiento','temas','usuarios','perfiles'],
    true),
   ('admin', 'Administrador',
    'Maneja toda la cartera, los usuarios y la configuración.',
    array['inicio','cargar','editar','consultores','territorio','auditoria','imagenes',
-         'tableros','tableros_admin','asistente','mantenimiento','temas','usuarios','perfiles'],
+         'tableros','tableros_admin','asistente','rutas','mantenimiento','temas','usuarios','perfiles'],
    true),
   ('backoffice', 'BackOffice',
    'Consulta: la cartera de un consultor, las regiones, las auditorías y los tableros.',
@@ -141,3 +141,7 @@ revoke all on public.perfiles from anon, authenticated;
 -- select clave, nombre, modulos from public.perfiles order by sistema desc, nombre;
 -- select a.usuario, a.rol, p.nombre from public.admins a join public.perfiles p on p.clave = a.rol;
 -- update public.perfiles set modulos = array_append(modulos, 'asistente') where clave = 'admin';
+-- Darle el Generador Rutas a los administradores de una instalación que ya existía
+-- (también se puede marcar en Configuración › Perfiles y permisos):
+-- update public.perfiles set modulos = array_append(modulos, 'rutas')
+--  where clave = 'admin' and not ('rutas' = any(modulos));

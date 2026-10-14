@@ -11,6 +11,7 @@ import {
   MapPin,
   Palette,
   Pencil,
+  Route,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -36,6 +37,7 @@ import VisorTableros from "./VisorTableros";
 import AsistenteIA from "./AsistenteIA";
 import PanelPerfiles from "./PanelPerfiles";
 import HallazgosRevisados from "./HallazgosRevisados";
+import GeneradorRutas from "./GeneradorRutas";
 
 /** Una sección del menú y el módulo que hay que tener para verla. */
 type Seccion = SeccionPanel & { modulo: IdModulo };
@@ -160,6 +162,16 @@ const SECCIONES: Seccion[] = [
     Icono: Sparkles,
     encabezadoPropio: true,
     render: () => <AsistenteIA />,
+  },
+  {
+    id: "rutas",
+    modulo: "rutas",
+    menu: "Generador Rutas",
+    grupo: "Herramientas",
+    Icono: Route,
+    descripcion:
+      "Sube un Excel con los puntos, di cuántas personas y cuántos puntos por persona, y se arman las rutas por cercanía. Revísalas en el mapa y descarga el mismo Excel con NUM_RUTA y PERSONA.",
+    render: () => <GeneradorRutas />,
   },
   {
     id: "mantenimiento",
