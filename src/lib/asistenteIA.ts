@@ -27,6 +27,7 @@ import {
   type PermisosPanel,
   type ResultadoConsulta,
 } from "./datosPanel";
+import { conRotacion, nombreModelo, type Rotacion } from "./modelosGemini";
 
 const URL_GEMINI = "https://generativelanguage.googleapis.com";
 const URL_GROQ = "https://api.groq.com/openai/v1";
@@ -70,14 +71,16 @@ export type Mensaje = {
 /** Imágenes del último mensaje en base64, para Groq (Gemini las ve por su uri). */
 export type ImagenActual = { nombre: string; mime: string; datos: string };
 
-export type Resultado = { ok: true; texto: string } | { ok: false; error: string };
+/** modelo: con Gemini, cuál de sus modelos respondió (ver lib/modelosGemini.ts). */
+export type Resultado = { ok: true; texto: string; modelo?: string } | { ok: false; error: string };
 
 /** Lo que va saliendo hacia el navegador, una línea de JSON por evento. */
 export type Evento =
   | { t: "estado"; texto: string }
   | { t: "borrador"; ia: IA; texto?: string; error?: string }
   | { t: "texto"; texto: string }
-  | { t: "fin"; fuentes: IA[]; aviso?: string }
+  /** modelos: con qué modelo respondió cada IA, si se sabe (hoy, el de Gemini). */
+  | { t: "fin"; fuentes: IA[]; aviso?: string; modelos?: Partial<Record<IA, string>> }
   /** Qué se consultó del panel para responder. */
   | { t: "datos"; consultas: { titulo: string; ok: boolean; error?: string }[] }
   | { t: "error"; mensaje: string };
@@ -141,7 +144,7 @@ Escribe tú la mejor respuesta final para el usuario:
  */
 let formaLlaveGemini: "cabecera" | "bearer" | null = null;
 
-async function pedirGemini(
+export async function pedirGemini(
   ruta: string,
   init: { method: string; headers?: Record<string, string>; body?: string | Uint8Array; signal?: AbortSignal }
 ): Promise<Response> {
@@ -177,7 +180,7 @@ async function pedirGemini(
 }
 
 /** Explica en palabras un error de Gemini. */
-async function errorGemini(respuesta: Response, modelo: string): Promise<string> {
+async function errorGemini(respuesta: Response, modelo: string, probados: string[] = []): Promise<string> {
   const json = await respuesta.json().catch(() => null);
   const detalle: string = json?.error?.message ?? `HTTP ${respuesta.status}`;
   console.error("[asistente gemini]", respuesta.status, detalle);
@@ -191,7 +194,11 @@ async function errorGemini(respuesta: Response, modelo: string): Promise<string>
   if (respuesta.status === 404) {
     return `Tu cuenta de Google no tiene el modelo «${modelo}». Cambia GEMINI_MODELO_CHAT por uno disponible.`;
   }
-  if (respuesta.status === 429) return "Se agotó por ahora la cuota de Gemini. Espera un momento y vuelve a intentar.";
+  if (respuesta.status === 429) {
+    return probados.length > 1
+      ? `Gemini llegó a su cupo en los ${probados.length} modelos que probó (${probados.map(nombreModelo).join(", ")}). Espera un momento y vuelve a intentar.`
+      : "Se agotó por ahora la cuota de Gemini. Espera un momento y vuelve a intentar.";
+  }
   if (respuesta.status === 413) return "El mensaje es demasiado grande para Gemini. Quita algún archivo.";
   if (respuesta.status >= 500) return "Gemini está fallando en este momento. Intenta de nuevo en un rato.";
   return `Gemini respondió con un error: ${detalle}`;
@@ -248,25 +255,35 @@ function modeloGemini() {
   return process.env.GEMINI_MODELO_CHAT || MODELO_GEMINI;
 }
 
-/** Respuesta completa de Gemini, de una vez. */
-async function gemini(mensajes: Mensaje[], instruccion: string, signal: AbortSignal): Promise<Resultado> {
-  const modelo = modeloGemini();
-  let respuesta: Response;
-  try {
-    respuesta = await pedirGemini(`/v1beta/models/${modelo}:generateContent`, {
+/**
+ * Una petición a Gemini que, si el modelo preferido agotó su cupo, prueba con
+ * los demás modelos de la cuenta (lib/modelosGemini.ts).
+ */
+function rotarGemini(accion: string, cuerpo: string, signal: AbortSignal): Promise<Rotacion> {
+  return conRotacion(pedirGemini, modeloGemini(), (modelo) =>
+    pedirGemini(`/v1beta/models/${modelo}:${accion}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: cuerpoGemini(mensajes, instruccion),
+      body: cuerpo,
       signal,
-    });
+    })
+  );
+}
+
+/** Respuesta completa de Gemini, de una vez. */
+async function gemini(mensajes: Mensaje[], instruccion: string, signal: AbortSignal): Promise<Resultado> {
+  let r: Rotacion;
+  try {
+    r = await rotarGemini("generateContent", cuerpoGemini(mensajes, instruccion), signal);
   } catch (e) {
     console.error("[asistente gemini] red", e);
     return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Gemini." };
   }
-  if (!respuesta.ok) return { ok: false, error: await errorGemini(respuesta, modelo) };
-  const json = await respuesta.json().catch(() => null);
+  if (!r.respuesta) return { ok: false, error: r.mensaje };
+  if (!r.respuesta.ok) return { ok: false, error: await errorGemini(r.respuesta, r.modelo, r.probados) };
+  const json = await r.respuesta.json().catch(() => null);
   const texto = textoDeRespuestaGemini(json).trim();
-  return texto ? { ok: true, texto } : { ok: false, error: motivoVacioGemini(json) };
+  return texto ? { ok: true, texto, modelo: r.modelo } : { ok: false, error: motivoVacioGemini(json) };
 }
 
 /** Respuesta de Gemini por partes, a medida que la escribe. */
@@ -277,20 +294,17 @@ async function geminiEnVivo(
   alEscribir: (texto: string) => void,
   signal: AbortSignal
 ): Promise<Resultado> {
-  const modelo = modeloGemini();
-  let respuesta: Response;
+  let r: Rotacion;
   try {
-    respuesta = await pedirGemini(`/v1beta/models/${modelo}:streamGenerateContent?alt=sse`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: cuerpoGemini(mensajes, instruccion, extra),
-      signal,
-    });
+    r = await rotarGemini("streamGenerateContent?alt=sse", cuerpoGemini(mensajes, instruccion, extra), signal);
   } catch (e) {
     console.error("[asistente gemini] red", e);
     return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Gemini." };
   }
-  if (!respuesta.ok || !respuesta.body) return { ok: false, error: await errorGemini(respuesta, modelo) };
+  if (!r.respuesta) return { ok: false, error: r.mensaje };
+  const respuesta = r.respuesta;
+  const modelo = r.modelo;
+  if (!respuesta.ok || !respuesta.body) return { ok: false, error: await errorGemini(respuesta, modelo, r.probados) };
 
   let todo = "";
   let ultimo: unknown = null;
@@ -309,7 +323,7 @@ async function geminiEnVivo(
     console.error("[asistente gemini] corte", e);
     if (!todo) return { ok: false, error: "Gemini cortó la respuesta. Intenta de nuevo." };
   }
-  return todo.trim() ? { ok: true, texto: todo } : { ok: false, error: motivoVacioGemini(ultimo) };
+  return todo.trim() ? { ok: true, texto: todo, modelo } : { ok: false, error: motivoVacioGemini(ultimo) };
 }
 
 // ------------------------------------------------------------------ Groq y OpenRouter
@@ -761,7 +775,6 @@ async function planOpenAI(
 
 /** Gemini elige las consultas (function calling). */
 async function planGemini(mensajes: Mensaje[], consultas: ConsultaPanel[], signal: AbortSignal): Promise<{ ok: true; pedidos: Pedido[] } | { ok: false; error: string }> {
-  const modelo = modeloGemini();
   const cuerpo = {
     systemInstruction: { parts: [{ text: instruccionConsultas() }] },
     contents: conversacionCorta(mensajes).map((m) => ({ role: m.rol === "usuario" ? "user" : "model", parts: [{ text: m.texto }] })),
@@ -778,20 +791,16 @@ async function planGemini(mensajes: Mensaje[], consultas: ConsultaPanel[], signa
     toolConfig: { functionCallingConfig: { mode: "AUTO" } },
     generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
   };
-  let respuesta: Response;
+  let r: Rotacion;
   try {
-    respuesta = await pedirGemini(`/v1beta/models/${modelo}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cuerpo),
-      signal,
-    });
+    r = await rotarGemini("generateContent", JSON.stringify(cuerpo), signal);
   } catch (e) {
     console.error("[asistente plan gemini] red", e);
     return { ok: false, error: signal.aborted ? "Se canceló." : "No se pudo contactar a Gemini." };
   }
-  if (!respuesta.ok) return { ok: false, error: await errorGemini(respuesta, modelo) };
-  const json = await respuesta.json().catch(() => null);
+  if (!r.respuesta) return { ok: false, error: r.mensaje };
+  if (!r.respuesta.ok) return { ok: false, error: await errorGemini(r.respuesta, r.modelo, r.probados) };
+  const json = await r.respuesta.json().catch(() => null);
   const partes = (json?.candidates?.[0]?.content?.parts ?? []) as { functionCall?: { name?: string; args?: unknown } }[];
   return {
     ok: true,
@@ -959,6 +968,8 @@ export async function conversar(
   }
 
   const escribir = (texto: string) => emitir({ t: "texto", texto });
+  /** Con qué modelo respondió Gemini, para mostrarlo debajo de la respuesta. */
+  const modelos: Partial<Record<IA, string>> = {};
 
   // ---------------------------------------------------------- datos del panel
   const consultas = permisos ? consultasPara(permisos.rol, permisos.modulos) : [];
@@ -997,9 +1008,11 @@ export async function conversar(
       });
       const r = await enVivo(ia, base);
       if (r.ok) {
+        if (r.modelo) modelos[ia] = r.modelo;
         const primera = i === 0 && errores.length === 0;
         return emitir({
           t: "fin",
+          modelos: { ...modelos },
           fuentes: [ia],
           aviso: primera ? juntar(avisoPrevio, ia === pedida ? pdfSin(ia) : "") : juntar(`Respondió ${NOMBRE[ia]}:`, ...errores, pdfSin(ia)),
         });
@@ -1024,6 +1037,7 @@ export async function conversar(
   ]);
 
   if (signal.aborted) return;
+  if (deGemini.ok && deGemini.modelo) modelos.gemini = deGemini.modelo;
 
   if (!deGroq.ok && !deGemini.ok) {
     // Las dos fallaron: responde GPT-4o, el respaldo.
@@ -1032,7 +1046,7 @@ export async function conversar(
     const r = await enVivo("openrouter", base);
     if (signal.aborted) return;
     if (!r.ok) return emitir({ t: "error", mensaje: `${deGroq.error} ${deGemini.error} ${r.error}` });
-    return emitir({ t: "fin", fuentes: ["openrouter"], aviso: juntar("Respondió GPT-4o:", deGroq.error, deGemini.error, pdfSin("openrouter")) });
+    return emitir({ t: "fin", modelos: { ...modelos }, fuentes: ["openrouter"], aviso: juntar("Respondió GPT-4o:", deGroq.error, deGemini.error, pdfSin("openrouter")) });
   }
 
   // Si una falló, la respuesta es la de la otra, tal cual.
@@ -1041,7 +1055,7 @@ export async function conversar(
     const buena = (deGroq.ok ? deGroq : deGemini) as { ok: true; texto: string };
     const mala = (deGroq.ok ? deGemini : deGroq) as { ok: false; error: string };
     escribir(buena.texto);
-    return emitir({ t: "fin", fuentes: [fuente], aviso: juntar(`Respondió solo ${NOMBRE[fuente]}:`, mala.error, pdfSin(fuente)) });
+    return emitir({ t: "fin", modelos: { ...modelos }, fuentes: [fuente], aviso: juntar(`Respondió solo ${NOMBRE[fuente]}:`, mala.error, pdfSin(fuente)) });
   }
 
   // Groq escribe la respuesta final. Si hay algo que Groq no ve (un PDF, una
@@ -1050,6 +1064,7 @@ export async function conversar(
   emitir({ t: "estado", texto: "Combinando las dos respuestas…" });
   const borradores = `--- Borrador A ---\n${deGroq.texto}\n\n--- Borrador B ---\n${deGemini.texto}\n\n--- Fin de los borradores ---\nEscribe ahora la respuesta final al último mensaje del usuario.`;
   const final = await enVivo(editor, base + INSTRUCCION_SINTESIS, borradores);
+  if (final.ok && final.modelo) modelos[editor] = final.modelo;
 
   if (!final.ok) {
     if (signal.aborted) return;
@@ -1058,11 +1073,12 @@ export async function conversar(
     escribir(propia.texto);
     return emitir({
       t: "fin",
+      modelos: { ...modelos },
       fuentes: [editor],
       aviso: `No se pudieron combinar las respuestas (${final.error}). Esta es la de ${NOMBRE[editor]}.`,
     });
   }
-  emitir({ t: "fin", fuentes: ["groq", "gemini"], aviso });
+  emitir({ t: "fin", modelos: { ...modelos }, fuentes: ["groq", "gemini"], aviso });
 }
 
 // ------------------------------------------------------------------ archivos
@@ -1163,11 +1179,10 @@ export async function preguntarConImagenes(
   pregunta: string,
   imagenes: ImagenActual[],
   signal: AbortSignal
-): Promise<{ ok: true; texto: string; ia: IA } | { ok: false; error: string }> {
+): Promise<{ ok: true; texto: string; ia: IA; modelo?: string } | { ok: false; error: string }> {
   const errores: string[] = [];
 
   if (hayGemini()) {
-    const modelo = modeloGemini();
     try {
       const partes = [
         { text: pregunta },
@@ -1176,23 +1191,24 @@ export async function preguntarConImagenes(
           { inline_data: { mime_type: img.mime, data: img.datos } },
         ]),
       ];
-      const respuesta = await pedirGemini(`/v1beta/models/${modelo}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const r = await rotarGemini(
+        "generateContent",
+        JSON.stringify({
           systemInstruction: { parts: [{ text: instruccion }] },
           contents: [{ role: "user", parts: partes }],
           generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
         }),
-        signal,
-      });
-      if (respuesta.ok) {
-        const json = await respuesta.json().catch(() => null);
+        signal
+      );
+      if (!r.respuesta) {
+        errores.push(r.mensaje);
+      } else if (r.respuesta.ok) {
+        const json = await r.respuesta.json().catch(() => null);
         const texto = textoDeRespuestaGemini(json).trim();
-        if (texto) return { ok: true, texto, ia: "gemini" };
+        if (texto) return { ok: true, texto, ia: "gemini", modelo: r.modelo };
         errores.push(motivoVacioGemini(json));
       } else {
-        errores.push(await errorGemini(respuesta, modelo));
+        errores.push(await errorGemini(r.respuesta, r.modelo, r.probados));
       }
     } catch (e) {
       console.error("[fotos gemini] red", e);

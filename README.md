@@ -980,6 +980,29 @@ pantalla lo sigue llamando GPT-4o), `OPENROUTER_MAX_TOKENS` (4096) y
 OpenRouter). Con una sola llave el módulo funciona con esa IA y lo dice en cada
 respuesta.
 
+**Gemini usa todos sus modelos.** En el plan gratis de Google el cupo es por
+modelo (Gemini 3.8 Flash: 20 peticiones al día; 3.5 Flash Lite: 500…), así
+que cada llamada a Gemini empieza por el preferido (`GEMINI_MODELO_CHAT`) y,
+si ese ya agotó su cupo (429), no existe para la cuenta (404) o está saturado
+(503), pasa solo al siguiente. Qué modelos hay se le pregunta a la cuenta
+(`GET /v1beta/models`) y se recuerda seis horas, así que cuando Google saque
+uno nuevo entra solo. Se usan los de texto, en este orden: Flash, Flash Lite y
+Pro, cada grupo del más nuevo al más viejo; quedan fuera los de voz (TTS),
+imagen, video, música, en vivo, embeddings, Gemma y similares, y los alias
+(`…-latest`) o versiones con fecha que repiten otro. Un modelo que agotó su
+cupo del día no se vuelve a probar hasta la medianoche del Pacífico (2 o 3
+a. m. en Colombia), que es cuando Google lo renueva; el de cupo por minuto,
+hasta lo que diga Google. Debajo de cada respuesta sale cuál respondió
+(«Gemini 3.7 Flash»). Si se acaban todos, responde Groq o GPT-4o y el aviso
+dice a qué hora se libera el primero. Lo mismo vale para el planificador de
+consultas, la confirmación de fotos repetidas y el análisis de tableros (que
+arranca con `GEMINI_MODELO`). Para fijar la lista a mano, en orden:
+`GEMINI_MODELOS=gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash-lite`
+(con uno solo, no rota). Los nombres exactos de la cuenta salen en el log del
+servidor la primera vez (`[gemini] modelos de la cuenta: …`), y cada vez que
+uno se salta, cuál respondió (`[gemini] respondió …`). La lógica está en
+`src/lib/modelosGemini.ts`.
+
 La llave de OpenRouter se crea en openrouter.ai/keys y gasta el saldo de esa
 cuenta (GPT-4o cobra por token de entrada y de salida). Como es el respaldo,
 solo se usa cuando Groq y Gemini fallan o cuando alguien elige «Solo GPT-4o».

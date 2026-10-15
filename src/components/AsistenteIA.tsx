@@ -69,6 +69,8 @@ type Mensaje = {
   avance?: string;
   borradores?: Partial<Record<IA, { texto?: string; error?: string }>>;
   fuentes?: IA[];
+  /** Con qué modelo respondió cada IA (hoy, el de Gemini, que rota según el cupo). */
+  modelos?: Partial<Record<IA, string>>;
   /** Lo que se consultó del panel para responder. */
   datos?: { titulo: string; ok: boolean; error?: string }[];
   aviso?: string;
@@ -85,6 +87,18 @@ const MODOS: { id: Modo; nombre: string; detalle: string }[] = [
 const NOMBRE_IA: Record<IA, string> = { groq: "Groq", gemini: "Gemini", openrouter: "GPT-4o" };
 /** Para respuestas viejas de esta pestaña, de cuando estaba DeepSeek. */
 const nombreIA = (ia: string) => NOMBRE_IA[ia as IA] ?? (ia === "deepseek" ? "DeepSeek" : ia);
+
+/** «gemini-3.7-flash» → «3.7 Flash». */
+const nombreModelo = (id: string) =>
+  id
+    .replace(/^gemini-/, "")
+    .split("-")
+    .map((p) => (/^\d/.test(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join(" ");
+
+/** «Gemini 3.7 Flash», o solo el nombre de la IA si no se sabe el modelo. */
+const conModelo = (ia: IA, modelos?: Partial<Record<IA, string>>) =>
+  ia === "gemini" && modelos?.gemini ? `${nombreIA(ia)} ${nombreModelo(modelos.gemini)}` : nombreIA(ia);
 
 const SUGERENCIAS = [
   "Resume este documento en cinco puntos",
@@ -294,7 +308,7 @@ function Respuesta({ m }: { m: Mensaje }) {
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-tinta-suave)]">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-relleno)] px-2 py-0.5">
               <Sparkles size={11} aria-hidden />
-              {(m.fuentes ?? []).map((f) => nombreIA(f)).join(" + ")}
+              {(m.fuentes ?? []).map((f) => conModelo(f, m.modelos)).join(" + ")}
             </span>
             {(m.datos ?? []).some((d) => d.ok) && (
               <span
@@ -560,7 +574,14 @@ export default function AsistenteIA() {
           else if (e.t === "datos") cambiarMensaje(respuesta.id, (m) => ({ ...m, datos: e.consultas }));
           else if (e.t === "fin") {
             terminado = true;
-            cambiarMensaje(respuesta.id, (m) => ({ ...m, estado: "listo", fuentes: e.fuentes, aviso: e.aviso, avance: undefined }));
+            cambiarMensaje(respuesta.id, (m) => ({
+              ...m,
+              estado: "listo",
+              fuentes: e.fuentes,
+              modelos: e.modelos,
+              aviso: e.aviso,
+              avance: undefined,
+            }));
           } else if (e.t === "error") {
             terminado = true;
             cambiarMensaje(respuesta.id, (m) => ({ ...m, estado: "error", error: e.mensaje, avance: undefined }));

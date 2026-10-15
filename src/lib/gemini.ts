@@ -4,9 +4,13 @@
  * La clave vive solo en el servidor (GEMINI_API_KEY). Nunca se manda al
  * navegador: si estuviera en el cliente, cualquiera la sacaría del código
  * de la página y la gastaría por su cuenta.
+ *
+ * Arranca con GEMINI_MODELO (o el de por defecto) y, si ese agotó su cupo,
+ * sigue con los demás modelos de la cuenta, como el asistente
+ * (lib/modelosGemini.ts).
  */
-
-const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+import { pedirGemini } from "./asistenteIA";
+import { conRotacion, type Rotacion } from "./modelosGemini";
 
 /**
  * Google está limitando los modelos 2.5 a quien ya los venía usando, así que
@@ -75,20 +79,21 @@ export async function analizarConGemini(
     generationConfig: { temperature: 0.2, maxOutputTokens: 1400 },
   };
 
-  let respuesta: Response;
+  let rotacion: Rotacion;
   try {
-    respuesta = await fetch(`${ENDPOINT}/${modelo}:generateContent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": clave,
-      },
-      body: JSON.stringify(cuerpo),
-    });
+    rotacion = await conRotacion(pedirGemini, modelo, (m) =>
+      pedirGemini(`/v1beta/models/${m}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      })
+    );
   } catch (e) {
     console.error("[gemini] red", e);
     return { ok: false, error: "No se pudo contactar a Gemini. Intenta de nuevo." };
   }
+  if (!rotacion.respuesta) return { ok: false, error: rotacion.mensaje };
+  const respuesta = rotacion.respuesta;
 
   const json = await respuesta.json().catch(() => null);
 
@@ -101,13 +106,16 @@ export async function analizarConGemini(
     if (respuesta.status === 404) {
       return {
         ok: false,
-        error: `Tu proyecto de Google no tiene acceso al modelo "${modelo}". Cambia GEMINI_MODELO por uno disponible en tu cuenta.`,
+        error: `Tu proyecto de Google no tiene acceso al modelo "${rotacion.modelo}". Cambia GEMINI_MODELO por uno disponible en tu cuenta.`,
       };
     }
     if (respuesta.status === 429) {
       return {
         ok: false,
-        error: "Se agotó la cuota de Gemini por ahora. Espera un momento y reintenta.",
+        error:
+          rotacion.probados.length > 1
+            ? `Gemini llegó a su cupo en los ${rotacion.probados.length} modelos que probó. Espera un momento y reintenta.`
+            : "Se agotó la cuota de Gemini por ahora. Espera un momento y reintenta.",
       };
     }
     return { ok: false, error: `Gemini respondió con un error: ${detalle}` };
