@@ -18,6 +18,8 @@ export type IdModulo =
   | "territorio"
   | "auditoria"
   | "imagenes"
+  | "fotos_query"
+  | "fotos_query_sql"
   | "tableros"
   | "tableros_admin"
   | "asistente"
@@ -43,6 +45,8 @@ export const MODULOS: Modulo[] = [
   { id: "territorio", nombre: "Departamento y ciudad", grupo: "Cartera", detalle: "Filtrar los puntos por región y bajarlos en Excel." },
   { id: "auditoria", nombre: "Auditoría de datos", grupo: "Auditorías", detalle: "Hallazgos de los formularios, el Excel limpio y marcarlos como revisados." },
   { id: "imagenes", nombre: "Auditoría de imágenes", grupo: "Auditorías", detalle: "Fotos de inicio de visita y marcarlas como correctas o para revisar." },
+  { id: "fotos_query", nombre: "Auditoría con query", grupo: "Auditorías", detalle: "Correr las queries de fotos guardadas, ver las fotos y marcarlas como correctas o para revisar. Las marcas son las mismas de la Auditoría de imágenes." },
+  { id: "fotos_query_sql", nombre: "Escribir queries", grupo: "Auditorías", detalle: "Escribir, probar, guardar y borrar las queries de la Auditoría con query (incluye correrlas). Con esto se puede leer cualquier tabla que vea el usuario de Athena." },
   { id: "tableros", nombre: "Ver tableros", grupo: "Reportes", detalle: "Los tableros de Power BI publicados." },
   { id: "tableros_admin", nombre: "Administrar tableros", grupo: "Reportes", detalle: "Agregar, editar, publicar u ocultar tableros de Power BI." },
   { id: "asistente", nombre: "Asistente IA", grupo: "Herramientas", detalle: "Chat con Groq, Gemini y GPT-4o, con imágenes y documentos. Consulta los datos de los demás módulos que tenga el perfil." },
@@ -124,7 +128,16 @@ export function modulosDeRuta(
   if (es("/api/admin/puntos") || es("/api/admin/purgar")) return ["editar"];
   if (es("/api/admin/consultores") || es("/api/admin/vendedores")) return ["consultores"];
   if (es("/api/admin/territorio")) return ["territorio"];
-  if (es("/api/admin/auditoria-imagenes") || es("/api/admin/revision-fotos")) return ["imagenes"];
+  if (es("/api/admin/auditoria-imagenes")) return ["imagenes"];
+  // Las marcas de las fotos las comparten la auditoría de imágenes y la de query.
+  if (es("/api/admin/revision-fotos")) return ["imagenes", "fotos_query", "fotos_query_sql"];
+  // Queries de fotos guardadas: verlas y correrlas, o escribirlas.
+  if (es("/api/admin/queries-fotos")) return lectura ? ["fotos_query", "fotos_query_sql"] : ["fotos_query_sql"];
+  // Correr en Athena. Mandar SQL escrito a mano (y no una query guardada) lo
+  // revisa además la ruta: el middleware no lee el cuerpo.
+  if (es("/api/admin/auditoria-query")) return ["fotos_query", "fotos_query_sql"];
+  // Fotos repetidas: huellas y confirmación con IA, desde la de query.
+  if (es("/api/admin/fotos-repetidas")) return ["fotos_query", "fotos_query_sql"];
   if (es("/api/admin/revision-hallazgos")) return ["auditoria"];
   if (es("/api/admin/auditoria")) return ["auditoria"];
   if (es("/api/admin/tableros")) return lectura ? ["tableros", "tableros_admin"] : ["tableros_admin"];

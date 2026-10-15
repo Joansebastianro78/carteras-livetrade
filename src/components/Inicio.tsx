@@ -224,6 +224,15 @@ function describir(a: ItemActividad): { frase: string; detalle: string | null } 
           .join(" · "),
       };
     }
+    case "query_fotos_crear":
+      return { frase: `guardó la query de fotos «${txt("nombre")}»`, detalle: null };
+    case "query_fotos_editar":
+      return {
+        frase: `editó la query de fotos «${txt("nombre")}»`,
+        detalle: d.anterior && d.anterior !== d.nombre ? `Antes se llamaba «${txt("anterior")}»` : null,
+      };
+    case "query_fotos_eliminar":
+      return { frase: `borró la query de fotos «${txt("nombre")}»`, detalle: null };
     default:
       return { frase: a.accion.replace(/_/g, " "), detalle: null };
   }
@@ -1143,6 +1152,8 @@ function tipoDe(accion: string): { nombre: string; clase: string } {
     return { nombre: "Revisados", clase: "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]" };
   if (accion.startsWith("usuario") || accion.startsWith("perfil"))
     return { nombre: "Usuarios", clase: "bg-[var(--color-morado-fondo)] text-[var(--color-morado-tinta)]" };
+  if (accion.startsWith("query_fotos"))
+    return { nombre: "Auditorías", clase: "bg-[var(--color-relleno)] text-[var(--color-tinta)]" };
   if (accion.startsWith("tablero"))
     return { nombre: "Tableros", clase: "bg-[var(--color-info-fondo)] text-[var(--color-info-tinta)]" };
   if (accion.startsWith("mantenimiento") || accion === "tema_cambiar")

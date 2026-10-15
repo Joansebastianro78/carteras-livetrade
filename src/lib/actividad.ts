@@ -28,7 +28,10 @@ export type AccionPanel =
   | "perfil_editar"
   | "perfil_eliminar"
   | "revisados_carga"
-  | "revisados_deshacer";
+  | "revisados_deshacer"
+  | "query_fotos_crear"
+  | "query_fotos_editar"
+  | "query_fotos_eliminar";
 
 let avisado = false;
 

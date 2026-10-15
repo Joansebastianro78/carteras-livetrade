@@ -5,9 +5,10 @@ import { Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import type { RespuestaEstado, RespuestaInicio, RespuestaPagina } from "@/lib/respuestasAthena";
 
 /**
- * Lo que comparten las pestañas que leen de Athena (auditoría de datos y de
- * imágenes): lanzar la consulta, esperar a que termine, traer los resultados
- * y mostrar el avance. Cada pestaña pone su ruta de API y su pantalla.
+ * Lo que comparten las pestañas que leen de Athena (auditoría de datos, de
+ * imágenes y con query): lanzar la consulta, esperar a que termine, traer los
+ * resultados y mostrar el avance. Cada pestaña pone su ruta de API y su
+ * pantalla.
  */
 
 /** Más que esto ya no cabe con holgura en el navegador. */
@@ -80,9 +81,12 @@ export function useConsultaAthena<T>(
     convertir.current = aFilas;
   });
 
-  /** `fresca` pide datos nuevos aunque Athena tenga un resultado reciente. */
+  /**
+   * `fresca` pide datos nuevos aunque Athena tenga un resultado reciente.
+   * `cuerpo` va en el POST a la ruta: en la Auditoría con query, cuál query.
+   */
   const consultar = useCallback(
-    async (fresca: boolean) => {
+    async (fresca: boolean, cuerpo?: Record<string, unknown>) => {
       const id = ++consulta.current;
       const vigente = () => consulta.current === id;
 
@@ -94,7 +98,7 @@ export function useConsultaAthena<T>(
         const { id: ejecucion } = await pedir<RespuestaInicio>(ruta, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fresca }),
+          body: JSON.stringify({ ...cuerpo, fresca }),
         });
         const conId = `${ruta}?id=${encodeURIComponent(ejecucion)}`;
 

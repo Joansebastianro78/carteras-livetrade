@@ -18,7 +18,7 @@ export const COLUMNAS_IMAGENES = [
   "fecha_inicio",
 ] as const;
 
-type ColumnaImagen = (typeof COLUMNAS_IMAGENES)[number];
+export type ColumnaImagen = (typeof COLUMNAS_IMAGENES)[number];
 
 /**
  * con_foto      la visita trae al menos un enlace de foto
@@ -78,33 +78,42 @@ export function fotosDe(valor: string | null | undefined): string[] {
 export function filasDeImagenes(columnas: string[], filas: (string | null)[][]): FilaImagen[] {
   const posicion = new Map(columnas.map((c, i) => [c.toLowerCase(), i]));
   return filas.map((f) => {
-    const fila = {} as FilaImagen;
+    const valores = {} as Record<ColumnaImagen, string | null>;
     for (const c of COLUMNAS_IMAGENES) {
       const i = posicion.get(c);
-      fila[c] = i === undefined ? null : (f[i] ?? null);
+      valores[c] = i === undefined ? null : (f[i] ?? null);
     }
-    fila.fotos = fotosDe(fila.foto_visita_inicio);
-    fila.estado =
-      fila.fotos.length > 0
-        ? "con_foto"
-        : (fila.foto_visita_inicio ?? "").trim() === ""
-          ? "sin_foto"
-          : "no_es_enlace";
-    const fecha = leerFecha(fila.fecha_inicio);
-    fila.dia = fecha?.dia ?? null;
-    fila.hora = fecha?.hora ?? null;
-    fila.orden = fecha ? `${fecha.dia} ${String(fecha.segundos).padStart(5, "0")}` : "";
-    const foto = (fila.foto_visita_inicio ?? "").trim();
-    fila.clave = foto ? huella(foto) : null;
-    return fila;
+    return armarFila(valores);
   });
+}
+
+/**
+ * Una visita con sus fotos, su estado, su fecha y la huella de la foto. La
+ * Auditoría con query la arma con las columnas que se eligen.
+ */
+export function armarFila(valores: Record<ColumnaImagen, string | null>): FilaImagen {
+  const fila = { ...valores } as FilaImagen;
+  fila.fotos = fotosDe(fila.foto_visita_inicio);
+  fila.estado =
+    fila.fotos.length > 0
+      ? "con_foto"
+      : (fila.foto_visita_inicio ?? "").trim() === ""
+        ? "sin_foto"
+        : "no_es_enlace";
+  const fecha = leerFecha(fila.fecha_inicio);
+  fila.dia = fecha?.dia ?? null;
+  fila.hora = fecha?.hora ?? null;
+  fila.orden = fecha ? `${fecha.dia} ${String(fecha.segundos).padStart(5, "0")}` : "";
+  const foto = (fila.foto_visita_inicio ?? "").trim();
+  fila.clave = foto ? huella(foto) : null;
+  return fila;
 }
 
 /**
  * Las visitas de la más reciente a la más antigua; las que no traen fecha, al
  * final. Athena las entrega sin orden. Devuelve una lista nueva.
  */
-export function ordenarPorFecha(filas: FilaImagen[]): FilaImagen[] {
+export function ordenarPorFecha<F extends FilaImagen>(filas: F[]): F[] {
   return [...filas].sort((a, b) => (a.orden === b.orden ? 0 : a.orden < b.orden ? 1 : -1));
 }
 

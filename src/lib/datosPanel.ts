@@ -355,7 +355,7 @@ const CONSULTAS: ConsultaPanel[] = [
     nombre: "actividad_reciente",
     titulo: "Actividad del panel",
     descripcion:
-      "Lo último que se hizo en el panel, con quién y cuándo: cargas de Excel, ediciones y borrados de puntos, hallazgos revisados, cambios de usuarios, perfiles, tableros, temas y mantenimiento.",
+      "Lo último que se hizo en el panel, con quién y cuándo: cargas de Excel, ediciones y borrados de puntos, hallazgos revisados, queries de fotos, cambios de usuarios, perfiles, tableros, temas y mantenimiento.",
     parametros: {
       type: "object",
       properties: { limite: { type: "integer", description: "Cuántos movimientos traer (1 a 30). Por defecto 15." } },

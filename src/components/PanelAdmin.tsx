@@ -5,6 +5,7 @@ import {
   ChartColumn,
   CheckCheck,
   ClipboardCheck,
+  DatabaseZap,
   House,
   Image as IconoImagen,
   Lock,
@@ -28,6 +29,7 @@ import EditorCartera from "./EditorCartera";
 import AdminUsuarios from "./AdminUsuarios";
 import Auditoria from "./Auditoria";
 import AuditoriaImagenes from "./AuditoriaImagenes";
+import AuditoriaQuery from "./AuditoriaQuery";
 import BackOffice from "./BackOffice";
 import FiltroTerritorio from "./FiltroTerritorio";
 import Mantenimiento from "./Mantenimiento";
@@ -116,6 +118,28 @@ const SECCIONES: Seccion[] = [
     Icono: IconoImagen,
     encabezadoPropio: true,
     render: () => <AuditoriaImagenes />,
+  },
+  // La auditoría con query: quien escribe queries también las corre, así que
+  // ve una sola sección. La pantalla pregunta a la API qué puede hacer.
+  {
+    id: "query",
+    modulo: "fotos_query_sql",
+    menu: "Con query",
+    titulo: "Auditoría con query",
+    grupo: "Auditorías",
+    Icono: DatabaseZap,
+    encabezadoPropio: true,
+    render: () => <AuditoriaQuery />,
+  },
+  {
+    id: "query",
+    modulo: "fotos_query",
+    menu: "Con query",
+    titulo: "Auditoría con query",
+    grupo: "Auditorías",
+    Icono: DatabaseZap,
+    encabezadoPropio: true,
+    render: () => <AuditoriaQuery />,
   },
   {
     // Lo que se marcó como revisado en la auditoría de datos: lo ve quien ve
@@ -242,6 +266,7 @@ export default function PanelAdmin({
       if (!tiene(s.modulo)) return false;
       // Quien administra los tableros no necesita además el visor.
       if (s.modulo === "tableros" && tiene("tableros_admin")) return false;
+      if (s.modulo === "fotos_query" && tiene("fotos_query_sql")) return false;
       return true;
     });
 

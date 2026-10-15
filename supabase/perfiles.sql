@@ -32,11 +32,13 @@ insert into public.perfiles (clave, nombre, descripcion, modulos, sistema) value
   ('superadmin', 'Superadministrador',
    'Todo el panel. Es el único que puede tocar a otro superadministrador.',
    array['inicio','cargar','editar','consultores','territorio','auditoria','imagenes',
+         'fotos_query','fotos_query_sql',
          'tableros','tableros_admin','asistente','rutas','mantenimiento','temas','usuarios','perfiles'],
    true),
   ('admin', 'Administrador',
    'Maneja toda la cartera, los usuarios y la configuración.',
    array['inicio','cargar','editar','consultores','territorio','auditoria','imagenes',
+         'fotos_query','fotos_query_sql',
          'tableros','tableros_admin','asistente','rutas','mantenimiento','temas','usuarios','perfiles'],
    true),
   ('backoffice', 'BackOffice',
@@ -145,3 +147,7 @@ revoke all on public.perfiles from anon, authenticated;
 -- (también se puede marcar en Configuración › Perfiles y permisos):
 -- update public.perfiles set modulos = array_append(modulos, 'rutas')
 --  where clave = 'admin' and not ('rutas' = any(modulos));
+-- Darle la Auditoría con query (correr y escribir queries) a los administradores
+-- de una instalación que ya existía:
+-- update public.perfiles set modulos = modulos || array['fotos_query','fotos_query_sql']
+--  where clave = 'admin' and not ('fotos_query_sql' = any(modulos));

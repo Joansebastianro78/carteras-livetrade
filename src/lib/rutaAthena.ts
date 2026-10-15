@@ -1,16 +1,19 @@
 /**
- * Ruta de API que corre UNA consulta fija en Athena. SOLO SERVIDOR.
+ * Ruta de API que corre una consulta en Athena. SOLO SERVIDOR.
  *
  * La usan /api/admin/auditoria y /api/admin/auditoria-imagenes, cada una con
- * su SQL:
+ * su SQL fijo, y /api/admin/auditoria-query, que arma el SQL con lo que llega
+ * en el cuerpo (una query guardada o una escrita, ya revisada):
  *
  *   POST {fresca?}             → lanza la consulta y devuelve su id
  *   GET  ?id=X                 → estado de esa ejecución
  *   GET  ?id=X&pagina=inicio   → primeras 1000 filas
  *   GET  ?id=X&pagina=<token>  → las 1000 siguientes
  *
- * El navegador nunca manda SQL, y solo puede leer las ejecuciones que lanzó
- * la misma ruta (ver "id firmado").
+ * En las auditorías de datos e imágenes el navegador nunca manda SQL. En la
+ * de query sí, y la ruta lo revisa (lib/sqlSoloLectura.ts) y pide el permiso
+ * «Escribir queries». En todas, el navegador solo puede leer las ejecuciones
+ * que lanzó la misma ruta (ver "id firmado").
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -63,10 +66,16 @@ function ejecucionDe(nombre: string, idFirmado: string): string | null {
 
 // -------------------------------------------------------------------- ruta
 /**
+ * El SQL de la ruta: un texto fijo, o una función que lo arma con el cuerpo
+ * del POST y devuelve el SQL, o una respuesta de error para cortar ahí.
+ */
+export type FuenteSql = string | ((cuerpo: Record<string, unknown>) => Promise<string | Response>);
+
+/**
  * `nombre` identifica la consulta en la firma y en el log del servidor; debe
  * ser distinto en cada ruta para que el id de una no sirva en otra.
  */
-export function crearRutaAthena(nombre: string, sql: string) {
+export function crearRutaAthena(nombre: string, sql: FuenteSql) {
   function fallo(paso: string, e: unknown) {
     // El detalle técnico queda en el log del servidor; a la pantalla va explicado.
     console.error(`[athena ${nombre} ${paso}]`, nombreError(e), (e as Error)?.message);
@@ -75,7 +84,8 @@ export function crearRutaAthena(nombre: string, sql: string) {
   }
 
   async function POST(req: Request) {
-    const cuerpo = (await req.json().catch(() => ({}))) as { fresca?: unknown };
+    const leido: unknown = await req.json().catch(() => ({}));
+    const cuerpo = (leido && typeof leido === "object" ? leido : {}) as Record<string, unknown>;
 
     // Se revisa antes de lanzar: sin secreto no habría cómo entregar el id.
     if (!process.env.ADMIN_SECRET) {
@@ -85,8 +95,17 @@ export function crearRutaAthena(nombre: string, sql: string) {
       );
     }
 
+    let texto: string;
+    if (typeof sql === "string") {
+      texto = sql;
+    } else {
+      const armado = await sql(cuerpo);
+      if (typeof armado !== "string") return armado;
+      texto = armado;
+    }
+
     try {
-      const ejecucion = await iniciarConsulta(sql, cuerpo.fresca === true);
+      const ejecucion = await iniciarConsulta(texto, cuerpo.fresca === true);
       const respuesta: RespuestaInicio = { id: `${ejecucion}.${firmar(nombre, ejecucion)}` };
       return NextResponse.json(respuesta);
     } catch (e) {

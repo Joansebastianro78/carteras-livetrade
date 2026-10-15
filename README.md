@@ -29,12 +29,15 @@ autorizarlo o hospedar el tarball internamente.
    `supabase/hallazgos.sql`.
 
    En un proyecto que ya estaba andando basta con ejecutar `supabase/panel.sql`
-   una vez. Crea dos tablas: `actividad_panel` (la actividad reciente del
-   Inicio) y `revision_fotos` (las marcas de la auditoría de imágenes). Se
-   puede volver a correr sin problema. Mientras no se ejecute, el panel
+   una vez. Crea estas tablas: `actividad_panel` (la actividad reciente del
+   Inicio), `revision_fotos` (las marcas de las auditorías de fotos),
+   `queries_fotos` (las queries guardadas de la Auditoría con query),
+   `huellas_fotos` y `repetidas_ia` (las fotos repetidas). Se puede volver a
+   correr sin problema: **si ya lo habías ejecutado, ejecútalo otra vez** para
+   que cree las nuevas. Mientras no se ejecute, el panel
    funciona igual: el Inicio no muestra los cambios de usuarios,
-   mantenimiento, tableros y temas, y las fotos no se pueden marcar; las dos
-   cosas lo avisan en pantalla.
+   mantenimiento, tableros y temas, las fotos no se pueden marcar y las
+   queries no se pueden guardar; todo eso lo avisa en pantalla.
 
    Para **Perfiles y permisos** hay que ejecutar `supabase/perfiles.sql` una
    vez, después de los anteriores. Crea la tabla `perfiles` con los tres de
@@ -271,8 +274,9 @@ las auditorías) y asignarlos en **Administradores**, como cualquier otro.
 
 Los módulos son las secciones del panel: Inicio, Cargar plantilla, Editar
 cartera, Consultores, Departamento y ciudad, Auditoría de datos, Auditoría de
-imágenes, Ver tableros, Administrar tableros, Asistente IA, Generador Rutas,
-Mantenimiento, Temas, Administradores y Perfiles y permisos. El catálogo está en
+imágenes, Auditoría con query, Escribir queries, Ver tableros, Administrar
+tableros, Asistente IA, Generador Rutas, Mantenimiento, Temas, Administradores
+y Perfiles y permisos. El catálogo está en
 `src/lib/permisos.ts` (`MODULOS`), y ahí mismo `modulosDeRuta` dice qué módulo
 pide cada ruta de `/api/admin`.
 
@@ -643,7 +647,8 @@ variables van con `ATHENA_` y no con `AWS_` porque Vercel reserva esos nombres.
   llamada choca con el límite de tiempo de las funciones de Vercel.
 - Los resultados llegan en páginas de 1000 filas (lo máximo de Athena por
   llamada). Por encima de 200.000 filas la pantalla pide usar DBeaver.
-- El navegador nunca manda SQL. La ruta solo corre esta consulta, y el id
+- En esta auditoría el navegador nunca manda SQL (en la Auditoría con query
+  sí, con sus reglas: ver más abajo). La ruta solo corre esta consulta, y el id
   que le entrega al navegador va firmado con `ADMIN_SECRET` (HMAC), junto
   con el nombre de la consulta: solo se
   leen las ejecuciones que lanzó la propia ruta, así que quien tenga sesión no
@@ -777,12 +782,151 @@ otra se cambia en ese archivo.
   válido» con el valor tal cual. Varias fotos en una celda van separadas por
   espacios o `|`.
 
-Las dos auditorías comparten la conexión: `src/lib/rutaAthena.ts` arma la ruta
-de API para una consulta fija, y `src/components/ConsultaAthena.tsx` lanza la
-consulta, espera y trae las páginas. Agregar otra consulta es un archivo con
-el SQL, una ruta de cuatro líneas y su pantalla. También comparten el filtro
-de fechas: `src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
-`src/components/RangoFechas.tsx` son los campos «Desde» y «Hasta».
+Las auditorías comparten la conexión: `src/lib/rutaAthena.ts` arma la ruta
+de API para una consulta (fija, o armada con lo que pide la pantalla, como en
+la de query), y `src/components/ConsultaAthena.tsx` lanza la consulta, espera
+y trae las páginas. Agregar otra consulta fija es un archivo con el SQL, una
+ruta de cuatro líneas y su pantalla. También comparten el filtro de fechas:
+`src/lib/fechas.ts` lee las fechas y decide qué cae en el rango, y
+`src/components/RangoFechas.tsx` son los campos «Desde» y «Hasta». La
+pantalla de revisar fotos (galería, filtros, visor, marcas) es
+`src/components/GaleriaFotos.tsx`, la misma en imágenes y en la de query.
+
+### Auditoría con query
+
+Sección **Auditorías → Con query**. Es la auditoría de imágenes igualita,
+con la diferencia de que la query no está fija en el código: se escribe en la
+página. Sirve para auditar otras fotos (la de cierre de visita, la de
+exhibición), otra campaña u otro rango sin tocar el código.
+
+Tiene dos permisos, en **Perfiles y permisos**:
+
+- **Auditoría con query**: elige una query guardada, la corre, ve las fotos,
+  las marca y descarga el Excel. Puede ver el SQL, no cambiarlo.
+- **Escribir queries**: además escribe SQL, lo corre sin guardarlo para
+  probar, y guarda, cambia o borra queries. Con esto se puede leer cualquier
+  tabla que vea el usuario de AWS de Athena, así que va solo a quien ya tenga
+  ese acceso por otro lado (DBeaver, por ejemplo).
+
+Los dos vienen marcados en Superadministrador y Administrador; en una
+instalación que ya existía hay que marcarlos en Perfiles y permisos (o con la
+línea comentada al final de `supabase/perfiles.sql`). BackOffice no los trae.
+
+Cómo se usa:
+
+1. Elegir una query de la lista, o «Nueva query» y escribir el SQL (Ctrl +
+   Enter la corre). La query tiene que traer **una columna con el enlace de
+   la foto**; lo demás es opcional.
+2. Al terminar, la página reconoce qué columna es la **foto** (la que trae
+   enlaces http/https), la **fecha**, el **PDV**, el **consultor** y el
+   **código** (por el contenido y por el nombre: `nombre_pdv`, `usuario`,
+   `mercaderista`, `cod_…`), y lo muestra en cinco listas para corregirlo. Con
+   las columnas de la consulta de imágenes (`nombre_pdv`, `nombre_usuario`,
+   `cod_personalizado`, `fecha_inicio`) acierta siempre.
+3. Debajo sale la misma pantalla de la auditoría de imágenes: fechas,
+   filtros, galería por día, la visita a la derecha (con las demás columnas
+   de la query), el visor, las marcas y el Excel. Además, las columnas de la
+   query con pocos valores (entre 2 y 80 distintos: departamento, ciudad,
+   zona, cadena…) salen como filtros, hasta cuatro, con cuántas visitas
+   tiene cada valor y «Sin dato» si hay visitas sin él. Como los demás
+   filtros, cambian lo que se ve; el Excel sigue las fechas.
+4. **Guardar** le pone nombre a la query y recuerda las columnas elegidas.
+   **Guardar cambios**, **Guardar como nueva** y **Borrar** para las que ya
+   existen. Guardar, cambiar y borrar quedan en la actividad del Inicio.
+
+- **PDV**: `nombre_pdv` o `nombre_personalizado` (el nombre del PDV en las
+  tablas de LiveTrade); si no hay ninguna de esas, una columna con pdv,
+  punto, tienda o cliente en el nombre, o cualquier otra `nombre_…` que no
+  sea del consultor.
+- **Las marcas son las mismas de la auditoría de imágenes** (tabla
+  `revision_fotos`): la foto se reconoce por su enlace, así que una foto
+  marcada en un módulo sale marcada en el otro. Borrar una query no borra
+  marcas.
+- **Excel**: todas las columnas de la query, con sus nombres y en su orden,
+  más `revision` y `revisado_por`; la foto como enlace y la fecha como fecha
+  de Excel. El nombre lleva el de la query y el rango:
+  `Auditoria_query_Fotos_de_cierre_2026-09-05_a_2026-09-10.xlsx`.
+- Hasta 200.000 filas, como las otras auditorías; si trae más, pide acotar
+  la query.
+
+#### Fotos repetidas
+
+En los filtros, **Buscar repetidas** encuentra la misma foto usada en visitas
+distintas (por ejemplo, la foto del libro contable de un PDV subida también en
+otro), dentro de las fechas elegidas.
+
+1. **Huella.** El servidor descarga cada foto, la pasa a gris, la reduce a 9×8
+   puntos y saca una huella de 64 bits (dHash, con `sharp`). Dos tomas de la
+   misma foto (recomprimida, achicada, un poco recortada o más clara) dan
+   huellas casi iguales; dos fotos distintas, muy diferentes. La huella queda
+   guardada en `huellas_fotos`: la segunda vez es inmediato y solo se
+   descargan las fotos nuevas. La primera vez, con 5.000 fotos, tarda unos
+   minutos; la barra dice cuántas van y se puede detener.
+2. **Grupos.** Se juntan las visitas con fotos parecidas (y se encadenan: si A
+   se parece a B y B a C, van las tres). «Parecido» decide cuánto:
+   **Idénticas** (hasta 4 bits distintos de 64), **Casi iguales** (hasta 10,
+   el de entrada) o **Parecidas** (hasta 14, encuentra más pero con más
+   falsas alarmas). Las fotos casi de un solo color (negras, en blanco) no se
+   comparan: se parecen todas. **Ver solo repetidas** muestra la galería por
+   grupo: cuántas visitas, de cuántos PDV y consultores. La primera de cada
+   grupo es la más antigua. Cada tarjeta repetida lleva su marca, la visita
+   elegida dice su grupo, y el Excel trae `grupo_repetida` e `ia_repetida`.
+3. **Confirmar con IA.** La huella no entiende lo que hay en la foto: dos
+   fotos distintas del mismo libro en el mismo mostrador pueden quedar
+   juntas. **Confirmar con IA** (de todos los grupos o de uno) le manda a
+   Gemini la foto más antigua del grupo y las demás (achicadas a 768 px, de a
+   cinco por pregunta) y le pregunta cuáles son la misma toma; si Gemini
+   falla o no está configurado, responde GPT-4o (OpenRouter). Cada grupo
+   queda con «IA: es la misma foto en todas», «misma foto en 2 de 3» o «son
+   fotos distintas», y cada tarjeta con lo que dijo. Lo que dijo la IA se
+   guarda en `repetidas_ia`: no se vuelve a pagar por el mismo par. Si dos
+   visitas tienen exactamente el mismo enlace, no se le pregunta: es la misma
+   foto.
+
+Lo que cuesta: las huellas no usan IA (solo descargar las fotos una vez). La
+IA se paga solo por los grupos que se confirman, una pregunta por cada cinco
+fotos de un grupo.
+
+Las fotos las descarga el servidor, no el navegador, y con cuidado: solo
+`http` y `https`, solo los puertos 80 y 443, nada que apunte a la red interna
+(`127.0.0.1`, `10.x`, `192.168.x`, `169.254.x`…), hasta 20 MB y 15 segundos
+por foto, y las redirecciones se revisan igual (`src/lib/descargaFoto.ts`).
+Si el servidor de fotos de LiveTrade no deja descargarlas desde afuera, las
+fotos quedan como «no se pudieron revisar» y la pantalla dice cuántas.
+
+La ruta es `/api/admin/fotos-repetidas` (la piden «Auditoría con query» o
+«Escribir queries»); la huella está en `src/lib/huellaVisual.ts` y los grupos
+en `src/lib/repetidas.ts`.
+
+**Qué SQL se acepta.** Solo lectura: una sola sentencia que empiece por
+`SELECT` o `WITH`. Se rechazan `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `DROP`,
+`CREATE`, `ALTER`, `UNLOAD`, `MSCK`, `GRANT` y parecidas, más de una
+sentencia (un `;` en el medio) y las funciones de tabla (`TABLE(…)`, que
+pueden mandar SQL a otras bases). Lo que va entre comillas y los comentarios
+no cuentan: `WHERE estado = 'DELETE'` sirve, y una columna que se llame como
+una de esas palabras se escribe entre comillas dobles (`"delete"`). El `;` y
+los comentarios del final se quitan antes de mandarla. La revisión está en
+`src/lib/sqlSoloLectura.ts`; la pantalla avisa mientras se escribe, pero la
+que vale es la del servidor (`/api/admin/auditoria-query`), que también
+revisa las queries guardadas antes de correrlas y el permiso «Escribir
+queries» cuando llega SQL escrito.
+
+Esa revisión es una barrera más, no la única: **lo que de verdad limita lo
+que se puede hacer en Athena son los permisos del usuario de AWS**
+(`ATHENA_ACCESS_KEY_ID`). Ese usuario debería poder leer las tablas y
+escribir solo en la carpeta de resultados de Athena, nada más.
+
+Los errores de Athena (una columna que no existe, una tabla mal escrita)
+salen en pantalla tal como los explica Athena. En el log del servidor queda
+quién corrió qué query (`[athena fotos-query]`).
+
+```sql
+-- queries guardadas
+select id, nombre, actualizado_por, updated_at from public.queries_fotos order by nombre;
+-- fotos repetidas: huellas guardadas y lo que dijo la IA
+select count(*), count(*) filter (where error is not null) as con_error from public.huellas_fotos;
+select misma, count(*) from public.repetidas_ia group by misma;
+```
 
 ## 10. Asistente IA
 
@@ -977,6 +1121,9 @@ está comentada al final de `supabase/perfiles.sql`).
   de filas convendría generarla en el servidor y entregar un enlace.
 - No hay borrado de ciclos viejos. Cuando la tabla crezca, conviene un job que
   archive los ciclos cerrados.
+- La Auditoría con query no pone tope a lo que lee Athena: una query sin
+  filtros sobre una tabla grande cuesta lo que cueste. Si hace falta, el
+  workgroup de Athena admite un límite de datos por consulta.
 - El resumen de la auditoría que sale en el Inicio se guarda en el navegador
   de cada quien, no en la base: otro computador no lo ve hasta consultarla.
 - El modo oscuro no oscurece los mapas: las capas son imágenes de terceros.

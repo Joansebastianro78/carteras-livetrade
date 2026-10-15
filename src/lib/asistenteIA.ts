@@ -1149,3 +1149,67 @@ export async function subirAGemini(
     return { ok: false, error: "No se pudo subir el archivo a Gemini." };
   }
 }
+
+// ------------------------------------------------------------------ preguntas con fotos
+
+/**
+ * Una pregunta corta sobre unas fotos, sin conversación: la usa la Auditoría
+ * con query para confirmar fotos repetidas. Responde Gemini (que ve mejor las
+ * fotos); si no está o falla, GPT-4o. Groq no entra: su modelo de imágenes
+ * solo acepta tres.
+ */
+export async function preguntarConImagenes(
+  instruccion: string,
+  pregunta: string,
+  imagenes: ImagenActual[],
+  signal: AbortSignal
+): Promise<{ ok: true; texto: string; ia: IA } | { ok: false; error: string }> {
+  const errores: string[] = [];
+
+  if (hayGemini()) {
+    const modelo = modeloGemini();
+    try {
+      const partes = [
+        { text: pregunta },
+        ...imagenes.flatMap((img, i) => [
+          { text: `Foto ${i + 1}:` },
+          { inline_data: { mime_type: img.mime, data: img.datos } },
+        ]),
+      ];
+      const respuesta = await pedirGemini(`/v1beta/models/${modelo}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: instruccion }] },
+          contents: [{ role: "user", parts: partes }],
+          generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
+        }),
+        signal,
+      });
+      if (respuesta.ok) {
+        const json = await respuesta.json().catch(() => null);
+        const texto = textoDeRespuestaGemini(json).trim();
+        if (texto) return { ok: true, texto, ia: "gemini" };
+        errores.push(motivoVacioGemini(json));
+      } else {
+        errores.push(await errorGemini(respuesta, modelo));
+      }
+    } catch (e) {
+      console.error("[fotos gemini] red", e);
+      errores.push(signal.aborted ? "Se canceló." : "No se pudo contactar a Gemini.");
+    }
+  }
+
+  if (hayOpenRouter() && !signal.aborted) {
+    const r = await respuestaOpenAI(OPENROUTER, [{ rol: "usuario", texto: pregunta }], imagenes, instruccion, signal);
+    if (r.ok) return { ok: true, texto: r.texto, ia: "openrouter" };
+    errores.push(r.error);
+  }
+
+  return {
+    ok: false,
+    error: errores.length
+      ? errores.join(" ")
+      : "No hay IA configurada para ver fotos: falta GEMINI_API_KEY u OPENROUTER_API_KEY.",
+  };
+}
