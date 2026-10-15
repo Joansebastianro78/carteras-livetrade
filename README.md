@@ -32,8 +32,8 @@ autorizarlo o hospedar el tarball internamente.
    una vez. Crea estas tablas: `actividad_panel` (la actividad reciente del
    Inicio), `revision_fotos` (las marcas de las auditorías de fotos),
    `queries_fotos` (las queries guardadas de la Auditoría con query),
-   `huellas_fotos` y `repetidas_ia` (las fotos repetidas). Se puede volver a
-   correr sin problema: **si ya lo habías ejecutado, ejecútalo otra vez** para
+   `huellas_fotos` y `repetidas_ia` (las fotos repetidas), y `etiquetas_fotos`
+   (lo que la IA ve en las fotos). Se puede volver a correr sin problema: **si ya lo habías ejecutado, ejecútalo otra vez** para
    que cree las nuevas. Mientras no se ejecute, el panel
    funciona igual: el Inicio no muestra los cambios de usuarios,
    mantenimiento, tableros y temas, las fotos no se pueden marcar y las
@@ -768,9 +768,10 @@ otra se cambia en ese archivo.
   una huella de su enlace: si el enlace cambia, la marca no la sigue.
 - **Descargar Excel**: las cinco columnas de la consulta, con la foto como
   enlace para abrirla con un clic y `fecha_inicio` como fecha de Excel, más
-  `revision` y `revisado_por`. Trae las visitas del rango de fechas (sin
-  rango, todas); el consultor, la revisión, el buscador y los filtros de foto
-  no lo recortan. El nombre del archivo lleva el rango:
+  `revision` y `revisado_por`. Trae exactamente lo que se ve: las visitas que
+  quedan con todos los filtros puestos (fechas, consultor, revisión,
+  buscador y estado de la foto), en el mismo orden; el botón dice cuántas
+  son. El nombre del archivo lleva el rango de fechas:
   `Auditoria_imagenes_2026-09-05_a_2026-09-10.xlsx`.
 - Las fotos se cargan directamente desde la dirección que trae
   `foto_visita_inicio`, en su tamaño original; por eso la galería muestra de a
@@ -828,8 +829,7 @@ Cómo se usa:
    de la query), el visor, las marcas y el Excel. Además, las columnas de la
    query con pocos valores (entre 2 y 80 distintos: departamento, ciudad,
    zona, cadena…) salen como filtros, hasta cuatro, con cuántas visitas
-   tiene cada valor y «Sin dato» si hay visitas sin él. Como los demás
-   filtros, cambian lo que se ve; el Excel sigue las fechas.
+   tiene cada valor y «Sin dato» si hay visitas sin él.
 4. **Guardar** le pone nombre a la query y recuerda las columnas elegidas.
    **Guardar cambios**, **Guardar como nueva** y **Borrar** para las que ya
    existen. Guardar, cambiar y borrar quedan en la actividad del Inicio.
@@ -842,9 +842,12 @@ Cómo se usa:
   `revision_fotos`): la foto se reconoce por su enlace, así que una foto
   marcada en un módulo sale marcada en el otro. Borrar una query no borra
   marcas.
-- **Excel**: todas las columnas de la query, con sus nombres y en su orden,
-  más `revision` y `revisado_por`; la foto como enlace y la fecha como fecha
-  de Excel. El nombre lleva el de la query y el rango:
+- **Excel**: lo que se ve con todos los filtros puestos (también
+  departamento, repetidas y lo que vio la IA), con todas las columnas de la
+  query, con sus nombres y en su orden, más `revision` y `revisado_por` (y
+  `grupo_repetida`, `ia_repetida` e `ia_ve` si se usaron); la foto como
+  enlace y la fecha como fecha de Excel. El nombre lleva el de la query y el
+  rango:
   `Auditoria_query_Fotos_de_cierre_2026-09-05_a_2026-09-10.xlsx`.
 - Hasta 200.000 filas, como las otras auditorías; si trae más, pide acotar
   la query.
@@ -862,11 +865,14 @@ otro), dentro de las fechas elegidas.
    guardada en `huellas_fotos`: la segunda vez es inmediato y solo se
    descargan las fotos nuevas. La primera vez, con 5.000 fotos, tarda unos
    minutos; la barra dice cuántas van y se puede detener.
-2. **Grupos.** Se juntan las visitas con fotos parecidas (y se encadenan: si A
-   se parece a B y B a C, van las tres). «Parecido» decide cuánto:
-   **Idénticas** (hasta 4 bits distintos de 64), **Casi iguales** (hasta 10,
-   el de entrada) o **Parecidas** (hasta 14, encuentra más pero con más
-   falsas alarmas). Las fotos casi de un solo color (negras, en blanco) no se
+2. **Grupos.** Cada grupo es una foto y sus copias: se toma la visita más
+   antigua y se le juntan las que tienen una foto parecida a la suya; esas
+   ya no entran en otro grupo. No se encadena (si A se parece a B y B a C,
+   pero A no a C, C no entra con A): con las fotos del libro que se entrega en
+   todos los PDV, encadenar armaba grupos de cientos de visitas que no eran
+   copias entre sí. «Parecido» decide cuánto: **Idénticas** (hasta 4 bits
+   distintos de 64), **Casi iguales** (hasta 8, el de entrada) o
+   **Parecidas** (hasta 12, encuentra más pero con más falsas alarmas). Las fotos casi de un solo color (negras, en blanco) no se
    comparan: se parecen todas. **Ver solo repetidas** muestra la galería por
    grupo: cuántas visitas, de cuántos PDV y consultores. La primera de cada
    grupo es la más antigua. Cada tarjeta repetida lleva su marca, la visita
@@ -897,6 +903,35 @@ fotos quedan como «no se pudieron revisar» y la pantalla dice cuántas.
 La ruta es `/api/admin/fotos-repetidas` (la piden «Auditoría con query» o
 «Escribir queries»); la huella está en `src/lib/huellaVisual.ts` y los grupos
 en `src/lib/repetidas.ts`.
+
+#### Qué se ve en las fotos (IA)
+
+En los filtros, **Qué se ve en las fotos**: se escribe qué buscar, separado
+por comas (de entrada «libro, afiche, persona, productos»; lo que se escriba
+queda recordado en ese navegador), y **Revisar con IA** le muestra a Gemini
+las fotos de las visitas que quedan con los filtros puestos, de a diez por
+pregunta, y le pregunta cuáles de esas cosas se ven en cada una (y si la foto
+es ilegible). Después salen filtros con cuántas visitas tienen cada cosa:
+«Libro 412», «Afiche 120»…, «Ninguna», «Ilegible» y «Sin revisar». Tocar
+«Libro» deja solo esas visitas, y el Excel las trae con la columna `ia_ve`.
+La visita elegida dice lo que vio la IA.
+
+- **Cupo.** Usa solo los modelos Flash Lite de Gemini (unos cientos de
+  preguntas al día cada uno), así no gasta el cupo de los Flash, que es el
+  del asistente, y nunca pasa a GPT-4o, que cobra. Diez fotos por pregunta:
+  5.000 fotos son unas 500 preguntas, dentro del cupo de un día, y tardan
+  unos 30 a 40 minutos la primera vez. Si Gemini pide una pausa por el tope
+  por minuto, espera solo y sigue; si se acabó el cupo del día, para y dice
+  a qué hora se libera. `GEMINI_MODELO_FOTOS` cambia el modelo con que
+  arranca (por defecto `gemini-3.5-flash-lite`).
+- **Lo revisado queda guardado** (tabla `etiquetas_fotos`, por foto y por
+  etiqueta): volver a revisar, otro día o con otras fechas, solo le pregunta
+  a la IA por lo que falta. Agregar una etiqueta nueva deja las fotos por
+  revisar solo para esa.
+- Conviene filtrar primero (fechas, departamento) para revisar lo que
+  interesa: el botón dice cuántas fotos va a revisar.
+- La IA se puede equivocar; sirve para encontrar rápido, no reemplaza mirar
+  la foto. La ruta es `/api/admin/fotos-ia`.
 
 **Qué SQL se acepta.** Solo lectura: una sola sentencia que empiece por
 `SELECT` o `WITH`. Se rechazan `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `DROP`,

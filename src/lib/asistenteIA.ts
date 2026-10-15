@@ -27,7 +27,7 @@ import {
   type PermisosPanel,
   type ResultadoConsulta,
 } from "./datosPanel";
-import { conRotacion, nombreModelo, type Rotacion } from "./modelosGemini";
+import { conRotacion, nombreModelo, type OpcionesRotacion, type Rotacion } from "./modelosGemini";
 
 const URL_GEMINI = "https://generativelanguage.googleapis.com";
 const URL_GROQ = "https://api.groq.com/openai/v1";
@@ -259,14 +259,24 @@ function modeloGemini() {
  * Una petición a Gemini que, si el modelo preferido agotó su cupo, prueba con
  * los demás modelos de la cuenta (lib/modelosGemini.ts).
  */
-function rotarGemini(accion: string, cuerpo: string, signal: AbortSignal): Promise<Rotacion> {
-  return conRotacion(pedirGemini, modeloGemini(), (modelo) =>
-    pedirGemini(`/v1beta/models/${modelo}:${accion}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: cuerpo,
-      signal,
-    })
+function rotarGemini(
+  accion: string,
+  cuerpo: string,
+  signal: AbortSignal,
+  preferido = modeloGemini(),
+  opciones: OpcionesRotacion = {}
+): Promise<Rotacion> {
+  return conRotacion(
+    pedirGemini,
+    preferido,
+    (modelo) =>
+      pedirGemini(`/v1beta/models/${modelo}:${accion}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: cuerpo,
+        signal,
+      }),
+    opciones
   );
 }
 
@@ -1178,9 +1188,15 @@ export async function preguntarConImagenes(
   instruccion: string,
   pregunta: string,
   imagenes: ImagenActual[],
-  signal: AbortSignal
-): Promise<{ ok: true; texto: string; ia: IA; modelo?: string } | { ok: false; error: string }> {
+  signal: AbortSignal,
+  /**
+   * preferido y familias: qué modelos de Gemini usar (ver OpcionesRotacion).
+   * sinRespaldo: no pasar a GPT-4o (que cobra) si Gemini no puede.
+   */
+  opciones: { preferido?: string; sinRespaldo?: boolean } & OpcionesRotacion = {}
+): Promise<{ ok: true; texto: string; ia: IA; modelo?: string } | { ok: false; error: string; esperaMs?: number | null }> {
   const errores: string[] = [];
+  let esperaMs: number | null = null;
 
   if (hayGemini()) {
     try {
@@ -1198,8 +1214,11 @@ export async function preguntarConImagenes(
           contents: [{ role: "user", parts: partes }],
           generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
         }),
-        signal
+        signal,
+        opciones.preferido ?? modeloGemini(),
+        { familias: opciones.familias }
       );
+      esperaMs = r.esperaMs;
       if (!r.respuesta) {
         errores.push(r.mensaje);
       } else if (r.respuesta.ok) {
@@ -1216,7 +1235,7 @@ export async function preguntarConImagenes(
     }
   }
 
-  if (hayOpenRouter() && !signal.aborted) {
+  if (hayOpenRouter() && !signal.aborted && !opciones.sinRespaldo) {
     const r = await respuestaOpenAI(OPENROUTER, [{ rol: "usuario", texto: pregunta }], imagenes, instruccion, signal);
     if (r.ok) return { ok: true, texto: r.texto, ia: "openrouter" };
     errores.push(r.error);
@@ -1224,6 +1243,7 @@ export async function preguntarConImagenes(
 
   return {
     ok: false,
+    esperaMs,
     error: errores.length
       ? errores.join(" ")
       : "No hay IA configurada para ver fotos: falta GEMINI_API_KEY u OPENROUTER_API_KEY.",

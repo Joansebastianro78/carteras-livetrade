@@ -138,6 +138,8 @@ export function modulosDeRuta(
   if (es("/api/admin/auditoria-query")) return ["fotos_query", "fotos_query_sql"];
   // Fotos repetidas: huellas y confirmación con IA, desde la de query.
   if (es("/api/admin/fotos-repetidas")) return ["fotos_query", "fotos_query_sql"];
+  // Qué se ve en las fotos según la IA, también desde la de query.
+  if (es("/api/admin/fotos-ia")) return ["fotos_query", "fotos_query_sql"];
   if (es("/api/admin/revision-hallazgos")) return ["auditoria"];
   if (es("/api/admin/auditoria")) return ["auditoria"];
   if (es("/api/admin/tableros")) return lectura ? ["tableros", "tableros_admin"] : ["tableros_admin"];

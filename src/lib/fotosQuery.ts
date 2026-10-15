@@ -220,7 +220,8 @@ export function exportadorDeQuery(columnas: string[], mapeo: Mapeo, nombre: stri
     filas: FilaQuery[],
     sufijo: string,
     revisionDe: (f: FilaQuery) => Revision | null,
-    repetidaDe?: (f: FilaQuery) => { grupo: number; ia: string | null } | null
+    repetidaDe?: (f: FilaQuery) => { grupo: number; ia: string | null } | null,
+    vistoDe?: (f: FilaQuery) => string | null
   ) => {
     const colFecha = mapeo.fecha === null ? -1 : columnas.indexOf(mapeo.fecha);
     const colFoto = mapeo.foto === null ? -1 : columnas.indexOf(mapeo.foto);
@@ -243,7 +244,9 @@ export function exportadorDeQuery(columnas: string[], mapeo: Mapeo, nombre: stri
       })
     );
     // Si se buscaron repetidas, dos columnas más: el grupo y lo que dijo la IA.
+    // Si la IA revisó qué se ve en las fotos, otra: lo que vio.
     const conRepetidas = repetidaDe !== undefined && filas.some((f) => repetidaDe(f) !== null);
+    const conVisto = vistoDe !== undefined && filas.some((f) => vistoDe(f) !== null);
     const revisiones = filas.map((f) => {
       const r = revisionDe(f);
       const base: (string | number | null)[] = r ? [NOMBRE_REVISION[r.estado], r.revisado_por] : [null, null];
@@ -251,9 +254,15 @@ export function exportadorDeQuery(columnas: string[], mapeo: Mapeo, nombre: stri
         const x = repetidaDe!(f);
         base.push(x ? x.grupo : null, x?.ia ?? null);
       }
+      if (conVisto) base.push(vistoDe!(f));
       return base;
     });
-    const extra = conRepetidas ? ["revision", "revisado_por", "grupo_repetida", "ia_repetida"] : ["revision", "revisado_por"];
+    const extra = [
+      "revision",
+      "revisado_por",
+      ...(conRepetidas ? ["grupo_repetida", "ia_repetida"] : []),
+      ...(conVisto ? ["ia_ve"] : []),
+    ];
 
     const hoja = XLSX.utils.aoa_to_sheet([[...columnas, ...extra], ...datos.map((d, i) => [...d, ...revisiones[i]])]);
 
@@ -283,6 +292,7 @@ export function exportadorDeQuery(columnas: string[], mapeo: Mapeo, nombre: stri
       { wch: 14 },
       { wch: 26 },
       ...(conRepetidas ? [{ wch: 15 }, { wch: 15 }] : []),
+      ...(conVisto ? [{ wch: 28 }] : []),
     ];
     hoja["!autofilter"] = {
       ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: datos.length, c: columnas.length + extra.length - 1 } }),

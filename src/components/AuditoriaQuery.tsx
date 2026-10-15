@@ -506,6 +506,7 @@ export default function AuditoriaQuery() {
       detalle={detalle}
       filtrosColumna={filtrosColumna}
       repetidas
+      etiquetasIA
     />
   );
 }

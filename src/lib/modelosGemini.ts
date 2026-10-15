@@ -40,6 +40,20 @@ const enfriados = new Map<string, { hasta: number; motivo: string }>();
 
 // ------------------------------------------------------------------ orden
 
+export type Familia = "flash" | "lite" | "pro" | "otro";
+const FAMILIAS: Familia[] = ["flash", "lite", "pro", "otro"];
+
+/**
+ * Para trabajos de muchas fotos (las etiquetas de la Auditoría con query) se
+ * usan solo los Flash Lite, que tienen cupo de cientos al día: así no se gasta
+ * el cupo de los Flash, que es el del asistente.
+ */
+export type OpcionesRotacion = { familias?: Familia[] };
+
+export function familiaDe(id: string): Familia {
+  return FAMILIAS[familia(id)];
+}
+
 function familia(id: string): number {
   if (/flash-lite/.test(id)) return 1;
   if (/flash/.test(id)) return 0;
@@ -106,12 +120,21 @@ async function modelosDeLaCuenta(pedir: PedirGemini): Promise<string[]> {
 }
 
 /** Los modelos que se van a probar, en orden, sin los que están descansando. */
-async function modelosParaUsar(pedir: PedirGemini, preferido: string): Promise<{ libres: string[]; todos: string[] }> {
+async function modelosParaUsar(
+  pedir: PedirGemini,
+  preferido: string,
+  opciones: OpcionesRotacion = {}
+): Promise<{ libres: string[]; todos: string[] }> {
   const fijos = (process.env.GEMINI_MODELOS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const lista = fijos.length ? fijos : [preferido, ...(await modelosDeLaCuenta(pedir)).filter((m) => m !== preferido)];
+  let lista = fijos.length ? fijos : [preferido, ...(await modelosDeLaCuenta(pedir)).filter((m) => m !== preferido)];
+  if (opciones.familias) {
+    const solo = lista.filter((m) => opciones.familias!.includes(familiaDe(m)));
+    // Si la cuenta no tiene de esa familia, mejor cualquiera que ninguno.
+    if (solo.length > 0) lista = solo;
+  }
   const ahora = Date.now();
   return { libres: lista.filter((m) => (enfriados.get(m)?.hasta ?? 0) <= ahora).slice(0, MAX_INTENTOS), todos: lista };
 }
@@ -184,9 +207,17 @@ function horaColombia(ms: number): string {
 
 // ------------------------------------------------------------------ rotar
 
+/** esperaMs: si todos los modelos están descansando, cuánto falta para que se libere el primero. */
 export type Rotacion =
-  | { respuesta: Response; modelo: string; probados: string[] }
-  | { respuesta: null; mensaje: string; probados: string[] };
+  | { respuesta: Response; modelo: string; probados: string[]; esperaMs: number | null }
+  | { respuesta: null; mensaje: string; probados: string[]; esperaMs: number | null };
+
+function esperaHastaLibre(todos: string[]): number | null {
+  const ahora = Date.now();
+  if (todos.length === 0) return null;
+  const proximo = Math.min(...todos.map((m) => enfriados.get(m)?.hasta ?? ahora));
+  return proximo > ahora ? proximo - ahora : null;
+}
 
 /**
  * Prueba la petición con cada modelo hasta que uno responda bien. Devuelve
@@ -197,14 +228,16 @@ export type Rotacion =
 export async function conRotacion(
   pedir: PedirGemini,
   preferido: string,
-  intento: (modelo: string) => Promise<Response>
+  intento: (modelo: string) => Promise<Response>,
+  opciones: OpcionesRotacion = {}
 ): Promise<Rotacion> {
-  const { libres, todos } = await modelosParaUsar(pedir, preferido);
+  const { libres, todos } = await modelosParaUsar(pedir, preferido, opciones);
   if (libres.length === 0) {
     const proximo = Math.min(...todos.map((m) => enfriados.get(m)?.hasta ?? Infinity));
     return {
       respuesta: null,
       probados: [],
+      esperaMs: esperaHastaLibre(todos),
       mensaje: `Gemini llegó al cupo en sus ${todos.length} ${todos.length === 1 ? "modelo" : "modelos"}. ${
         Number.isFinite(proximo) ? `El primero se libera hacia las ${horaColombia(proximo)} (hora de Colombia).` : "Intenta más tarde."
       }`,
@@ -219,7 +252,7 @@ export async function conRotacion(
     probados.push(modelo);
     if (respuesta.ok) {
       if (probados.length > 1) console.info(`[gemini] respondió ${modelo} después de probar ${probados.slice(0, -1).join(", ")}`);
-      return { respuesta, modelo, probados };
+      return { respuesta, modelo, probados, esperaMs: null };
     }
     ultima = respuesta;
     const sigue = await anotarFalla(modelo, respuesta.clone());
@@ -227,7 +260,7 @@ export async function conRotacion(
     // Un error interno puede ser de la pregunta y no del modelo: se prueba uno más y ya.
     if (respuesta.status >= 500 && respuesta.status !== 503 && ++internos >= 2) break;
   }
-  return { respuesta: ultima!, modelo: probados[probados.length - 1], probados };
+  return { respuesta: ultima!, modelo: probados[probados.length - 1], probados, esperaMs: esperaHastaLibre(todos) };
 }
 
 /** «3.7 Flash», «2.5 Flash Lite»: el nombre del modelo para la pantalla. */

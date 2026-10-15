@@ -4,9 +4,8 @@
  * /api/admin/fotos-repetidas; aquí no se importa nada del servidor.
  *
  * La huella de cada foto (lib/huellaVisual.ts) la saca el servidor una vez y
- * queda guardada (tabla huellas_fotos). Los grupos se arman en el navegador:
- * dos visitas quedan juntas si alguna foto de una se parece a alguna de la
- * otra, y los parecidos se encadenan (si A se parece a B y B a C, van las tres).
+ * queda guardada (tabla huellas_fotos). Los grupos se arman en el navegador
+ * (agruparRepetidas, abajo).
  */
 import { huella as claveDe, PATRON_CLAVE } from "./revisionFotos";
 import type { FilaImagen } from "./imagenesAuditoria";
@@ -28,8 +27,8 @@ export type Veredicto = {
 /** Cuántos bits distintos (de 64) se aceptan para decir que dos fotos son la misma. */
 export const PARECIDO = {
   identicas: { nombre: "Idénticas", bits: 4 },
-  casi: { nombre: "Casi iguales", bits: 10 },
-  parecidas: { nombre: "Parecidas", bits: 14 },
+  casi: { nombre: "Casi iguales", bits: 8 },
+  parecidas: { nombre: "Parecidas", bits: 12 },
 } as const;
 export type Parecido = keyof typeof PARECIDO;
 
@@ -64,8 +63,20 @@ export type Grupo<F extends FilaImagen> = {
   consultores: number;
 };
 
+/** De la más antigua a la más reciente; las que no traen fecha, al final. */
+const porFecha = (a: FilaImagen, b: FilaImagen) =>
+  a.orden === b.orden ? 0 : !a.orden ? 1 : !b.orden ? -1 : a.orden < b.orden ? -1 : 1;
+
 /**
  * Los grupos de visitas con fotos repetidas, del más grande al más chico.
+ *
+ * Cada grupo es una foto y sus copias directas: se toma la visita más
+ * antigua, se le juntan las que tienen una foto parecida a la suya, y esas ya
+ * no entran en otro grupo. No se encadena (si A se parece a B y B a C, pero A
+ * no a C, C no entra con A): con fotos de un mismo objeto, como el libro que
+ * se entrega en todos los PDV, encadenar armaba grupos de cientos de visitas
+ * que no eran copias entre sí.
+ *
  * No se comparan las fotos de una misma visita entre sí, ni las fotos planas
  * (negras o en blanco), que se parecen todas.
  */
@@ -74,58 +85,47 @@ export function agruparRepetidas<F extends FilaImagen>(
   huellas: Map<string, InfoHuella>,
   maxBits: number
 ): Grupo<F>[] {
-  type Foto = { v: number; url: string; alta: number; baja: number };
-  const fotos: Foto[] = [];
-  visitas.forEach((f, v) => {
+  type Foto = { url: string; alta: number; baja: number };
+  const orden = [...visitas].sort(porFecha);
+  const fotosDe = orden.map((f) => {
+    const salida: Foto[] = [];
     for (const url of f.fotos) {
       const h = huellas.get(claveDe(url));
       if (!h?.huella || h.plana) continue;
-      fotos.push({ v, url, alta: parseInt(h.huella.slice(0, 8), 16), baja: parseInt(h.huella.slice(8), 16) });
+      salida.push({ url, alta: parseInt(h.huella.slice(0, 8), 16), baja: parseInt(h.huella.slice(8), 16) });
     }
+    return salida;
   });
+  const parecidas = (a: Foto, b: Foto) => bits((a.alta ^ b.alta) >>> 0) + bits((a.baja ^ b.baja) >>> 0) <= maxBits;
 
-  const padre = visitas.map((_, i) => i);
-  const raiz = (i: number): number => {
-    while (padre[i] !== i) {
-      padre[i] = padre[padre[i]];
-      i = padre[i];
+  const usada = new Array<boolean>(orden.length).fill(false);
+  const grupos: Omit<Grupo<F>, "numero">[] = [];
+  for (let i = 0; i < orden.length; i++) {
+    if (usada[i] || fotosDe[i].length === 0) continue;
+    const foto = new Map<F, string>();
+    for (let j = i + 1; j < orden.length; j++) {
+      if (usada[j]) continue;
+      buscar: for (const a of fotosDe[i]) {
+        for (const b of fotosDe[j]) {
+          if (!parecidas(a, b)) continue;
+          if (!foto.has(orden[i])) foto.set(orden[i], a.url);
+          foto.set(orden[j], b.url);
+          usada[j] = true;
+          break buscar;
+        }
+      }
     }
-    return i;
-  };
-  const foto = new Map<number, string>();
-
-  for (let i = 0; i < fotos.length; i++) {
-    const a = fotos[i];
-    for (let j = i + 1; j < fotos.length; j++) {
-      const b = fotos[j];
-      if (a.v === b.v) continue;
-      if (bits((a.alta ^ b.alta) >>> 0) + bits((a.baja ^ b.baja) >>> 0) > maxBits) continue;
-      if (!foto.has(a.v)) foto.set(a.v, a.url);
-      if (!foto.has(b.v)) foto.set(b.v, b.url);
-      const ra = raiz(a.v);
-      const rb = raiz(b.v);
-      if (ra !== rb) padre[ra] = rb;
-    }
+    if (foto.size === 0) continue;
+    usada[i] = true;
+    const integrantes = orden.filter((f) => foto.has(f));
+    grupos.push({
+      visitas: integrantes,
+      foto,
+      pdvs: new Set(integrantes.map((f) => (f.cod_personalizado ?? f.nombre_pdv ?? "").trim())).size,
+      consultores: new Set(integrantes.map((f) => (f.nombre_usuario ?? "").trim())).size,
+    });
   }
 
-  const porRaiz = new Map<number, number[]>();
-  for (const v of foto.keys()) {
-    const r = raiz(v);
-    (porRaiz.get(r) ?? porRaiz.set(r, []).get(r)!).push(v);
-  }
-
-  const grupos = [...porRaiz.values()]
-    .filter((vs) => vs.length > 1)
-    .map((vs) => {
-      const ordenadas = vs.map((v) => visitas[v]).sort((a, b) => (a.orden === b.orden ? 0 : !a.orden ? 1 : !b.orden ? -1 : a.orden < b.orden ? -1 : 1));
-      return {
-        visitas: ordenadas,
-        foto: new Map(vs.map((v) => [visitas[v], foto.get(v)!])),
-        pdvs: new Set(ordenadas.map((f) => (f.cod_personalizado ?? f.nombre_pdv ?? "").trim())).size,
-        consultores: new Set(ordenadas.map((f) => (f.nombre_usuario ?? "").trim())).size,
-      };
-    })
-    .sort((a, b) => b.visitas.length - a.visitas.length || (a.visitas[0].orden < b.visitas[0].orden ? 1 : -1));
-
+  grupos.sort((a, b) => b.visitas.length - a.visitas.length || porFecha(b.visitas[0], a.visitas[0]));
   return grupos.map((g, i) => ({ ...g, numero: i + 1 }));
 }

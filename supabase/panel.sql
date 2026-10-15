@@ -1,5 +1,6 @@
 -- =====================================================================
--- Panel: actividad reciente, revisión de fotos, queries de fotos y fotos repetidas
+-- Panel: actividad reciente, revisión de fotos, queries de fotos, fotos
+-- repetidas y lo que la IA ve en las fotos
 -- Ejecutar DESPUÉS de gestion.sql. Se puede volver a ejecutar sin problema.
 --
 -- Sin este archivo el panel sigue funcionando: el Inicio muestra solo las
@@ -120,6 +121,25 @@ create table if not exists public.repetidas_ia (
 alter table public.repetidas_ia enable row level security;
 alter table public.repetidas_ia force row level security;
 revoke all on public.repetidas_ia from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Qué se ve en cada foto, según la IA (Auditoría con query)
+-- Una fila por foto y etiqueta (lo que se le pidió buscar: libro, afiche…):
+-- presente dice si la IA la vio. La etiqueta «ilegible» marca las fotos
+-- borrosas u oscuras. clave es la huella del enlace, como en las demás.
+-- ---------------------------------------------------------------------
+create table if not exists public.etiquetas_fotos (
+    clave       text not null,
+    etiqueta    text not null,
+    presente    boolean not null,
+    ia          text,
+    created_at  timestamptz not null default now(),
+    primary key (clave, etiqueta)
+);
+
+alter table public.etiquetas_fotos enable row level security;
+alter table public.etiquetas_fotos force row level security;
+revoke all on public.etiquetas_fotos from anon, authenticated;
 
 -- Consultas útiles:
 -- select * from public.actividad_panel order by created_at desc limit 50;

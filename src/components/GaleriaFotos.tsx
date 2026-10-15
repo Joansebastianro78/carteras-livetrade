@@ -37,6 +37,8 @@ import type { Grupo } from "@/lib/repetidas";
 import { cifra, sinTildes, type Fase } from "./ConsultaAthena";
 import PanelRepetidas, { EncabezadoGrupo } from "./PanelRepetidas";
 import { useRepetidas } from "./useRepetidas";
+import PanelEtiquetas, { ILEGIBLES, NINGUNA, SIN_REVISAR, type CuentasIA } from "./PanelEtiquetas";
+import { useEtiquetasIA, type Visto } from "./useEtiquetasIA";
 
 /**
  * La pantalla de revisar fotos: filtros, galería por día, la visita elegida a
@@ -95,7 +97,8 @@ type Props<F extends FilaImagen> = {
     filas: F[],
     sufijo: string,
     revisionDe: (f: F) => Revision | null,
-    repetidaDe?: (f: F) => { grupo: number; ia: string | null } | null
+    repetidaDe?: (f: F) => { grupo: number; ia: string | null } | null,
+    vistoDe?: (f: F) => string | null
   ) => void;
   /** Datos de más para la visita elegida (las otras columnas de una query). */
   detalle?: (f: F) => [string, string][];
@@ -103,6 +106,8 @@ type Props<F extends FilaImagen> = {
   filtrosColumna?: FiltroColumna<F>[];
   /** Buscar fotos repetidas y confirmarlas con IA. */
   repetidas?: boolean;
+  /** Que la IA diga qué se ve en las fotos (libro, afiche…) para filtrar por eso. */
+  etiquetasIA?: boolean;
 };
 
 /** El valor del filtro de columna para las visitas que no traen dato. */
@@ -127,6 +132,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
   detalle,
   filtrosColumna,
   repetidas = false,
+  etiquetasIA = false,
 }: Props<F>) {
 
   /** Rango de fechas: delimita la galería, los conteos y el Excel. */
@@ -144,6 +150,8 @@ export default function GaleriaFotos<F extends FilaImagen>({
   /** Valor elegido en cada filtro de columna (por su id); vacío es «Todos». */
   const [valoresColumna, setValoresColumna] = useState<Record<string, string>>({});
   const [soloRepetidas, setSoloRepetidas] = useState(false);
+  /** Lo que vio la IA: una etiqueta, NINGUNA, ILEGIBLES o SIN_REVISAR; vacío es todas. */
+  const [vistoFiltro, setVistoFiltro] = useState("");
 
   // ------------------------------------------------------------ revisiones
   const [revisiones, setRevisiones] = useState<Map<string, Revision>>(() => new Map());
@@ -224,6 +232,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
     setAviso(null);
     setValoresColumna({});
     setSoloRepetidas(false);
+    setVistoFiltro("");
   }, [filas]);
 
   const marcarRota = useCallback((url: string) => {
@@ -258,6 +267,30 @@ export default function GaleriaFotos<F extends FilaImagen>({
 
   // Las repetidas se buscan entre las visitas de las fechas elegidas.
   const rep = useRepetidas(repetidas, enRango);
+  const eti = useEtiquetasIA(etiquetasIA);
+  const { vistoDe } = eti;
+
+  /** Cuántas visitas de las fechas tienen cada cosa que vio la IA. */
+  const cuentasIA = useMemo((): CuentasIA => {
+    const porEtiqueta = new Map(eti.etiquetas.map((e) => [e, 0]));
+    let ninguna = 0;
+    let ilegibles = 0;
+    let sinRevisar = 0;
+    if (etiquetasIA) {
+      for (const f of enRango) {
+        const v = vistoDe(f);
+        if (!v) continue;
+        if (!v.revisada) {
+          sinRevisar++;
+          continue;
+        }
+        for (const e of v.ve) porEtiqueta.set(e, (porEtiqueta.get(e) ?? 0) + 1);
+        if (v.ilegible) ilegibles++;
+        else if (v.ve.length === 0) ninguna++;
+      }
+    }
+    return { porEtiqueta: [...porEtiqueta.entries()], ninguna, ilegibles, sinRevisar };
+  }, [etiquetasIA, enRango, vistoDe, eti.etiquetas]);
   const { reiniciar: reiniciarRepetidas, grupoDe, resumenIA, veredictoDe } = rep;
   const filasRepetidas = useRef(filas);
   useEffect(() => {
@@ -358,6 +391,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
         if (elegido === SIN_DATO ? v !== null : v !== elegido) return false;
       }
       if (soloRepetidas && !grupoDe.has(f)) return false;
+      if (vistoFiltro && !cumpleVisto(vistoDe(f), vistoFiltro)) return false;
       return !q || (indice.get(f) ?? "").includes(q);
     });
     // Las repetidas se ven por grupo, en el orden del grupo.
@@ -369,7 +403,11 @@ export default function GaleriaFotos<F extends FilaImagen>({
       });
     }
     return lista;
-  }, [enRango, consultor, filtro, revisionFiltro, busqueda, indice, esRota, revisionDe, filtrosColumna, valoresColumna, soloRepetidas, grupoDe]);
+  }, [enRango, consultor, filtro, revisionFiltro, busqueda, indice, esRota, revisionDe, filtrosColumna, valoresColumna, soloRepetidas, grupoDe, vistoFiltro, vistoDe]);
+
+  /** Fotos de las visitas filtradas que la IA todavía no ha revisado. */
+  const { pendientesDe } = eti;
+  const pendientesIA = useMemo(() => (etiquetasIA ? pendientesDe(filtradas).length : 0), [etiquetasIA, pendientesDe, filtradas]);
 
   /** Posición de cada visita en la lista: llave estable para la galería. */
   const numero = useMemo(() => new Map(filas.map((f, i) => [f, i])), [filas]);
@@ -415,17 +453,23 @@ export default function GaleriaFotos<F extends FilaImagen>({
     else setAbierta(fotos.primera.get(f) ?? null);
   }
 
-  /** El Excel trae las visitas del rango de fechas; sin rango, todas. */
+  /** El Excel trae lo que se ve: las visitas que quedan con todos los filtros, en ese orden. */
   function descargar() {
     try {
       exportar(
-        enRango,
+        filtradas,
         sufijoRango(rango),
         revisionDe,
         rep.buscado
           ? (f) => {
               const r = repetidaDe(f);
               return r ? { grupo: r.numero, ia: r.ia === null ? null : r.ia ? "Misma foto" : "Foto distinta" } : null;
+            }
+          : undefined,
+        etiquetasIA
+          ? (f) => {
+              const v = vistoDe(f);
+              return v?.revisada ? textoVisto(v) : null;
             }
           : undefined
       );
@@ -469,6 +513,11 @@ export default function GaleriaFotos<F extends FilaImagen>({
     });
   }
   if (soloRepetidas) puestos.push({ id: "repetidas", etiqueta: "Solo repetidas", quitar: () => alFiltrar(setSoloRepetidas)(false) });
+  if (vistoFiltro) {
+    const nombre =
+      vistoFiltro === NINGUNA ? "ninguna de la lista" : vistoFiltro === ILEGIBLES ? "ilegible" : vistoFiltro === SIN_REVISAR ? "sin revisar" : vistoFiltro;
+    puestos.push({ id: "visto", etiqueta: `IA: ${nombre}`, quitar: () => alFiltrar(setVistoFiltro)("") });
+  }
 
   function quitarTodo() {
     setRango(SIN_RANGO);
@@ -478,6 +527,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
     setBusqueda("");
     setValoresColumna({});
     setSoloRepetidas(false);
+    setVistoFiltro("");
     setVisibles(POR_PAGINA);
     setAbierta(null);
   }
@@ -502,6 +552,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
     revisionFiltro,
     filtro !== "todas" ? "x" : "",
     soloRepetidas ? "x" : "",
+    vistoFiltro,
     ...Object.values(valoresColumna),
   ].filter(Boolean).length;
   const listo = fase.tipo === "listo" && filas.length > 0;
@@ -519,12 +570,12 @@ export default function GaleriaFotos<F extends FilaImagen>({
               <button
                 type="button"
                 onClick={descargar}
-                disabled={enRango.length === 0}
+                disabled={filtradas.length === 0}
                 className="boton boton-ambar"
               >
                 <Sheet size={16} aria-hidden />
                 Descargar Excel
-                <span className="cifras font-normal">({cifra(enRango.length)})</span>
+                <span className="cifras font-normal">({cifra(filtradas.length)})</span>
               </button>
             )}
           </>
@@ -663,19 +714,26 @@ export default function GaleriaFotos<F extends FilaImagen>({
               <PanelRepetidas r={rep} soloRepetidas={soloRepetidas} onSoloRepetidas={alFiltrar(setSoloRepetidas)} />
             )}
 
+            {etiquetasIA && (
+              <PanelEtiquetas
+                e={eti}
+                pendientes={pendientesIA}
+                cuentas={cuentasIA}
+                filtro={vistoFiltro}
+                onFiltro={alFiltrar(setVistoFiltro)}
+                onRevisar={() => eti.revisar(filtradas)}
+              />
+            )}
+
             <FiltrosActivos
               filtros={puestos}
               onQuitarTodo={quitarTodo}
               nota={
-                enRango.length === 0
-                  ? "No hay visitas en esas fechas para descargar."
+                filtradas.length === 0
+                  ? "No hay visitas con estos filtros para descargar."
                   : `El Excel trae ${
-                      conRango
-                        ? enRango.length === 1
-                          ? "la visita de estas fechas"
-                          : `las ${cifra(enRango.length)} visitas de estas fechas`
-                        : `las ${cifra(enRango.length)} visitas`
-                    }, con su revisión; los demás filtros solo cambian lo que ves.`
+                      filtradas.length === 1 ? "la visita" : `las ${cifra(filtradas.length)} visitas`
+                    } que ves${filtradas.length === enRango.length && !conRango ? "" : " con estos filtros"}, con su revisión.`
               }
             />
           </section>
@@ -789,7 +847,11 @@ export default function GaleriaFotos<F extends FilaImagen>({
                   fila={actual}
                   queFoto={queFoto}
                   nombreFecha={nombreFecha}
-                  extras={[...(detalle ? detalle(actual) : []), ...datosRepetida(repetidaDe(actual))]}
+                  extras={[
+                    ...(detalle ? detalle(actual) : []),
+                    ...datosRepetida(repetidaDe(actual)),
+                    ...datosVisto(vistoDe(actual)),
+                  ]}
                   revision={revisionDe(actual)}
                   puedeMarcar={puedeMarcar}
                   rota={esRota(actual)}
@@ -831,11 +893,11 @@ export default function GaleriaFotos<F extends FilaImagen>({
             <button
               type="button"
               onClick={descargar}
-              disabled={enRango.length === 0}
+              disabled={filtradas.length === 0}
               className="boton boton-ambar flex-1"
             >
               <Sheet size={16} aria-hidden />
-              Excel ({cifra(enRango.length)})
+              Excel ({cifra(filtradas.length)})
             </button>
           </div>
         </>
@@ -881,6 +943,28 @@ function Insignia({ revision }: { revision: Revision | null }) {
 }
 
 /** Una visita de la galería: su foto (o por qué no hay) y sus datos. */
+/** Si lo que vio la IA en la visita cumple el filtro. */
+function cumpleVisto(v: Visto | null, filtro: string): boolean {
+  if (!v) return false;
+  if (filtro === SIN_REVISAR) return !v.revisada;
+  if (!v.revisada) return false;
+  if (filtro === NINGUNA) return v.ve.length === 0 && !v.ilegible;
+  if (filtro === ILEGIBLES) return v.ilegible;
+  return v.ve.includes(filtro);
+}
+
+/** «libro, persona», «nada de la lista» o «foto ilegible». */
+function textoVisto(v: Visto): string {
+  if (v.ve.length > 0) return v.ve.join(", ");
+  return v.ilegible ? "foto ilegible" : "nada de la lista";
+}
+
+/** Lo que vio la IA, para la visita elegida. */
+function datosVisto(v: Visto | null): [string, string][] {
+  if (!v) return [];
+  return [["La IA ve", v.revisada ? textoVisto(v) : "Sin revisar"]];
+}
+
 /** Lo que se dice de una repetida en la visita elegida. */
 function datosRepetida(r: Repetida | null): [string, string][] {
   if (!r) return [];

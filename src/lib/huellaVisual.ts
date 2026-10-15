@@ -50,11 +50,14 @@ export async function sacarHuella(datos: Buffer): Promise<Huella> {
   return { huella: hex(alta) + hex(baja), plana: maximo - minimo < 12 };
 }
 
-/** La foto en JPEG de hasta 768 px por lado, en base64, para mandarla a la IA. */
-export async function fotoParaIA(datos: Buffer): Promise<string> {
+/**
+ * La foto en JPEG de hasta `lado` px por lado, en base64, para mandarla a la
+ * IA. Más chica gasta menos tokens y menos tiempo de subida.
+ */
+export async function fotoParaIA(datos: Buffer, lado = 768): Promise<string> {
   const chica = await sharp(datos, { failOn: "none", limitInputPixels: MAX_PIXELES })
     .rotate()
-    .resize(768, 768, { fit: "inside", withoutEnlargement: true })
+    .resize(lado, lado, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 78 })
     .toBuffer();
   return chica.toString("base64");
