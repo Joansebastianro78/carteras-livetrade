@@ -1192,8 +1192,15 @@ export async function preguntarConImagenes(
   /**
    * preferido y familias: qué modelos de Gemini usar (ver OpcionesRotacion).
    * sinRespaldo: no pasar a GPT-4o (que cobra) si Gemini no puede.
+   * referencias: imágenes que van antes de las fotos, cada una con su
+   *   rótulo, para mostrarle a la IA cómo es lo que busca (no se numeran).
+   *   Solo con Gemini: quien las use debe pedir sinRespaldo.
    */
-  opciones: { preferido?: string; sinRespaldo?: boolean } & OpcionesRotacion = {}
+  opciones: {
+    preferido?: string;
+    sinRespaldo?: boolean;
+    referencias?: { rotulo: string; imagen: ImagenActual }[];
+  } & OpcionesRotacion = {}
 ): Promise<{ ok: true; texto: string; ia: IA; modelo?: string } | { ok: false; error: string; esperaMs?: number | null }> {
   const errores: string[] = [];
   let esperaMs: number | null = null;
@@ -1202,6 +1209,10 @@ export async function preguntarConImagenes(
     try {
       const partes = [
         { text: pregunta },
+        ...(opciones.referencias ?? []).flatMap((r) => [
+          { text: r.rotulo },
+          { inline_data: { mime_type: r.imagen.mime, data: r.imagen.datos } },
+        ]),
         ...imagenes.flatMap((img, i) => [
           { text: `Foto ${i + 1}:` },
           { inline_data: { mime_type: img.mime, data: img.datos } },

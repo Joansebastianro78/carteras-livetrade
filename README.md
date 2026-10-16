@@ -275,8 +275,8 @@ las auditorías) y asignarlos en **Administradores**, como cualquier otro.
 Los módulos son las secciones del panel: Inicio, Cargar plantilla, Editar
 cartera, Consultores, Departamento y ciudad, Auditoría de datos, Auditoría de
 imágenes, Auditoría con query, Escribir queries, Ver tableros, Administrar
-tableros, Asistente IA, Generador Rutas, Mantenimiento, Temas, Administradores
-y Perfiles y permisos. El catálogo está en
+tableros, Asistente IA, Generador Rutas, Exportador de fotos, Mantenimiento,
+Temas, Administradores y Perfiles y permisos. El catálogo está en
 `src/lib/permisos.ts` (`MODULOS`), y ahí mismo `modulosDeRuta` dice qué módulo
 pide cada ruta de `/api/admin`.
 
@@ -773,6 +773,8 @@ otra se cambia en ese archivo.
   buscador y estado de la foto), en el mismo orden; el botón dice cuántas
   son. El nombre del archivo lleva el rango de fechas:
   `Auditoria_imagenes_2026-09-05_a_2026-09-10.xlsx`.
+- **Descargar fotos**: las mismas visitas en un ZIP, con carpetas por ciclo
+  (ver [Descarga de fotos en ZIP](#descarga-de-fotos-en-zip)).
 - Las fotos se cargan directamente desde la dirección que trae
   `foto_visita_inicio`, en su tamaño original; por eso la galería muestra de a
   24 y solo descarga las que van quedando a la vista. Si el servidor de fotos
@@ -928,6 +930,20 @@ La visita elegida dice lo que vio la IA.
   etiqueta): volver a revisar, otro día o con otras fechas, solo le pregunta
   a la IA por lo que falta. Agregar una etiqueta nueva deja las fotos por
   revisar solo para esa.
+- **El libro fiscal de la CCB.** Con «libro» (o «libros», «libro fiscal»…),
+  la IA también busca el Libro fiscal de registro de operaciones diarias de
+  la Cámara de Comercio de Bogotá: la pregunta lo describe (portada roja con
+  el logo de la CCB y el título; contraportada con «Renueva tu matrícula
+  mercantil hasta el 31 de marzo») y lleva dos fotos de referencia, la
+  portada y la contraportada, antes de las fotos a revisar. Así lo reconoce
+  aunque se vea de lejos, de lado o parezca un afiche. Las fotos están en
+  `src/lib/referenciaLibro.ts` (solo las usa el servidor); van en cada
+  pregunta que busca libro, unas dos imágenes más por cada diez fotos.
+  Lo que se revisó antes de esto se aprovecha: un «sí hay libro» vale igual,
+  y solo las fotos que salieron «sin libro» quedan por revisar otra vez (se
+  reconocen porque lo nuevo se guarda con `ref:libro-ccb-1` en la columna
+  `ia`). Para cambiar las fotos de referencia, se reemplazan en ese archivo y
+  se sube `VERSION_LIBRO`.
 - Conviene filtrar primero (fechas, departamento) para revisar lo que
   interesa: el botón dice cuántas fotos va a revisar.
 - La IA se puede equivocar; sirve para encontrar rápido, no reemplaza mirar
@@ -962,6 +978,60 @@ select id, nombre, actualizado_por, updated_at from public.queries_fotos order b
 select count(*), count(*) filter (where error is not null) as con_error from public.huellas_fotos;
 select misma, count(*) from public.repetidas_ia group by misma;
 ```
+
+### Descarga de fotos en ZIP
+
+En **Imágenes** y en **Con query**, el botón **Descargar fotos (N)** baja en
+un ZIP las fotos de las visitas que quedan con todos los filtros puestos (lo
+mismo que trae el Excel); N es cuántas fotos son.
+
+- **Carpetas por ciclo**, según cómo empieza el nombre del PDV
+  (`nombre_personalizado`): `PLT-` → `CICLO 0 - PILOTO`, `BV1-1-` →
+  `CICLO 1.1 - SUB CICLO`, `BV1-` → `CICLO 1`, `BV2-1-` →
+  `CICLO 2.1 - SUB CICLO`, `BV2-` → `CICLO 2`, y `BV3-` a `BV6-` →
+  `CICLO 3` a `CICLO 6`. Sin importar mayúsculas. Un PDV que no empiece por
+  ninguno va a `SIN CICLO`. La lista está en `src/lib/ciclosPdv.ts`; se
+  revisa en ese orden, así que `BV1-1-` va antes que `BV1-`.
+- **Nombre de cada foto**: PDV, código y fecha de la visita,
+  `PLT-CHAPARRO_10737539_2026-09-15_17h26.jpg`. Si la visita trae varias
+  fotos, `_foto1`, `_foto2`; si dos fotos quedan con el mismo nombre en la
+  misma carpeta, la segunda lleva ` (2)`. Lo que Windows no acepta en un
+  nombre (`\ / : * ? " < > |`) se cambia por un espacio. La extensión sale
+  del contenido de la foto (`.jpg`, `.png`, `.webp`…).
+- **indice.xlsx**, en la raíz del ZIP: una fila por foto con la parte, la
+  carpeta, el archivo, el PDV, el código, el consultor, la fecha, la
+  revisión, el enlace y si se descargó o el motivo por el que no.
+- **Por partes.** El ZIP se arma en el navegador, sin comprimir (las fotos ya
+  vienen comprimidas). Para no llenar la memoria, al llegar a 400 MB entrega
+  esa parte y sigue con otra: `Fotos_auditoria_imagenes_2026-09-05_a_2026-09-10.zip`,
+  `…_parte2.zip`. El índice va en la última. Hay que dejar la pestaña abierta
+  hasta que termine; **Detener** para, y lo ya entregado queda en las
+  descargas. En Con query el nombre lleva el de la query.
+- **De dónde se bajan las fotos.** Primero se intenta directo, desde el
+  navegador al servidor de fotos (sin pasar por Vercel y sin mandar de qué
+  página viene). Si ese servidor no deja que otra página lea sus fotos
+  (CORS), se piden a `/api/admin/foto`, que las trae desde el servidor del
+  panel. Se decide con la primera foto de cada servidor; si después una foto
+  falla directo, esa se pide por el panel. La ruta usa los mismos cuidados
+  de las repetidas (`src/lib/descargaFoto.ts`: solo `http`/`https`, nada de
+  la red interna, hasta 20 MB) y solo devuelve imágenes de verdad (JPEG, PNG,
+  WebP, GIF, HEIC; un SVG o un HTML se rechazan), siempre como archivo para
+  descargar. Lo bajado directo pasa por la misma revisión en el navegador.
+  Baja seis a la vez y reintenta una vez las que fallan por un error
+  pasajero. Las que no se pudieron bajar no frenan el ZIP: quedan en
+  `indice.xlsx` con el motivo.
+- **Vercel no deja responder más de 4,5 MB**: una foto más grande que pase
+  por el panel se recomprime en JPEG (hasta 4.000 px). Las del celular casi
+  nunca llegan a eso, y las que se bajan directo llegan tal cual.
+- Por el panel, cada foto cuenta como una llamada a una función de Vercel y
+  su peso como transferencia (entra y sale). Bajar 5.000 fotos de 1 MB son
+  unos 10 GB de transferencia: conviene filtrar primero (fechas, consultor,
+  departamento). Directo, Vercel no interviene.
+
+La ruta la piden «Auditoría de imágenes», «Auditoría con query», «Escribir
+queries» o «Exportador de fotos». El ZIP está en `src/lib/zipSimple.ts`, la
+descarga en `src/components/DescargaFotos.tsx` (la misma del Exportador de
+fotos) y lo que comparten con la ruta, en `src/lib/fotosZip.ts`.
 
 ## 10. Asistente IA
 
@@ -1171,7 +1241,63 @@ En una instalación que ya existía, el perfil Administrador no lo trae marcado:
 el superadministrador lo marca en Perfiles y permisos (o con la línea que
 está comentada al final de `supabase/perfiles.sql`).
 
-## 12. Pendientes conocidos
+## 12. Exportador de fotos
+
+Sección **Herramientas → Exportador de fotos**, para los perfiles con ese
+módulo (viene marcado en Superadministrador y Administrador; en una
+instalación que ya existía se marca en **Configuración › Perfiles y
+permisos**, o con la línea comentada al final de `supabase/perfiles.sql`).
+Se sube un Excel con el enlace de la foto de cada fila y se baja un ZIP con
+las fotos en una carpeta por ciclo.
+
+1. **La plantilla**: un `.xlsx` con los títulos en la fila 1, por ejemplo
+   `ID`, `BAVARIA`, `PDV`, `CICLO`, `FOTO EVIDENCIA`. Se lee en el navegador
+   y no se sube a ningún lado. Si tiene varias hojas, se elige cuál. Arriba
+   dice cuántas filas tiene, cuántas con foto y cuántas sin enlace (un
+   `#N/A` del BUSCARV, una celda vacía).
+2. **Lo que reconoce solo** (y se puede cambiar):
+   - **Enlace de la foto**: la columna con más enlaces `http`/`https`
+     (si hay varias, la que se llame FOTO, IMAGEN o EVIDENCIA). Una celda
+     puede traer varias fotos separadas por espacios o `|`, o un
+     hipervínculo con otro texto («Ver foto»).
+   - **Una carpeta por**: la columna `CICLO`, si la hay; si no, el ciclo
+     según el prefijo del nombre del PDV (`PLT-` → `CICLO 0 - PILOTO`,
+     `BV1-1-` → `CICLO 1.1 - SUB CICLO`… como en la descarga de las
+     auditorías). También puede ser cualquier otra columna (departamento,
+     consultor) o ninguna. Una fila con la celda vacía va a `SIN CICLO`
+     (o `SIN <título de la columna>`).
+   - **Nombre de cada foto**: el PDV y el código (`PDV`/`NOMBRE`/
+     `NOMBRE_PERSONALIZADO` y `BAVARIA`/`CODIGO`), unidos con `_` en el orden
+     en que se marquen. Lo que ya está en el nombre no se repite: con PDV
+     `PLT-CHAPARRO-10737539` y código `10737539` queda
+     `PLT-CHAPARRO-10737539.jpg`; si el código es otro, va aparte
+     (`PLT-BABILONIA-11362101_11362112.jpg`). Varias fotos en una fila:
+     `_foto1`, `_foto2`; el mismo nombre dos veces en una carpeta: ` (2)`.
+   - **Una carpeta por PDV** (marcado de entrada): dentro de cada ciclo, una
+     carpeta con el mismo nombre de la foto y la foto adentro:
+     `CICLO 0 - PILOTO/PLT-ALMACEN CARDENAS-10600749/PLT-ALMACEN CARDENAS-10600749.jpg`.
+     Si dos filas son el mismo PDV (mismo nombre y código), sus fotos quedan
+     en la misma carpeta. Las filas sin enlace no arman carpeta: quedan solo
+     en el índice. Desmarcado, las fotos quedan sueltas en la carpeta del
+     ciclo.
+3. **Así queda el ZIP**: las carpetas en orden, cuántas fotos, cuántas
+   carpetas de PDV y cuántas filas sin enlace tiene cada una, y la ruta de
+   una foto de ejemplo. Desmarcar una
+   carpeta la deja por fuera (por ejemplo, para bajar solo un ciclo).
+4. **Descargar ZIP** lo arma igual que la descarga de las galerías (ver
+   [Descarga de fotos en ZIP](#descarga-de-fotos-en-zip)): por partes de
+   400 MB, `Fotos_<nombre de la plantilla>.zip`, `…_parte2.zip`, con
+   `indice.xlsx` en la última: una fila por foto, en el orden de la
+   plantilla, con la parte, la carpeta, el archivo, la fila del Excel, todas
+   las columnas de la plantilla y el estado («Descargada», «No se pudo
+   descargar: …» o «Sin enlace de foto (la celda dice «#N/A»)»).
+
+Hasta 100.000 filas por plantilla. Con la plantilla de prueba (3.654 filas,
+2.884 fotos) salen ocho carpetas, de `CICLO 0 - PILOTO` a `CICLO 6`. La
+lectura y las reglas están en `src/lib/exportadorFotos.ts`; la pantalla, en
+`src/components/ExportadorFotos.tsx`.
+
+## 13. Pendientes conocidos
 
 - El limitador de intentos vive en memoria del proceso. Con varias instancias en
   Vercel, cada una lleva su propia cuenta. Para algo serio, Upstash Redis.

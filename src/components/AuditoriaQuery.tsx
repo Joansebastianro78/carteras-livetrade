@@ -507,6 +507,7 @@ export default function AuditoriaQuery() {
       filtrosColumna={filtrosColumna}
       repetidas
       etiquetasIA
+      nombreFotos={`Fotos_${corrida?.nombre ?? "query"}`}
     />
   );
 }

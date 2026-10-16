@@ -30,5 +30,12 @@ export function leerEtiquetas(texto: unknown): string[] {
   return salida;
 }
 
+/**
+ * Las etiquetas de libro («libro», «libros», «libro fiscal»…): con esas la IA
+ * también busca el Libro fiscal de la Cámara de Comercio de Bogotá, con fotos
+ * de referencia de la portada y la contraportada (lib/referenciaLibro.ts).
+ */
+export const esEtiquetaLibro = (e: string) => /(^|\s)libros?(\s|$)/.test(e);
+
 /** «libro» → «Libro». */
 export const nombreEtiqueta = (e: string) => e.charAt(0).toUpperCase() + e.slice(1);

@@ -9,6 +9,7 @@ import {
   ExternalLink,
   ImageOff,
   Maximize2,
+  FolderDown,
   Sheet,
   SlidersHorizontal,
   TriangleAlert,
@@ -35,6 +36,7 @@ import RangoFechas from "./RangoFechas";
 import type { FiltroColumna } from "@/lib/fotosQuery";
 import type { Grupo } from "@/lib/repetidas";
 import { cifra, sinTildes, type Fase } from "./ConsultaAthena";
+import { ENCABEZADO_VISITAS, fotosDeVisitas, ProgresoDescargaFotos, useDescargaFotos } from "./DescargaFotos";
 import PanelRepetidas, { EncabezadoGrupo } from "./PanelRepetidas";
 import { useRepetidas } from "./useRepetidas";
 import PanelEtiquetas, { ILEGIBLES, NINGUNA, SIN_REVISAR, type CuentasIA } from "./PanelEtiquetas";
@@ -108,6 +110,8 @@ type Props<F extends FilaImagen> = {
   repetidas?: boolean;
   /** Que la IA diga qué se ve en las fotos (libro, afiche…) para filtrar por eso. */
   etiquetasIA?: boolean;
+  /** Con qué nombre sale el ZIP de las fotos (se le agregan las fechas). */
+  nombreFotos: string;
 };
 
 /** El valor del filtro de columna para las visitas que no traen dato. */
@@ -133,6 +137,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
   filtrosColumna,
   repetidas = false,
   etiquetasIA = false,
+  nombreFotos,
 }: Props<F>) {
 
   /** Rango de fechas: delimita la galería, los conteos y el Excel. */
@@ -557,6 +562,14 @@ export default function GaleriaFotos<F extends FilaImagen>({
   ].filter(Boolean).length;
   const listo = fase.tipo === "listo" && filas.length > 0;
 
+  // ------------------------------------------------------------ fotos en ZIP
+  const zip = useDescargaFotos();
+  const fotosFiltradas = useMemo(() => filtradas.reduce((n, f) => n + f.fotos.length, 0), [filtradas]);
+  const bajandoZip = zip.estado.tipo === "bajando";
+  function descargarFotos() {
+    zip.descargar(fotosDeVisitas(filtradas, revisionDe), `${nombreFotos}_${sufijoRango(rango)}`, ENCABEZADO_VISITAS);
+  }
+
   // ------------------------------------------------------------ pantalla
   return (
     <div className="space-y-5">
@@ -566,6 +579,19 @@ export default function GaleriaFotos<F extends FilaImagen>({
         acciones={
           <>
             {acciones}
+            {listo && (
+              <button
+                type="button"
+                onClick={descargarFotos}
+                disabled={fotosFiltradas === 0 || bajandoZip}
+                title="Las fotos que ves, en un ZIP con carpetas por ciclo"
+                className="boton boton-secundario"
+              >
+                <FolderDown size={16} aria-hidden />
+                Descargar fotos
+                <span className="cifras font-normal">({cifra(fotosFiltradas)})</span>
+              </button>
+            )}
             {listo && (
               <button
                 type="button"
@@ -583,6 +609,8 @@ export default function GaleriaFotos<F extends FilaImagen>({
       />
 
       {arriba}
+
+      <ProgresoDescargaFotos estado={zip.estado} onDetener={zip.detener} onCerrar={zip.cerrar} />
 
       {aviso && (
         <p className="flex items-center gap-2 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] text-[var(--color-aviso-tinta)]">

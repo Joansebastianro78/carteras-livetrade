@@ -6,6 +6,7 @@ import {
   CheckCheck,
   ClipboardCheck,
   DatabaseZap,
+  FolderDown,
   House,
   Image as IconoImagen,
   Lock,
@@ -40,6 +41,7 @@ import AsistenteIA from "./AsistenteIA";
 import PanelPerfiles from "./PanelPerfiles";
 import HallazgosRevisados from "./HallazgosRevisados";
 import GeneradorRutas from "./GeneradorRutas";
+import ExportadorFotos from "./ExportadorFotos";
 
 /** Una sección del menú y el módulo que hay que tener para verla. */
 type Seccion = SeccionPanel & { modulo: IdModulo };
@@ -196,6 +198,16 @@ const SECCIONES: Seccion[] = [
     descripcion:
       "Sube un Excel con los puntos, di cuántas personas y cuántos puntos por persona, y se arman las rutas por cercanía. Revísalas en el mapa y descarga el mismo Excel con NUM_RUTA y PERSONA.",
     render: () => <GeneradorRutas />,
+  },
+  {
+    id: "exportador",
+    modulo: "exportador_fotos",
+    menu: "Exportador de fotos",
+    grupo: "Herramientas",
+    Icono: FolderDown,
+    descripcion:
+      "Sube un Excel con el enlace de la foto de cada PDV y baja todas las fotos en un ZIP: una carpeta por ciclo y, adentro, una por PDV con su foto, con el nombre del PDV y su código.",
+    render: () => <ExportadorFotos />,
   },
   {
     id: "mantenimiento",

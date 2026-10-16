@@ -45,6 +45,7 @@ export default function AuditoriaImagenes() {
       nombreFecha="Inicio"
       queFoto="Foto de inicio de visita"
       exportar={exportarImagenes}
+      nombreFotos="Fotos_auditoria_imagenes"
     />
   );
 }

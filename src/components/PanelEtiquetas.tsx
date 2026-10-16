@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, ScanSearch, TriangleAlert } from "lucide-react";
-import { nombreEtiqueta } from "@/lib/etiquetasIA";
+import { esEtiquetaLibro, nombreEtiqueta } from "@/lib/etiquetasIA";
 import { cifra } from "./ConsultaAthena";
 import type { EtiquetasIA } from "./useEtiquetasIA";
 
@@ -34,6 +34,7 @@ export default function PanelEtiquetas({
   onRevisar: () => void;
 }) {
   const revisando = e.estado.tipo === "revisando";
+  const libro = e.etiquetas.find(esEtiquetaLibro);
   const hayResultados = cuentas.porEtiqueta.some(([, n]) => n > 0) || cuentas.ninguna > 0 || cuentas.ilegibles > 0;
 
   const chips: { id: string; nombre: string; n: number }[] = [
@@ -52,6 +53,8 @@ export default function PanelEtiquetas({
           </label>
           <p className="mb-1.5 text-[12.5px] leading-snug text-[var(--color-tinta-suave)]">
             Escribe qué buscar, separado por comas. La IA revisa las fotos que quedan con los filtros puestos.
+            {libro &&
+              ` «${nombreEtiqueta(libro)}» también encuentra el Libro fiscal de la Cámara de Comercio de Bogotá, por la portada o la contraportada.`}
           </p>
           <input
             id="fotos-ia-etiquetas"

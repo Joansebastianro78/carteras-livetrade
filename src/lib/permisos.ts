@@ -24,6 +24,7 @@ export type IdModulo =
   | "tableros_admin"
   | "asistente"
   | "rutas"
+  | "exportador_fotos"
   | "mantenimiento"
   | "temas"
   | "usuarios"
@@ -51,6 +52,7 @@ export const MODULOS: Modulo[] = [
   { id: "tableros_admin", nombre: "Administrar tableros", grupo: "Reportes", detalle: "Agregar, editar, publicar u ocultar tableros de Power BI." },
   { id: "asistente", nombre: "Asistente IA", grupo: "Herramientas", detalle: "Chat con Groq, Gemini y GPT-4o, con imágenes y documentos. Consulta los datos de los demás módulos que tenga el perfil." },
   { id: "rutas", nombre: "Generador Rutas", grupo: "Herramientas", detalle: "Repartir los puntos de un Excel entre personas por cercanía, verlos en el mapa y descargar el Excel con la ruta de cada punto." },
+  { id: "exportador_fotos", nombre: "Exportador de fotos", grupo: "Herramientas", detalle: "Subir un Excel con los enlaces de las fotos y bajarlas en un ZIP, en una carpeta por ciclo y con el nombre del PDV en cada foto." },
   { id: "mantenimiento", nombre: "Mantenimiento", grupo: "Configuración", detalle: "Cerrar y abrir la página de consulta de los consultores." },
   { id: "temas", nombre: "Temas", grupo: "Configuración", detalle: "Adornos de temporada de la página." },
   { id: "usuarios", nombre: "Administradores", grupo: "Configuración", detalle: "Crear usuarios del panel, cambiarles la clave o el perfil y desactivarlos. Solo puede dar perfiles con permisos que él también tenga." },
@@ -129,6 +131,8 @@ export function modulosDeRuta(
   if (es("/api/admin/consultores") || es("/api/admin/vendedores")) return ["consultores"];
   if (es("/api/admin/territorio")) return ["territorio"];
   if (es("/api/admin/auditoria-imagenes")) return ["imagenes"];
+  // Una foto traída por el servidor, para la descarga en ZIP de las auditorías de fotos y del Exportador de fotos.
+  if (es("/api/admin/foto")) return ["imagenes", "fotos_query", "fotos_query_sql", "exportador_fotos"];
   // Las marcas de las fotos las comparten la auditoría de imágenes y la de query.
   if (es("/api/admin/revision-fotos")) return ["imagenes", "fotos_query", "fotos_query_sql"];
   // Queries de fotos guardadas: verlas y correrlas, o escribirlas.

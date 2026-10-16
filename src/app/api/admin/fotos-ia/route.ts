@@ -6,7 +6,8 @@ import { descargarFoto } from "@/lib/descargaFoto";
 import { fotoParaIA } from "@/lib/huellaVisual";
 import { preguntarConImagenes, type ImagenActual } from "@/lib/asistenteIA";
 import { nombreModelo } from "@/lib/modelosGemini";
-import { FOTOS_POR_PREGUNTA, ILEGIBLE, leerEtiquetas, type Vistas } from "@/lib/etiquetasIA";
+import { FOTOS_POR_PREGUNTA, ILEGIBLE, esEtiquetaLibro, leerEtiquetas, type Vistas } from "@/lib/etiquetasIA";
+import { CONTRAPORTADA_LIBRO, PORTADA_LIBRO, VERSION_LIBRO } from "@/lib/referenciaLibro";
 import { PATRON_CLAVE, claveDe } from "@/lib/repetidas";
 
 export const runtime = "nodejs";
@@ -25,6 +26,13 @@ export const maxDuration = 60;
  * GPT-4o, que cobra: son miles de fotos. Si los Flash Lite están en su tope
  * por minuto, responde 429 con cuántos segundos esperar. Lo que dice la IA se
  * guarda en etiquetas_fotos (supabase/panel.sql).
+ *
+ * Con «libro» (o «libros», «libro fiscal»…), la pregunta describe el Libro
+ * fiscal de la Cámara de Comercio de Bogotá y lleva dos fotos de referencia,
+ * portada y contraportada (lib/referenciaLibro.ts). Lo revisado así se guarda
+ * con VERSION_LIBRO; un «no hay libro» guardado sin esa versión (de antes de
+ * las referencias) se toma como sin revisar y se vuelve a preguntar. Un «sí
+ * hay libro» de antes vale igual: las referencias solo agregan.
  */
 
 const MAX_CLAVES = 1000;
@@ -40,12 +48,29 @@ const INSTRUCCION_IA =
   "Eres auditor de fotos de visitas a puntos de venta en Colombia. Miras cada foto y dices cuáles cosas de una lista se ven en ella. Respondes solo con JSON válido.";
 
 function preguntaIA(n: number, etiquetas: string[]): string {
+  const libros = etiquetas.filter(esEtiquetaLibro);
   return `Te paso ${n} fotos numeradas de 1 a ${n}.
 Para cada foto, di cuáles de estas cosas se ven claramente en ella: ${etiquetas.map((e) => `"${e}"`).join(", ")}.
-Usa exactamente esas palabras. Si no se ve ninguna, deja la lista vacía. Marca "ilegible": true si la foto está tan borrosa, oscura o cortada que no se puede saber.
+Usa exactamente esas palabras. Si no se ve ninguna, deja la lista vacía. Marca "ilegible": true si la foto está tan borrosa, oscura o cortada que no se puede saber.${
+    libros.length ? `\n${textoLibro(libros)}` : ""
+  }
 Responde solo con este JSON, sin texto antes ni después:
 {"fotos":[{"numero":1,"ve":["${etiquetas[0]}"],"ilegible":false}]}`;
 }
+
+/** Cómo es el libro fiscal de la CCB, para las etiquetas de libro. */
+function textoLibro(libros: string[]): string {
+  const cuales = libros.map((e) => `"${e}"`).join(" y ");
+  return `Ojo con ${cuales}: también cuenta el Libro fiscal de registro de operaciones diarias de la Cámara de Comercio de Bogotá, que se les entrega a los puntos de venta. Es un libro grande y delgado, más ancho que alto. La portada tiene una franja roja con el logo de la Cámara de Comercio de Bogotá y el título "Libro fiscal de registro de operaciones diarias", junto a la foto de una comerciante en su negocio. La contraportada tiene una franja roja con "Renueva tu matrícula mercantil hasta el 31 de marzo" y la foto de un comerciante en un café. Antes de las fotos van dos imágenes de referencia de ese libro, la portada y la contraportada: no son fotos para revisar ni llevan número. Si en una foto se ve ese libro, por cualquiera de sus dos caras, de frente, de lado, de lejos, en la mano de alguien o tapado en parte, incluye ${cuales} aunque parezca un afiche o se vea una persona en la pasta.`;
+}
+
+const REFERENCIAS_LIBRO = [
+  { rotulo: "Referencia: portada del libro fiscal (no es una foto para revisar).", imagen: { nombre: "libro-portada.jpg", mime: "image/jpeg", datos: PORTADA_LIBRO } },
+  {
+    rotulo: "Referencia: contraportada del libro fiscal (no es una foto para revisar).",
+    imagen: { nombre: "libro-contraportada.jpg", mime: "image/jpeg", datos: CONTRAPORTADA_LIBRO },
+  },
+];
 
 const json = (cuerpo: unknown, status = 200) => NextResponse.json(cuerpo, { status });
 
@@ -115,7 +140,7 @@ async function guardadas(claves: unknown, etiquetas: string[]) {
   for (let i = 0; i < claves.length; i += TROZO) {
     const { data, error, status } = await supabaseAdmin
       .from("etiquetas_fotos")
-      .select("clave,etiqueta,presente")
+      .select("clave,etiqueta,presente,ia")
       .in("clave", (claves as string[]).slice(i, i + TROZO))
       .in("etiqueta", buscadas);
     if (error) {
@@ -123,7 +148,9 @@ async function guardadas(claves: unknown, etiquetas: string[]) {
       if (esTablaFaltante(error, status)) return json({ resultados: {}, aviso: AVISO_SIN_TABLA });
       return json({ error: "No se pudo leer lo que ya dijo la IA." }, 500);
     }
-    for (const f of (data ?? []) as { clave: string; etiqueta: string; presente: boolean }[]) {
+    for (const f of (data ?? []) as { clave: string; etiqueta: string; presente: boolean; ia: string | null }[]) {
+      // Un «no hay libro» de antes de las fotos de referencia no vale: se vuelve a preguntar.
+      if (esEtiquetaLibro(f.etiqueta) && !f.presente && !(f.ia ?? "").includes(VERSION_LIBRO)) continue;
       (resultados[f.clave] ??= {})[f.etiqueta] = f.presente;
     }
   }
@@ -153,10 +180,12 @@ async function revisar(urls: unknown, etiquetas: string[], usuario: string) {
   if (listas.length === 0) return json({ resultados: {}, fallidas, aviso: null });
 
   const imagenes: ImagenActual[] = listas.map((x, i) => ({ nombre: `foto-${i + 1}.jpg`, mime: "image/jpeg", datos: x.datos }));
+  const conLibro = etiquetas.some(esEtiquetaLibro);
   const r = await preguntarConImagenes(INSTRUCCION_IA, preguntaIA(imagenes.length, etiquetas), imagenes, AbortSignal.timeout(50_000), {
     preferido: process.env.GEMINI_MODELO_FOTOS || "gemini-3.5-flash-lite",
     familias: ["lite"],
     sinRespaldo: true,
+    referencias: conLibro ? REFERENCIAS_LIBRO : undefined,
   });
   if (!r.ok) {
     const espera = r.esperaMs ? Math.ceil(r.esperaMs / 1000) : null;
@@ -186,7 +215,8 @@ async function revisar(urls: unknown, etiquetas: string[], usuario: string) {
     if (!v) return;
     const clave = claveDe(x.url);
     resultados[clave] = v;
-    for (const [etiqueta, presente] of Object.entries(v)) filas.push({ clave, etiqueta, presente, ia: modelo });
+    const ia = conLibro ? `${modelo} · ${VERSION_LIBRO}` : modelo;
+    for (const [etiqueta, presente] of Object.entries(v)) filas.push({ clave, etiqueta, presente, ia });
   });
 
   let aviso: string | null = null;
