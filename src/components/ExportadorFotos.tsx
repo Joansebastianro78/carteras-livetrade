@@ -329,7 +329,7 @@ export default function ExportadorFotos() {
                 Descargar ZIP ({cifra(fotosElegidas)} {fotosElegidas === 1 ? "foto" : "fotos"})
               </button>
               <p className="text-[12.5px] leading-snug text-[var(--color-tinta-suave)]">
-                El ZIP se arma en tu navegador: deja la pestaña abierta hasta que termine. Si pasa de 400 MB, sale por partes.
+                Sale un solo archivo ZIP. En Chrome y Edge primero te pregunta dónde guardarlo y lo va escribiendo ahí. Deja la pestaña abierta hasta que termine.
               </p>
             </section>
           )}

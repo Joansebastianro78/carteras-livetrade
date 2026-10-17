@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { CheckCircle2, Loader2, TriangleAlert, X } from "lucide-react";
 import { cicloDePdv } from "@/lib/ciclosPdv";
-import { ZipSimple } from "@/lib/zipSimple";
+import { DestinoArchivo, DestinoMemoria, ZipSimple, type ArchivoEscribible } from "@/lib/zipSimple";
 import { EXTENSION_IMAGEN, nombreArchivo, tipoImagen, type FotoZip } from "@/lib/fotosZip";
 import type { FilaImagen, Revision } from "@/lib/imagenesAuditoria";
 import { cifra, megas } from "./ConsultaAthena";
@@ -20,19 +20,37 @@ import { cifra, megas } from "./ConsultaAthena";
  * que las trae desde el servidor del panel. Se prueba con la primera foto de
  * cada servidor y lo que salga vale para las demás.
  *
- * Las fotos se guardan sin comprimir. Para no llenar la memoria, al pasar de
- * 400 MB se entrega esa parte y se sigue con otra (…_parte2.zip).
+ * Sale un solo ZIP. Donde el navegador deja elegir dónde guardar (Chrome,
+ * Edge), primero pregunta y después lo va escribiendo directo en ese archivo,
+ * sin guardarlo en memoria: no tiene tope de tamaño (pasado de 4 GB usa
+ * ZIP64). Donde no (Firefox, Safari), se arma en memoria y se descarga al
+ * final; si pasa de 2 GB, ahí sí sale por partes (…_parte2.zip).
  */
 
-const LIMITE_PARTE = 400 * 1024 * 1024;
+/**
+ * Sin «Guardar como» (Firefox, Safari), el ZIP se arma en la memoria del
+ * navegador: hasta este tope sale en un solo archivo; más grande, por partes.
+ */
+const LIMITE_MEMORIA = 2 * 1024 * 1024 * 1024;
 const A_LA_VEZ = 6;
 /** Una foto bajada directo que tarde más que esto se pide por el servidor. */
 const ESPERA_DIRECTA = 30_000;
 
 export type EstadoZip =
   | { tipo: "quieto" }
-  | { tipo: "bajando"; hechas: number; total: number; bytes: number; partes: number }
-  | { tipo: "listo"; fotos: number; fallidas: number; sinEnlace: number; partes: string[]; detenido: boolean }
+  | { tipo: "bajando"; hechas: number; total: number; bytes: number; partes: number; enDisco: boolean }
+  | {
+      tipo: "listo";
+      fotos: number;
+      fallidas: number;
+      sinEnlace: number;
+      partes: string[];
+      detenido: boolean;
+      /** true: se guardó en el archivo que se eligió en «Guardar como». */
+      enDisco: boolean;
+      /** Al detener: cuántas partes ya habían salido. */
+      entregadas?: number;
+    }
   | { tipo: "error"; mensaje: string };
 
 type Bajada = { ok: true; datos: Uint8Array; tipo: string } | { ok: false; motivo: string };
@@ -100,11 +118,16 @@ function hostDe(url: string): string {
 export function useDescargaFotos() {
   const [estado, setEstado] = useState<EstadoZip>({ tipo: "quieto" });
   const vuelta = useRef(0);
+  /** Para el aviso al detener: si iba a un archivo elegido y cuántas partes ya salieron. */
+  const enCurso = useRef<{ enDisco: boolean; entregadas: number; zip: ZipSimple | null }>({ enDisco: false, entregadas: 0, zip: null });
 
   /**
    * Arma el ZIP con esas fotos. `base` es el nombre del archivo (sin .zip) y
    * `encabezado`, los títulos de las columnas propias del índice (las de
    * FotoZip.indice), que van entre «archivo» y «estado».
+   *
+   * Hay que llamarla desde el clic del botón: lo primero que hace es abrir
+   * «Guardar como», y el navegador solo lo deja abrir justo después de un clic.
    */
   async function descargar(fotos: FotoZip[], base: string, encabezado: string[]) {
     const id = ++vuelta.current;
@@ -115,7 +138,17 @@ export function useDescargaFotos() {
     if (total === 0) return;
     const archivoBase = nombreArchivo(base).replace(/ /g, "_");
 
-    let zip = new ZipSimple();
+    // 1. Dónde guardarlo. Si el navegador deja elegir (Chrome, Edge), el ZIP se
+    //    escribe directo en ese archivo: uno solo, del tamaño que sea.
+    const abierto = await elegirArchivo(`${archivoBase}.zip`);
+    if (abierto === "cancelado") return;
+    if (!vigente()) {
+      await abierto?.archivo.abort().catch(() => {});
+      return;
+    }
+    const enDisco = abierto !== null;
+    let zip = new ZipSimple(abierto ? new DestinoArchivo(abierto.archivo) : new DestinoMemoria());
+    enCurso.current = { enDisco, entregadas: 0, zip };
     let parte = 1;
     const partes: string[] = [];
     let usados = new Set<string>();
@@ -128,16 +161,22 @@ export function useDescargaFotos() {
     /** Por servidor de fotos: si se deja leer directo. */
     const directo = new Map<string, Promise<boolean>>();
 
-    const nombreParte = () => `${archivoBase}${parte > 1 ? `_parte${parte}` : ""}.zip`;
-    const cerrarParte = () => {
+    const nombreParte = () => (abierto ? abierto.nombre : `${archivoBase}${parte > 1 ? `_parte${parte}` : ""}.zip`);
+    /** Solo sin archivo elegido, si pasa del tope de memoria: se entrega esta parte y se sigue con otra. */
+    const cerrarParte = async () => {
       if (zip.cantidad === 0) return;
+      const viejo = zip;
       const nombre = nombreParte();
-      entregar(zip.cerrar(), nombre);
-      partes.push(nombre);
-      zip = new ZipSimple();
+      zip = new ZipSimple(new DestinoMemoria());
+      enCurso.current.zip = zip;
       usados = new Set();
       carpetas = new Set();
       parte++;
+      const blob = await viejo.cerrar();
+      if (!vigente()) return;
+      if (blob) entregar(blob, nombre);
+      partes.push(nombre);
+      enCurso.current.entregadas = partes.length;
     };
 
     const fila = (i: number, archivo: string | null, estadoFoto: string) => {
@@ -166,7 +205,7 @@ export function useDescargaFotos() {
       if (!x.url) fila(i, null, x.motivo ?? "Sin enlace de foto");
     });
 
-    setEstado({ tipo: "bajando", hechas, total, bytes, partes: 0 });
+    setEstado({ tipo: "bajando", hechas, total, bytes, partes: 0, enDisco });
     let siguiente = 0;
     try {
       await Promise.all(
@@ -176,7 +215,7 @@ export function useDescargaFotos() {
             const b = await bajar(x.url!);
             if (!vigente()) return;
             if (b.ok) {
-              if (zip.tamano + b.datos.length > LIMITE_PARTE && zip.cantidad > 0) cerrarParte();
+              if (!enDisco && zip.tamano + b.datos.length > LIMITE_MEMORIA && zip.cantidad > 0) await cerrarParte();
               const carpeta = x.carpeta ? `${x.carpeta}/` : "";
               // Cada nivel de la ruta con su propia entrada («CICLO 1/» y «CICLO 1/PDV/»).
               const niveles = x.carpeta ? x.carpeta.split("/") : [];
@@ -195,42 +234,89 @@ export function useDescargaFotos() {
               zip.agregar(`${carpeta}${nombre}`, b.datos, fecha);
               bytes += b.datos.length;
               fila(i, nombre, "Descargada");
+              // Si el disco va más lento que la descarga, se espera aquí en vez de llenar la memoria.
+              await zip.espacio();
             } else {
               fallidas++;
               fila(i, null, `No se pudo descargar: ${b.motivo}`);
             }
             hechas++;
-            setEstado({ tipo: "bajando", hechas, total, bytes, partes: partes.length });
+            if (vigente()) setEstado({ tipo: "bajando", hechas, total, bytes, partes: partes.length, enDisco });
           }
         })
       );
-      if (!vigente()) return;
+      if (!vigente()) {
+        await zip.abortar();
+        return;
+      }
 
-      // El índice va en la última parte: qué archivo es cada foto, y las que no se bajaron.
+      // El índice va al final (en la última parte, si hubo varias): qué archivo es cada foto, y las que no se bajaron.
       const filas = indice.filter(Boolean);
       const titulos = ["parte", "carpeta", "archivo", ...encabezado, "estado"];
-      const hoja = XLSX.utils.aoa_to_sheet([titulos, ...filas]);
-      hoja["!cols"] = titulos.map((t, c) => ({
-        wch: Math.min(60, Math.max(t.length + 2, ...filas.slice(0, 500).map((f) => String(f[c] ?? "").length + 1))),
+      const hoja = XLSX.utils.aoa_to_sheet(enDisco || partes.length === 0 ? [titulos.slice(1), ...filas.map((f) => f.slice(1))] : [titulos, ...filas]);
+      const columnas = enDisco || partes.length === 0 ? titulos.slice(1) : titulos;
+      const desde = columnas.length === titulos.length ? 0 : 1;
+      hoja["!cols"] = columnas.map((t, c) => ({
+        wch: Math.min(60, Math.max(t.length + 2, ...filas.slice(0, 500).map((f) => String(f[c + desde] ?? "").length + 1))),
       }));
       const libro = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(libro, hoja, "Fotos");
       zip.agregar("indice.xlsx", new Uint8Array(XLSX.write(libro, { type: "array", bookType: "xlsx" }) as ArrayBuffer));
-      cerrarParte();
-      setEstado({ tipo: "listo", fotos: hechas - fallidas, fallidas, sinEnlace: fotos.length - total, partes, detenido: false });
+      const ultimo = zip;
+      const nombre = nombreParte();
+      const blob = await ultimo.cerrar();
+      if (!vigente()) return;
+      if (blob) entregar(blob, nombre);
+      partes.push(nombre);
+      setEstado({ tipo: "listo", fotos: hechas - fallidas, fallidas, sinEnlace: fotos.length - total, partes, detenido: false, enDisco });
     } catch (e) {
-      if (vigente()) setEstado({ tipo: "error", mensaje: `No se pudo armar el ZIP: ${(e as Error).message}` });
+      await zip.abortar().catch(() => {});
+      if (vigente()) {
+        setEstado({
+          tipo: "error",
+          mensaje: enDisco
+            ? `No se pudo guardar el ZIP en tu computador: ${(e as Error).message}. Revisa que haya espacio en el disco e intenta de nuevo.`
+            : `No se pudo armar el ZIP: ${(e as Error).message}`,
+        });
+      }
     }
   }
 
   function detener() {
     vuelta.current++;
+    const { enDisco, entregadas, zip } = enCurso.current;
+    // También si ya se estaba cerrando: el archivo elegido no se guarda a medias.
+    zip?.abortar().catch(() => {});
     setEstado((e) =>
-      e.tipo === "bajando" ? { tipo: "listo", fotos: 0, fallidas: 0, sinEnlace: 0, partes: [], detenido: true } : { tipo: "quieto" }
+      e.tipo === "bajando"
+        ? { tipo: "listo", fotos: 0, fallidas: 0, sinEnlace: 0, partes: [], detenido: true, enDisco, entregadas }
+        : { tipo: "quieto" }
     );
   }
 
   return { estado, descargar, detener, cerrar: () => setEstado({ tipo: "quieto" }) };
+}
+
+/**
+ * «Guardar como» del navegador (Chrome y Edge; Firefox y Safari no lo tienen).
+ * null: no se puede elegir (se arma en memoria y se descarga al final).
+ * "cancelado": la persona cerró la ventana sin elegir.
+ */
+async function elegirArchivo(sugerido: string): Promise<{ archivo: ArchivoEscribible; nombre: string } | null | "cancelado"> {
+  const elegir = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
+  if (typeof elegir !== "function") return null;
+  try {
+    const h = await elegir.call(window, {
+      suggestedName: sugerido,
+      types: [{ description: "Archivo ZIP", accept: { "application/zip": [".zip"] } }],
+    });
+    const archivo = await h.createWritable();
+    return { archivo: archivo as unknown as ArchivoEscribible, nombre: h.name };
+  } catch (e) {
+    if ((e as DOMException)?.name === "AbortError") return "cancelado";
+    console.warn("[descarga zip] no se pudo elegir dónde guardar; va a memoria", e);
+    return null;
+  }
 }
 
 // ------------------------------------------------------- galerías de fotos
@@ -304,7 +390,9 @@ export function ProgresoDescargaFotos({
           />
         </span>
         <p className="text-xs text-[var(--color-tinta-suave)]">
-          No cierres esta pestaña hasta que termine. Si son muchas fotos, el ZIP sale por partes de 400 MB.
+          {estado.enDisco
+            ? "Se va guardando en el archivo que elegiste. No cierres esta pestaña hasta que termine."
+            : "No cierres esta pestaña hasta que termine: el ZIP se descarga al final."}
         </p>
       </section>
     );
@@ -315,10 +403,12 @@ export function ProgresoDescargaFotos({
     estado.tipo === "error"
       ? estado.mensaje
       : estado.detenido
-        ? "Se detuvo la descarga. Las partes que ya salieron quedaron en tus descargas."
+        ? estado.entregadas
+          ? "Se detuvo la descarga. Las partes que ya salieron quedaron en tus descargas."
+          : "Se detuvo la descarga. No se guardó ningún archivo."
         : `Listo: ${cifra(estado.fotos)} ${estado.fotos === 1 ? "foto" : "fotos"} en ${
             estado.partes.length === 1
-              ? estado.partes[0]
+              ? `${estado.partes[0]}${estado.enDisco ? ", en la carpeta que elegiste" : ""}`
               : estado.partes.length === 2
                 ? `2 archivos (${estado.partes.join(" y ")})`
                 : `${estado.partes.length} archivos, de ${estado.partes[0]} a ${estado.partes[estado.partes.length - 1]}`

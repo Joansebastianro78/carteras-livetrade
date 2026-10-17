@@ -998,15 +998,26 @@ mismo que trae el Excel); N es cuántas fotos son.
   misma carpeta, la segunda lleva ` (2)`. Lo que Windows no acepta en un
   nombre (`\ / : * ? " < > |`) se cambia por un espacio. La extensión sale
   del contenido de la foto (`.jpg`, `.png`, `.webp`…).
-- **indice.xlsx**, en la raíz del ZIP: una fila por foto con la parte, la
-  carpeta, el archivo, el PDV, el código, el consultor, la fecha, la
-  revisión, el enlace y si se descargó o el motivo por el que no.
-- **Por partes.** El ZIP se arma en el navegador, sin comprimir (las fotos ya
-  vienen comprimidas). Para no llenar la memoria, al llegar a 400 MB entrega
-  esa parte y sigue con otra: `Fotos_auditoria_imagenes_2026-09-05_a_2026-09-10.zip`,
-  `…_parte2.zip`. El índice va en la última. Hay que dejar la pestaña abierta
-  hasta que termine; **Detener** para, y lo ya entregado queda en las
-  descargas. En Con query el nombre lleva el de la query.
+- **indice.xlsx**, en la raíz del ZIP: una fila por foto con la carpeta, el
+  archivo, el PDV, el código, el consultor, la fecha, la revisión, el enlace
+  y si se descargó o el motivo por el que no.
+- **Un solo archivo.** El ZIP se arma en el navegador, sin comprimir (las
+  fotos ya vienen comprimidas), y sale en un solo archivo:
+  `Fotos_auditoria_imagenes_2026-09-05_a_2026-09-10.zip` (en Con query lleva
+  el nombre de la query).
+  - En **Chrome y Edge**, al tocar el botón el navegador pregunta dónde
+    guardarlo («Guardar como») y el ZIP se va escribiendo directo en ese
+    archivo, a medida que llegan las fotos: no se guarda en la memoria de la
+    página y no tiene tope de tamaño. Pasado de 4 GB (o de 65.535 archivos)
+    usa ZIP64, que abren Windows 10 y 11, 7-Zip y WinRAR. Cerrar «Guardar
+    como» sin elegir cancela la descarga.
+  - En **Firefox y Safari**, que no tienen ese «Guardar como», se arma en
+    memoria y se descarga al terminar, también en un solo archivo. Solo si
+    pasa de 2 GB sale por partes (`…_parte2.zip`, con el índice en la última
+    y una columna «parte»), para no reventar la memoria del navegador.
+  - Hay que dejar la pestaña abierta hasta que termine. **Detener** para y
+    descarta el archivo a medio armar (en Firefox y Safari, las partes que ya
+    salieron quedan en las descargas).
 - **De dónde se bajan las fotos.** Primero se intenta directo, desde el
   navegador al servidor de fotos (sin pasar por Vercel y sin mandar de qué
   página viene). Si ese servidor no deja que otra página lea sus fotos
@@ -1285,11 +1296,11 @@ las fotos en una carpeta por ciclo.
    una foto de ejemplo. Desmarcar una
    carpeta la deja por fuera (por ejemplo, para bajar solo un ciclo).
 4. **Descargar ZIP** lo arma igual que la descarga de las galerías (ver
-   [Descarga de fotos en ZIP](#descarga-de-fotos-en-zip)): por partes de
-   400 MB, `Fotos_<nombre de la plantilla>.zip`, `…_parte2.zip`, con
-   `indice.xlsx` en la última: una fila por foto, en el orden de la
-   plantilla, con la parte, la carpeta, el archivo, la fila del Excel, todas
-   las columnas de la plantilla y el estado («Descargada», «No se pudo
+   [Descarga de fotos en ZIP](#descarga-de-fotos-en-zip)): un solo archivo,
+   `Fotos_<nombre de la plantilla>.zip` (en Chrome y Edge, donde se elija en
+   «Guardar como»), con `indice.xlsx` adentro: una fila por foto, en el
+   orden de la plantilla, con la carpeta, el archivo, la fila del Excel,
+   todas las columnas de la plantilla y el estado («Descargada», «No se pudo
    descargar: …» o «Sin enlace de foto (la celda dice «#N/A»)»).
 
 Hasta 100.000 filas por plantilla. Con la plantilla de prueba (3.654 filas,
