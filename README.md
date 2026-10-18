@@ -1219,6 +1219,34 @@ dentro del panel: reparte los puntos de un Excel entre personas por cercanía.
    totales y parámetros. Las demás columnas, hojas y formatos quedan como
    venían.
 
+**Cambios a mano: seleccionar puntos.** Después de generar, **Seleccionar
+puntos** (arriba del mapa) deja marcar puntos y pasarlos a otra persona:
+
+- **Lazo**: arrastrando sobre el mapa se dibuja alrededor de los puntos y
+  quedan marcados los que caen adentro, con un anillo oscuro. **Tocar** un
+  punto lo marca o lo desmarca. Se puede repetir para ir sumando. Mientras
+  se selecciona, arrastrar no mueve el mapa (el zoom sí funciona); **Esc** o
+  el mismo botón terminan, y lo marcado se queda.
+- Debajo del mapa dice cuántos hay marcados y de dónde son («8 sin asignar,
+  3 de PERSONA 2»). **Pasarlos a**: una **persona nueva** (la siguiente: si
+  hay 3 rutas, la 4), con un nombre opcional (vacío: PERSONA 4); una ruta
+  que ya existe; o **Sin asignar**. **Asignar** los pasa: la ruta nueva sale
+  en el mapa con su color, su contorno y su número, y en la lista con sus
+  puntos y distancias; las demás se recalculan, y una que se quede sin
+  puntos desaparece. Después de pasarlos a alguien, lo siguiente que se
+  seleccione va, de entrada, a esa misma persona.
+- **Deshacer** devuelve el último cambio (los que se quiera, uno por uno);
+  **Limpiar selección** quita las marcas.
+- El Excel trae lo cambiado a mano en NUM_RUTA y PERSONA, la ruta nueva en
+  Resumen_Rutas y, en los parámetros, cuántos puntos quedaron en otra ruta
+  que la que les dio el generador («Asignados a mano») y cuántas rutas hay
+  al final.
+- **Generar otra vez** arma todo de nuevo y borra los cambios a mano (lo
+  avisa debajo del botón).
+
+La lógica está en `reasignar` de `src/lib/rutas.ts`; el lazo, en
+`src/components/MapaRutas.tsx`.
+
 Todo pasa en el navegador: el Excel no se sube al servidor ni a Supabase, y
 no hay ruta de API para esto. El algoritmo está en `src/lib/rutas.ts`, igual
 que el script paso por paso: corrige las coordenadas (coma decimal, signo de

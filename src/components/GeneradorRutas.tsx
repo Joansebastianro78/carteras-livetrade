@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Download,
   FileSpreadsheet,
+  Lasso,
   Loader2,
   MapPinned,
   RefreshCw,
   Route,
   TriangleAlert,
+  Undo2,
   Upload,
 } from "lucide-react";
 import { COLORES_RUTA } from "@/lib/tipos";
@@ -17,6 +19,8 @@ import {
   colorRuta,
   corregirCoordenadas,
   leerNombres,
+  reasignar,
+  rutaNueva,
   SIN_ASIGNAR,
   SIN_COORD,
   type OpcionesRutas,
@@ -63,6 +67,24 @@ export default function GeneradorRutas() {
   const [descargando, setDescargando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const trabajador = useRef<Worker | null>(null);
+  // Selección a mano: los puntos marcados en el mapa y a quién pasarlos.
+  const [seleccionando, setSeleccionando] = useState(false);
+  const [seleccion, setSeleccion] = useState<Set<number>>(() => new Set());
+  /** "nueva", "sin" (sin asignar) o el número de una ruta. */
+  const [destino, setDestino] = useState("nueva");
+  const [nombreNueva, setNombreNueva] = useState("");
+  /** Lo que había antes de cada asignación a mano, para deshacer. */
+  const [historial, setHistorial] = useState<ResultadoRutas[]>([]);
+  const [hecho, setHecho] = useState<string | null>(null);
+
+  function limpiarSeleccion() {
+    setSeleccionando(false);
+    setSeleccion(new Set());
+    setDestino("nueva");
+    setNombreNueva("");
+    setHistorial([]);
+    setHecho(null);
+  }
 
   useEffect(() => () => trabajador.current?.terminate(), []);
 
@@ -80,6 +102,7 @@ export default function GeneradorRutas() {
       setGenerado(null);
       setEnfocada(null);
       setErrorGenerar(null);
+      limpiarSeleccion();
     } catch (e) {
       if (!(e instanceof ErrorArchivo)) console.error("[rutas archivo]", e);
       setErrorArchivo(e instanceof ErrorArchivo ? e.message : "No se pudo leer el archivo.");
@@ -139,6 +162,7 @@ export default function GeneradorRutas() {
       if (g) {
         setGenerado(g);
         setEnfocada(null);
+        limpiarSeleccion();
       }
       if (error) setErrorGenerar(error);
     };
@@ -198,6 +222,7 @@ export default function GeneradorRutas() {
     archivo.info.forEach((info, i) => {
       if (lat[i] === null || lon[i] === null) return;
       lista.push({
+        i,
         lat: lat[i]!,
         lon: lon[i]!,
         ruta: generado ? generado.r.ruta[i] : null,
@@ -210,6 +235,69 @@ export default function GeneradorRutas() {
 
   const trabajando = avance !== null;
   const r = generado?.r;
+
+  // ---------------------------------------------------------- selección a mano
+  const nueva = r ? rutaNueva(r) : 1;
+  /** Cuántos seleccionados hay sin asignar y de cada ruta. */
+  const desglose = useMemo(() => {
+    if (!r) return "";
+    const cuenta = new Map<number | null, number>();
+    for (const i of seleccion) cuenta.set(r.ruta[i], (cuenta.get(r.ruta[i]) ?? 0) + 1);
+    const nombreDe = new Map(r.resumen.map((x) => [x.num, x.persona]));
+    return [...cuenta.entries()]
+      .sort(([a], [b]) => (a ?? 0) - (b ?? 0))
+      .map(([num, n]) => `${cifra(n)} ${num === null ? "sin asignar" : `de ${nombreDe.get(num) ?? `la ruta ${num}`}`}`)
+      .join(", ");
+  }, [r, seleccion]);
+
+  const alSeleccionar = useCallback((indices: number[], modo: "agregar" | "alternar") => {
+    setHecho(null);
+    setSeleccion((s) => {
+      const n = new Set(s);
+      for (const i of indices) {
+        if (modo === "alternar" && n.has(i)) n.delete(i);
+        else n.add(i);
+      }
+      return n;
+    });
+  }, []);
+
+  function asignar() {
+    if (!generado || seleccion.size === 0) return;
+    const num = destino === "sin" ? null : destino === "nueva" ? nueva : Number(destino);
+    const nuevo = reasignar(generado.r, seleccion, num, destino === "nueva" ? nombreNueva : undefined);
+    if (nuevo === generado.r) {
+      setHecho("Esos puntos ya estaban ahí.");
+      return;
+    }
+    const quien = num === null ? SIN_ASIGNAR : nuevo.resumen.find((x) => x.num === num)?.persona ?? `PERSONA ${num}`;
+    setHistorial((h) => [...h, generado.r]);
+    setGenerado({ r: nuevo, op: generado.op });
+    setHecho(`${cifra(seleccion.size)} ${seleccion.size === 1 ? "punto pasó" : "puntos pasaron"} a ${quien}${num !== null ? ` (ruta ${num})` : ""}.`);
+    setSeleccion(new Set());
+    setNombreNueva("");
+    // Lo siguiente que se seleccione va, de entrada, a la misma persona.
+    if (num !== null) setDestino(String(num));
+  }
+
+  function deshacer() {
+    if (!generado || historial.length === 0) return;
+    const previo = historial[historial.length - 1];
+    setHistorial((h) => h.slice(0, -1));
+    setGenerado({ r: previo, op: generado.op });
+    setHecho("Se deshizo el último cambio.");
+    if (destino !== "nueva" && destino !== "sin" && !previo.resumen.some((x) => x.num === Number(destino))) setDestino("nueva");
+  }
+
+  // Esc termina de seleccionar (lo seleccionado se queda).
+  useEffect(() => {
+    if (!seleccionando) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSeleccionando(false);
+    };
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, [seleccionando]);
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
@@ -417,7 +505,9 @@ export default function GeneradorRutas() {
             <p className="mt-2 text-[12px] leading-snug text-[var(--color-tinta-suave)]">
               {cambiado
                 ? "Cambiaste el reparto: genera otra vez para verlo en el mapa y en el Excel."
-                : "Cada vez que generas puede salir un reparto un poco distinto, igual de cercano."}
+                : r?.aMano
+                  ? `Generar otra vez borra lo que cambiaste a mano (${cifra(r.aMano)} ${r.aMano === 1 ? "punto" : "puntos"}).`
+                  : "Cada vez que generas puede salir un reparto un poco distinto, igual de cercano."}
             </p>
           )}
           {errorGenerar && (
@@ -445,16 +535,39 @@ export default function GeneradorRutas() {
             </p>
           </div>
           {r && (
-            <button type="button" onClick={descargar} disabled={descargando} className="boton boton-primario">
-              {descargando ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Download size={16} aria-hidden />}
-              Descargar Excel
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                aria-pressed={seleccionando}
+                onClick={() => {
+                  setSeleccionando((s) => !s);
+                  setHecho(null);
+                }}
+                className={`boton boton-secundario ${seleccionando ? "border-[var(--color-tinta)] bg-[var(--color-seleccion)]" : ""}`}
+              >
+                <Lasso size={16} aria-hidden />
+                Seleccionar puntos
+              </button>
+              <button type="button" onClick={descargar} disabled={descargando} className="boton boton-primario">
+                {descargando ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Download size={16} aria-hidden />}
+                Descargar Excel
+              </button>
+            </div>
           )}
         </div>
 
         <div className="h-[56vh] min-h-[340px] border-b border-[var(--color-linea)]">
           {puntosMapa.length > 0 ? (
-            <MapaRutasCliente puntos={puntosMapa} generado={!!r} colorDe={color} enfocada={enfocada} />
+            <MapaRutasCliente
+              puntos={puntosMapa}
+              generado={!!r}
+              colorDe={color}
+              enfocada={enfocada}
+              claveVista={`${archivo?.nombre}|${archivo?.hoja}`}
+              seleccionando={!!r && seleccionando}
+              seleccion={seleccion}
+              onSeleccion={alSeleccionar}
+            />
           ) : (
             <div className="grid h-full place-items-center bg-[var(--color-mapa,var(--color-relleno))] px-6 text-center">
               <div>
@@ -466,6 +579,72 @@ export default function GeneradorRutas() {
             </div>
           )}
         </div>
+
+        {r && (seleccionando || seleccion.size > 0 || historial.length > 0) && (
+          <div aria-label="Puntos seleccionados" role="group" className="space-y-2.5 border-b border-[var(--color-linea)] bg-[var(--color-relleno)] px-5 py-3.5">
+            <p className="text-[13px] leading-snug" aria-live="polite">
+              {seleccion.size > 0 ? (
+                <>
+                  <span className="cifras font-semibold">
+                    {cifra(seleccion.size)} {seleccion.size === 1 ? "punto seleccionado" : "puntos seleccionados"}
+                  </span>
+                  <span className="text-[var(--color-tinta-suave)]">: {desglose}.</span>
+                </>
+              ) : seleccionando ? (
+                <span className="text-[var(--color-tinta-suave)]">
+                  Dibuja alrededor de los puntos que quieras (arrastrando) o tócalos uno por uno; tocar uno marcado lo quita. Para mover el
+                  mapa, termina de seleccionar.
+                </span>
+              ) : (
+                <span className="text-[var(--color-tinta-suave)]">Toca «Seleccionar puntos» para marcar más.</span>
+              )}
+              {hecho && <span className="block font-medium text-[var(--color-exito,var(--color-tinta))]">{hecho}</span>}
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[180px]">
+                <label htmlFor="rutas-destino" className="campo-etiqueta">
+                  Pasarlos a
+                </label>
+                <select id="rutas-destino" value={destino} onChange={(e) => setDestino(e.target.value)} className="campo">
+                  <option value="nueva">Persona nueva ({nueva})</option>
+                  {r.resumen.map((x) => (
+                    <option key={x.num} value={String(x.num)}>
+                      {x.num} · {x.persona}
+                    </option>
+                  ))}
+                  <option value="sin">Sin asignar</option>
+                </select>
+              </div>
+              {destino === "nueva" && (
+                <div className="min-w-[160px] flex-1 sm:max-w-[240px]">
+                  <label htmlFor="rutas-nombre-nueva" className="campo-etiqueta">
+                    Nombre <span className="font-normal text-[var(--color-tinta-suave)]">(opcional)</span>
+                  </label>
+                  <input
+                    id="rutas-nombre-nueva"
+                    value={nombreNueva}
+                    onChange={(e) => setNombreNueva(e.target.value)}
+                    placeholder={`PERSONA ${nueva}`}
+                    autoComplete="off"
+                    className="campo"
+                  />
+                </div>
+              )}
+              <button type="button" onClick={asignar} disabled={seleccion.size === 0} className="boton boton-primario">
+                Asignar
+              </button>
+              <button type="button" onClick={() => setSeleccion(new Set())} disabled={seleccion.size === 0} className="boton boton-secundario">
+                Limpiar selección
+              </button>
+              {historial.length > 0 && (
+                <button type="button" onClick={deshacer} className="boton boton-secundario">
+                  <Undo2 size={15} aria-hidden />
+                  Deshacer
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {r && (
           <div className="p-4">

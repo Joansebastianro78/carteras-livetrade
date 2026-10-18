@@ -489,6 +489,10 @@ export type ResultadoRutas = {
   corregidas: number;
   reparto: Reparto;
   avisos: string[];
+  /** Puntos que quedaron en otra ruta que la que les dio el generador (los cambiados a mano, ver reasignar). */
+  aMano?: number;
+  /** La ruta que les dio el generador, antes de los cambios a mano. */
+  rutaGenerada?: (number | null)[];
 };
 
 export class ErrorRutas extends Error {}
@@ -561,25 +565,7 @@ export function generarRutas(
   });
   const persona = ruta.map((num, i) => (num ? personaDe(num) : lat[i] === null ? SIN_COORD : SIN_ASIGNAR));
 
-  // ---- resumen
-  const resumen: RutaResumen[] = [];
-  for (let num = 1; num <= orden.length; num++) {
-    const idx = ruta.map((r, i) => (r === num ? i : -1)).filter((i) => i >= 0);
-    const la = idx.map((i) => lat[i]!);
-    const lo = idx.map((i) => lon[i]!);
-    const cLat = la.reduce((a, b) => a + b, 0) / la.length;
-    const cLon = lo.reduce((a, b) => a + b, 0) / lo.length;
-    const d = la.map((_, t) => Math.hypot((lo[t] - cLon) * 111.32 * Math.cos((cLat * Math.PI) / 180), (la[t] - cLat) * 110.574));
-    resumen.push({
-      num,
-      persona: personaDe(num),
-      puntos: idx.length,
-      latCentro: red(cLat, 6),
-      lonCentro: red(cLon, 6),
-      distPromKm: red(d.reduce((a, b) => a + b, 0) / d.length, 2),
-      distMaxKm: red(Math.max(...d), 2),
-    });
-  }
+  const resumen = resumirRutas(lat, ruta, lon, personaDe);
 
   const corregidas = lat.filter((v, i) => v !== null && (v !== aNumero(latCrudas[i]) || lon[i] !== aNumero(lonCrudas[i]))).length;
   return {
@@ -593,6 +579,78 @@ export function generarRutas(
     corregidas,
     reparto,
     avisos,
+  };
+}
+
+/** Puntos, centro y distancias de cada ruta que tenga puntos, en orden de número. */
+function resumirRutas(
+  lat: (number | null)[],
+  ruta: (number | null)[],
+  lon: (number | null)[],
+  personaDe: (num: number) => string
+): RutaResumen[] {
+  const porRuta = new Map<number, number[]>();
+  ruta.forEach((num, i) => {
+    if (num !== null && lat[i] !== null) (porRuta.get(num) ?? porRuta.set(num, []).get(num)!).push(i);
+  });
+  return [...porRuta.keys()]
+    .sort((a, b) => a - b)
+    .map((num) => {
+      const idx = porRuta.get(num)!;
+      const la = idx.map((i) => lat[i]!);
+      const lo = idx.map((i) => lon[i]!);
+      const cLat = la.reduce((a, b) => a + b, 0) / la.length;
+      const cLon = lo.reduce((a, b) => a + b, 0) / lo.length;
+      const d = la.map((_, t) => Math.hypot((lo[t] - cLon) * 111.32 * Math.cos((cLat * Math.PI) / 180), (la[t] - cLat) * 110.574));
+      return {
+        num,
+        persona: personaDe(num),
+        puntos: idx.length,
+        latCentro: red(cLat, 6),
+        lonCentro: red(cLon, 6),
+        distPromKm: red(d.reduce((a, b) => a + b, 0) / d.length, 2),
+        distMaxKm: red(Math.max(...d), 2),
+      };
+    });
+}
+
+// ---------------------------------------------------------------- a mano
+/** El número para una persona nueva: el siguiente a la última ruta. */
+export const rutaNueva = (r: ResultadoRutas) => Math.max(0, ...r.resumen.map((x) => x.num)) + 1;
+
+/**
+ * Pasa esos puntos (índices de fila) a la ruta `destino`: una que ya existe,
+ * una nueva (rutaNueva), o ninguna (null: quedan SIN ASIGNAR). Las demás
+ * rutas quedan como estaban, con su resumen recalculado; una que se quede sin
+ * puntos desaparece. `nombre` es el de la persona si la ruta es nueva (vacío:
+ * PERSONA #). Los puntos sin coordenadas no se tocan.
+ */
+export function reasignar(r: ResultadoRutas, filas: Iterable<number>, destino: number | null, nombre?: string): ResultadoRutas {
+  const nombres = new Map(r.resumen.map((x) => [x.num, x.persona]));
+  if (destino !== null && !nombres.has(destino)) nombres.set(destino, nombre?.trim() || `PERSONA ${destino}`);
+  const personaDe = (num: number) => nombres.get(num) ?? `PERSONA ${num}`;
+
+  const ruta = r.ruta.slice();
+  const persona = r.persona.slice();
+  let cambiados = 0;
+  for (const i of filas) {
+    if (r.lat[i] === null || r.lat[i] === undefined || ruta[i] === destino) continue;
+    ruta[i] = destino;
+    persona[i] = destino === null ? SIN_ASIGNAR : personaDe(destino);
+    cambiados++;
+  }
+  if (cambiados === 0) return r;
+  const original = r.rutaGenerada ?? r.ruta;
+  return {
+    ...r,
+    ruta,
+    persona,
+    resumen: resumirRutas(r.lat, ruta, r.lon, personaDe),
+    sinAsignar: r.lat.filter((v, i) => v !== null && ruta[i] === null).length,
+    // El aviso de cuántos quedaban sin asignar al generar ya no vale.
+    avisos: r.avisos.filter((a) => !a.includes(`quedan «${SIN_ASIGNAR}»`)),
+    aMano: ruta.filter((num, i) => num !== original[i]).length,
+    rutaGenerada: original,
   };
 }
 

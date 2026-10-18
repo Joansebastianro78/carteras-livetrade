@@ -274,6 +274,10 @@ export async function escribirExcelRutas(a: ArchivoRutas, r: ResultadoRutas, op:
   rs.addRow(["Personas", op.personas]);
   rs.addRow(["Puntos por persona", op.puntosPorPersona]);
   rs.addRow(["Reparto", op.parejo ? "parejo (+/-1 punto)" : "solo maximo"]);
+  if (r.aMano) {
+    rs.addRow(["Asignados a mano", r.aMano]);
+    rs.addRow(["Rutas al final", r.resumen.length]);
+  }
   rs.addRow(["Generado", fechaHora(ahora)]);
 
   for (let c = 1; c <= 7; c++) {
