@@ -40,11 +40,12 @@ revoke all on public.actividad_panel from anon, authenticated;
 -- consultar esto sin depender de Athena.
 --   estado = correcta → la foto sirve
 --   estado = revisar  → hay que revisarla con el consultor
+--   estado = pendiente → se miró, pero falta decidir
 -- Quitar la marca borra la fila.
 -- ---------------------------------------------------------------------
 create table if not exists public.revision_fotos (
     clave              text primary key,
-    estado             text not null check (estado in ('correcta', 'revisar')),
+    estado             text not null check (estado in ('correcta', 'revisar', 'pendiente')),
     cod_personalizado  text,
     nombre_usuario     text,
     fecha_inicio       text,
@@ -52,6 +53,12 @@ create table if not exists public.revision_fotos (
     revisado_por       text,
     updated_at         timestamptz not null default now()
 );
+
+-- «Pendiente» se agregó después: en una base que ya tenía la tabla, se
+-- cambia la regla (volver a ejecutar esto no hace daño).
+alter table public.revision_fotos drop constraint if exists revision_fotos_estado_check;
+alter table public.revision_fotos add constraint revision_fotos_estado_check
+    check (estado in ('correcta', 'revisar', 'pendiente'));
 
 create index if not exists ix_revision_fotos_estado
     on public.revision_fotos (estado, updated_at desc);

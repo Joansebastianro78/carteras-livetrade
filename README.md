@@ -761,11 +761,17 @@ otra se cambia en ese archivo.
   elegidas. En pantalla grande, tocar una foto la muestra a la derecha con sus
   datos; en el celular se abre en grande. En el visor se pasa a la anterior o
   la siguiente con las flechas (también las del teclado) y se cierra con Esc.
-- **Revisión de fotos.** Cada foto se puede marcar «Correcta» o «Para
-  revisar» (tocar la marca puesta la quita). Las marcas se guardan en la tabla
+- **Revisión de fotos.** Cada foto se puede marcar «Correcta», «Para
+  revisar» o «Pendiente» (se miró pero falta decidir; no cuenta como
+  revisada: arriba sale aparte, «Revisadas 188 de 774 · 12 pendientes», y
+  tiene su filtro). Tocar la marca puesta la quita. Las marcas se guardan en la tabla
   `revision_fotos` (de `supabase/panel.sql`) con quién y cuándo, así que las ve
   todo el equipo; arriba sale cuántas van revisadas. La foto se reconoce por
   una huella de su enlace: si el enlace cambia, la marca no la sigue.
+  En una base que ya existía, «Pendiente» necesita volver a ejecutar
+  `supabase/panel.sql` (cambia la regla de la columna `estado`); mientras
+  tanto, marcar «Pendiente» avisa eso y las otras dos marcas siguen
+  funcionando.
 - **Descargar Excel**: las cinco columnas de la consulta, con la foto como
   enlace para abrirla con un clic y `fecha_inicio` como fecha de Excel, más
   `revision` y `revisado_por`. Trae exactamente lo que se ve: las visitas que

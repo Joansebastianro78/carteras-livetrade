@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { COOKIE_ADMIN, leerSesion } from "@/lib/auth";
-import { PATRON_CLAVE } from "@/lib/revisionFotos";
+import { ESTADOS_REVISION, PATRON_CLAVE, type EstadoRevision } from "@/lib/revisionFotos";
 import { esTablaFaltante, textoError } from "@/lib/tablaFaltante";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  *
  *   GET                                        → todas las revisiones
  *   POST { clave, estado, cod, usuario, fecha, foto }
- *        estado: "correcta" | "revisar" | null (null quita la marca)
+ *        estado: "correcta" | "revisar" | "pendiente" | null (null quita la marca)
  */
 
 const AVISO_SIN_TABLA =
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   if (!PATRON_CLAVE.test(clave)) {
     return NextResponse.json({ error: "Falta la foto que se quiere marcar." }, { status: 400 });
   }
-  if (estado !== null && estado !== "correcta" && estado !== "revisar") {
+  if (estado !== null && !ESTADOS_REVISION.includes(estado as EstadoRevision)) {
     return NextResponse.json({ error: "Marca no válida." }, { status: 400 });
   }
 
@@ -115,9 +115,17 @@ export async function POST(req: Request) {
   if (error) {
     console.error("[revision-fotos marcar]", textoError(error, status));
     const falta = esTablaFaltante(error, status);
+    // 23514: la regla de la tabla todavía no acepta «pendiente» (base de antes de esa marca).
+    const sinPendiente = estado === "pendiente" && (error as { code?: string }).code === "23514";
     return NextResponse.json(
-      { error: falta ? AVISO_SIN_TABLA : "No se pudo guardar la marca." },
-      { status: falta ? 503 : 500 }
+      {
+        error: falta
+          ? AVISO_SIN_TABLA
+          : sinPendiente
+            ? "Para marcar «Pendiente» falta actualizar la base: ejecuta supabase/panel.sql en el SQL Editor de Supabase."
+            : "No se pudo guardar la marca.",
+      },
+      { status: falta || sinPendiente ? 503 : 500 }
     );
   }
 

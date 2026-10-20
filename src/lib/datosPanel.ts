@@ -526,7 +526,7 @@ const CONSULTAS: ConsultaPanel[] = [
       const estados = new Map(revisiones.filas.map((r) => [String(r.clave), r]));
       const filas = filasDeImagenes(athena.columnas, athena.filas).filter((f) => enRango(f.dia, rango));
 
-      let conFoto = 0, sinFoto = 0, noEnlace = 0, correctas = 0, paraRevisar = 0;
+      let conFoto = 0, sinFoto = 0, noEnlace = 0, correctas = 0, paraRevisar = 0, marcadasPendiente = 0;
       const consultores = new Map<string, { consultor: string; visitas: number; sin_foto: number; para_revisar: number; pendientes: number }>();
       const revisores = new Map<string, number>();
       for (const f of filas) {
@@ -545,6 +545,7 @@ const CONSULTAS: ConsultaPanel[] = [
           else {
             contar(revisores, (r.revisado_por as string) || "Sin usuario");
             if (r.estado === "correcta") correctas++;
+            else if (r.estado === "pendiente") marcadasPendiente++;
             else {
               paraRevisar++;
               c.para_revisar++;
@@ -563,7 +564,8 @@ const CONSULTAS: ConsultaPanel[] = [
         foto_que_no_es_enlace: noEnlace,
         fotos_correctas: correctas,
         fotos_para_revisar: paraRevisar,
-        fotos_sin_mirar: conFoto - correctas - paraRevisar,
+        fotos_marcadas_pendiente: marcadasPendiente,
+        fotos_sin_mirar: conFoto - correctas - paraRevisar - marcadasPendiente,
         revisiones_por_persona: top([...revisores.entries()].map(([usuario, n]) => ({ usuario, fotos: n })), "fotos", 10),
         consultores_con_mas_sin_foto: top(lista.filter((c) => c.sin_foto > 0), "sin_foto", 10),
         consultores_con_mas_para_revisar: top(lista.filter((c) => c.para_revisar > 0), "para_revisar", 10),

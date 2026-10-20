@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   Check,
   ChevronLeft,
+  Clock,
   Copy,
   ChevronRight,
   ExternalLink,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/fechas";
 import { limpiarTexto } from "@/lib/limpiadorAuditoria";
 import type { EstadoFoto, EstadoRevision, FilaImagen, Revision } from "@/lib/imagenesAuditoria";
+import { NOMBRE_REVISION } from "@/lib/revisionFotos";
 import EncabezadoPagina from "./EncabezadoPagina";
 import FiltrosActivos, { type FiltroActivo } from "./FiltrosActivos";
 import RangoFechas from "./RangoFechas";
@@ -346,7 +348,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
   // Los conteos son de las fechas elegidas; la lista de consultores, de toda la consulta.
   const cuentas = useMemo(() => {
     const porEstado: Record<EstadoFoto, number> = { con_foto: 0, sin_foto: 0, no_es_enlace: 0 };
-    const porRevision = { sin: 0, correcta: 0, revisar: 0 };
+    const porRevision = { sin: 0, correcta: 0, revisar: 0, pendiente: 0 };
     const porConsultor = new Map<string, number>();
     let conRotas = 0;
     for (const f of filas) porConsultor.set(usuarioDe(f), 0);
@@ -504,7 +506,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
     puestos.push({ id: "foto", etiqueta: nombres[filtro], quitar: () => alFiltrar(setFiltro)("todas") });
   }
   if (revisionFiltro) {
-    const nombres = { sin: "Sin revisar", correcta: "Correctas", revisar: "Para revisar" };
+    const nombres = { sin: "Sin revisar", correcta: "Correctas", revisar: "Para revisar", pendiente: "Pendientes" };
     puestos.push({ id: "revision", etiqueta: nombres[revisionFiltro], quitar: () => alFiltrar(setRevisionFiltro)("") });
   }
   if (busqueda.trim()) puestos.push({ id: "busqueda", etiqueta: `«${busqueda.trim()}»`, quitar: () => alFiltrar(setBusqueda)("") });
@@ -676,6 +678,7 @@ export default function GaleriaFotos<F extends FilaImagen>({
                   <option value="sin">Sin revisar ({cifra(cuentas.porRevision.sin)})</option>
                   <option value="correcta">Correctas ({cifra(cuentas.porRevision.correcta)})</option>
                   <option value="revisar">Para revisar ({cifra(cuentas.porRevision.revisar)})</option>
+                  <option value="pendiente">Pendientes ({cifra(cuentas.porRevision.pendiente)})</option>
                 </select>
               </div>
               <div className="sm:col-span-2 lg:col-span-1">
@@ -797,6 +800,8 @@ export default function GaleriaFotos<F extends FilaImagen>({
                   <div className="flex items-center gap-2.5 text-[13px] text-[var(--color-tinta-suave)]">
                     <span className="cifras">
                       Revisadas {cifra(revisadas)} de {cifra(cuentas.porEstado.con_foto)}
+                      {cuentas.porRevision.pendiente > 0 &&
+                        ` · ${cifra(cuentas.porRevision.pendiente)} ${cuentas.porRevision.pendiente === 1 ? "pendiente" : "pendientes"}`}
                     </span>
                     <span className="h-1.5 w-28 overflow-hidden rounded-full bg-[var(--color-relleno)]" aria-hidden>
                       <span
@@ -952,20 +957,23 @@ export default function GaleriaFotos<F extends FilaImagen>({
 
 // ---------------------------------------------------------------- piezas
 
+/** Cómo se ve cada marca: color (puesta) e ícono. */
+const ESTILO_REVISION: Record<EstadoRevision, { color: string; Icono: typeof Check }> = {
+  correcta: { color: "border-[var(--color-exito)] bg-[var(--color-exito-fondo)] text-[var(--color-exito)]", Icono: Check },
+  revisar: { color: "border-[var(--color-aviso-borde)] bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]", Icono: TriangleAlert },
+  pendiente: { color: "border-[var(--color-info-tinta)] bg-[var(--color-info-fondo)] text-[var(--color-info-tinta)]", Icono: Clock },
+};
+
 /** Insignia de la revisión sobre la foto. */
 function Insignia({ revision }: { revision: Revision | null }) {
   if (!revision) return null;
-  const correcta = revision.estado === "correcta";
+  const { color, Icono } = ESTILO_REVISION[revision.estado];
   return (
     <span
-      className={`absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold shadow ${
-        correcta
-          ? "bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
-          : "bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]"
-      }`}
+      className={`absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold shadow ${color}`}
     >
-      {correcta ? <Check size={12} aria-hidden /> : <TriangleAlert size={12} aria-hidden />}
-      {correcta ? "Correcta" : "Para revisar"}
+      <Icono size={12} aria-hidden />
+      {NOMBRE_REVISION[revision.estado]}
     </span>
   );
 }
@@ -1075,7 +1083,7 @@ function Tarjeta({
       type="button"
       onClick={onAbrir}
       aria-pressed={elegida}
-      aria-label={`Ver la foto de ${pdvDe(fila)}${revision ? (revision.estado === "correcta" ? ", correcta" : ", para revisar") : ""}${repetida ? `, repetida en el grupo ${repetida.numero}` : ""}`}
+      aria-label={`Ver la foto de ${pdvDe(fila)}${revision ? `, ${NOMBRE_REVISION[revision.estado].toLowerCase()}` : ""}${repetida ? `, repetida en el grupo ${repetida.numero}` : ""}`}
       className={`block w-full overflow-hidden rounded-[6px] bg-[var(--color-papel)] ${borde} hover:border-[var(--color-tinta)]`}
     >
       <span className="relative block aspect-[4/3] w-full bg-[var(--color-mapa)]">
@@ -1121,7 +1129,7 @@ function ParDato({ nombre, valor }: { nombre: string; valor: string }) {
   );
 }
 
-/** Correcta / Para revisar. Tocar la marca puesta la quita. */
+/** Correcta / Para revisar / Pendiente. Tocar la marca puesta la quita. */
 function BotonesRevision({
   revision,
   puedeMarcar,
@@ -1134,18 +1142,14 @@ function BotonesRevision({
   /** En el visor, sobre fondo negro. */
   oscuro?: boolean;
 }) {
-  const opciones: { id: EstadoRevision; nombre: string; Icono: typeof Check }[] = [
-    { id: "correcta", nombre: "Correcta", Icono: Check },
-    { id: "revisar", nombre: "Para revisar", Icono: TriangleAlert },
-  ];
+  const opciones: EstadoRevision[] = ["correcta", "revisar", "pendiente"];
   return (
-    <div role="group" aria-label="Revisión de la foto" className="flex gap-2">
-      {opciones.map((o) => {
+    // En el panel de la derecha la fila es angosta: ahí los íconos se esconden para que quepa el texto.
+    <div role="group" aria-label="Revisión de la foto" className="@container grid grid-cols-3 gap-1.5">
+      {opciones.map((id) => {
+        const o = { id, nombre: NOMBRE_REVISION[id], ...ESTILO_REVISION[id] };
         const puesta = revision?.estado === o.id;
-        const color =
-          o.id === "correcta"
-            ? "border-[var(--color-exito)] bg-[var(--color-exito-fondo)] text-[var(--color-exito)]"
-            : "border-[var(--color-aviso-borde)] bg-[var(--color-aviso-fondo)] text-[var(--color-aviso-tinta)]";
+        const color = o.color;
         return (
           <button
             key={o.id}
@@ -1154,7 +1158,7 @@ function BotonesRevision({
             disabled={!puedeMarcar}
             title={puedeMarcar ? (puesta ? "Quitar la marca" : undefined) : "Falta ejecutar supabase/panel.sql"}
             onClick={() => onMarcar(puesta ? null : o.id)}
-            className={`boton boton-chico flex-1 ${
+            className={`boton boton-chico min-w-0 px-1.5 ${
               puesta
                 ? color
                 : oscuro
@@ -1162,8 +1166,8 @@ function BotonesRevision({
                   : "boton-secundario"
             }`}
           >
-            <o.Icono size={14} aria-hidden />
-            {o.nombre}
+            <o.Icono size={14} aria-hidden className="shrink-0 @max-[22rem]:hidden" />
+            <span className="truncate">{o.nombre}</span>
           </button>
         );
       })}

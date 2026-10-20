@@ -3,8 +3,20 @@
  * la que se reconoce cada foto. Lo usan el navegador y la ruta de la API.
  */
 
-/** Correcta: la foto sirve. Revisar: hay que hablarlo con el consultor. */
-export type EstadoRevision = "correcta" | "revisar";
+/**
+ * Correcta: la foto sirve. Revisar: hay que hablarlo con el consultor.
+ * Pendiente: se miró pero falta decidir (no cuenta como revisada).
+ */
+export type EstadoRevision = "correcta" | "revisar" | "pendiente";
+
+export const ESTADOS_REVISION: EstadoRevision[] = ["correcta", "revisar", "pendiente"];
+
+/** Cómo se dice cada marca en la pantalla y en los Excel. */
+export const NOMBRE_REVISION: Record<EstadoRevision, string> = {
+  correcta: "Correcta",
+  revisar: "Para revisar",
+  pendiente: "Pendiente",
+};
 
 export type Revision = {
   estado: EstadoRevision;

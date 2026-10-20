@@ -7,6 +7,7 @@ import { cicloDePdv } from "@/lib/ciclosPdv";
 import { DestinoArchivo, DestinoMemoria, ZipSimple, type ArchivoEscribible } from "@/lib/zipSimple";
 import { EXTENSION_IMAGEN, nombreArchivo, tipoImagen, type FotoZip } from "@/lib/fotosZip";
 import type { FilaImagen, Revision } from "@/lib/imagenesAuditoria";
+import { NOMBRE_REVISION } from "@/lib/revisionFotos";
 import { cifra, megas } from "./ConsultaAthena";
 
 /**
@@ -321,7 +322,6 @@ async function elegirArchivo(sugerido: string): Promise<{ archivo: ArchivoEscrib
 
 // ------------------------------------------------------- galerías de fotos
 
-const NOMBRE_REVISION = { correcta: "Correcta", revisar: "Para revisar" } as const;
 
 /** Las columnas del índice en las galerías (después de parte, carpeta y archivo). */
 export const ENCABEZADO_VISITAS = ["pdv", "codigo", "consultor", "fecha", "revision", "enlace"];

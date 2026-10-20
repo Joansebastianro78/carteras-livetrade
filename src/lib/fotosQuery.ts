@@ -6,7 +6,8 @@
  */
 import * as XLSX from "xlsx";
 import { leerFecha } from "./fechas";
-import { armarFila, fotosDe, type EstadoRevision, type FilaImagen, type Revision } from "./imagenesAuditoria";
+import { armarFila, fotosDe, type FilaImagen, type Revision } from "./imagenesAuditoria";
+import { NOMBRE_REVISION } from "./revisionFotos";
 import { MAPEO_VACIO, ROLES, type Mapeo } from "./queriesFotos";
 
 /** Una visita de la query: lo que usa la galería y la fila tal como llegó. */
@@ -191,11 +192,6 @@ export function detalleDeQuery(columnas: string[], mapeo: Mapeo) {
 // ------------------------------------------------------------------ Excel
 const MAX_ENLACES = 65_000;
 const MAX_LARGO_ENLACE = 2_000;
-
-const NOMBRE_REVISION: Record<EstadoRevision, string> = {
-  correcta: "Correcta",
-  revisar: "Para revisar",
-};
 
 /** «Fotos de cierre (Bogotá)» → Fotos_de_cierre_Bogota */
 function paraArchivo(nombre: string): string {

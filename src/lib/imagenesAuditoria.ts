@@ -5,7 +5,7 @@
  */
 import * as XLSX from "xlsx";
 import { leerFecha } from "./fechas";
-import { huella, type EstadoRevision, type Revision } from "./revisionFotos";
+import { huella, NOMBRE_REVISION, type Revision } from "./revisionFotos";
 
 export type { EstadoRevision, Revision } from "./revisionFotos";
 
@@ -128,11 +128,6 @@ const ANCHOS: Record<ColumnaImagen, number> = {
   cod_personalizado: 18,
   foto_visita_inicio: 70,
   fecha_inicio: 17,
-};
-
-const NOMBRE_REVISION: Record<EstadoRevision, string> = {
-  correcta: "Correcta",
-  revisar: "Para revisar",
 };
 
 /**
