@@ -26,6 +26,7 @@ export const SQL_AUDITORIA = String.raw`SELECT
         WHEN d.actividad_id IN (12602, 12603, 12604, 12605, 12606) THEN 'Linea base'
         WHEN d.actividad_id = 13346 THEN 'Linea de seguimiento'
         WHEN d.actividad_id = 12663 THEN 'Inscripcion avanza'
+        WHEN d.actividad_id = 12983 THEN 'Avance de curso visita 2'
         ELSE 'Sin clasificar'
     END AS tipo_linea
 FROM dim_lf_general_datos d

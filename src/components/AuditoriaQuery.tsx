@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyPlus, Play, Save, Trash2, TriangleAlert } from "lucide-react";
-import { ordenarPorFecha } from "@/lib/imagenesAuditoria";
+import { fotosDe, ordenarPorFecha } from "@/lib/imagenesAuditoria";
 import {
   detalleDeQuery,
   detectarColumnas,
@@ -13,12 +13,22 @@ import {
 } from "@/lib/fotosQuery";
 import { MAX_NOMBRE_QUERY, NOMBRE_ROL, ROLES, type Mapeo, type QueryGuardada } from "@/lib/queriesFotos";
 import { revisarSql } from "@/lib/sqlSoloLectura";
+import EncabezadoPagina from "./EncabezadoPagina";
 import GaleriaFotos from "./GaleriaFotos";
+import VistaDatosQuery from "./VistaDatosQuery";
 import { BotonReconsultar, ProgresoConsulta, cifra, textoConsulta, useConsultaAthena } from "./ConsultaAthena";
 
 /**
- * Auditoría con query: la misma revisión de fotos de la auditoría de imágenes,
- * pero con la query que se elija o se escriba aquí.
+ * Auditoría con query: corre la query que se elija o se escriba aquí y la
+ * muestra según lo que traiga:
+ *
+ *   - Con una columna de enlaces de fotos: la misma revisión de fotos de la
+ *     auditoría de imágenes (galería, marcas, repetidas, IA).
+ *   - Sin fotos (respuestas de formularios, cobertura...): una vista de datos
+ *     como la de la auditoría de datos, con fechas, filtros, cifras, barras
+ *     por columna, tabla y Excel.
+ *
+ * Si trae las dos cosas, arranca en fotos y un selector deja pasar a datos.
  *
  * Quien tiene «Auditoría con query» elige una query guardada y la corre.
  * Quien tiene además «Escribir queries» la escribe, la prueba, la guarda, la
@@ -28,11 +38,16 @@ import { BotonReconsultar, ProgresoConsulta, cifra, textoConsulta, useConsultaAt
 
 const RECORDAR = "auditoria-query:elegida";
 
-const EJEMPLO = `SELECT nombre_pdv, nombre_usuario, cod_personalizado,
+const EJEMPLO = `-- Fotos: trae una columna con el enlace de la foto
+SELECT nombre_pdv, nombre_usuario, cod_personalizado,
        foto_visita_inicio, fecha_inicio
 FROM dim_lf_general_cobertura
 WHERE campana_id = 2423
-  AND inicio_visita_id IS NOT NULL`;
+  AND inicio_visita_id IS NOT NULL
+
+-- Datos: cualquier columna, sin fotos
+-- SELECT d.nombre_usuario, d.componente_etiqueta, d.componente_valor, d.fecha
+-- FROM dim_lf_general_datos d WHERE d.actividad_id = 13985`;
 
 type Corrida = {
   cuerpo: Record<string, unknown>;
@@ -133,6 +148,8 @@ export default function AuditoriaQuery() {
   } = useConsultaAthena<(string | null)[]>("/api/admin/auditoria-query", aFilas, { automatica: false });
 
   const [corrida, setCorrida] = useState<Corrida | null>(null);
+  /** Cómo se ve el resultado cuando la query trae fotos; null es lo de siempre (fotos). */
+  const [vistaElegida, setVistaElegida] = useState<"fotos" | "datos" | null>(null);
   /** Columnas cambiadas a mano después de correr. */
   const [elegidas, setElegidas] = useState<Partial<Mapeo>>({});
 
@@ -153,6 +170,7 @@ export default function AuditoriaQuery() {
     }
     setCorrida(nueva);
     setElegidas({});
+    setVistaElegida(null);
     setColumnas([]);
     consultar(false, nueva.cuerpo);
   }
@@ -174,9 +192,37 @@ export default function AuditoriaQuery() {
     return Object.fromEntries(ROLES.map((r, i) => [r, v[i]])) as Mapeo;
   }, [claveMapeo]);
   const columnasCambiadas = ROLES.some((r) => calculado[r] !== sinElegir[r]);
+  /**
+   * Qué trae de verdad la columna de fotos: celdas con enlace y celdas con
+   * otra cosa (respuestas, fechas, números). Una query de formularios puede
+   * dejar marcada como «Foto» una columna que casi nunca trae enlaces.
+   */
+  const conteoFoto = useMemo(() => {
+    let enlaces = 0;
+    let texto = 0;
+    const i = mapeo.foto === null ? -1 : columnas.indexOf(mapeo.foto);
+    if (i >= 0) {
+      for (const f of crudas) {
+        const v = (f[i] ?? "").trim();
+        if (!v) continue;
+        if (fotosDe(v).length > 0) enlaces++;
+        else texto++;
+      }
+    }
+    return { enlaces, texto };
+  }, [columnas, crudas, mapeo.foto]);
+  /** Hay galería solo si la columna elegida trae al menos un enlace. */
+  const hayFotos = mapeo.foto !== null && conteoFoto.enlaces > 0;
+  /** Sin fotos solo hay datos; con ellas, fotos salvo que se elija datos. */
+  const modo: "fotos" | "datos" = !hayFotos ? "datos" : (vistaElegida ?? "fotos");
 
   const filas = useMemo(
-    () => (mapeo.foto === null ? [] : ordenarPorFecha(filasDeQuery(columnas, crudas, mapeo))),
+    () =>
+      mapeo.foto === null
+        ? []
+        : // Una celda con texto que no es enlace no es una visita sin foto: es otra respuesta
+          // de la query. Se queda fuera de la galería y sigue en «Ver datos» y en el Excel.
+          ordenarPorFecha(filasDeQuery(columnas, crudas, mapeo)).filter((f) => f.estado !== "no_es_enlace"),
     [columnas, crudas, mapeo]
   );
   const detalle = useMemo(() => detalleDeQuery(columnas, mapeo), [columnas, mapeo]);
@@ -343,9 +389,9 @@ export default function AuditoriaQuery() {
                 </p>
               ) : (
                 <p id="query-sql-ayuda" className="mt-1.5 text-[12.5px] leading-snug text-[var(--color-tinta-suave)]">
-                  Solo SELECT o WITH, una query a la vez. Tiene que traer una columna con el enlace de la foto; la
-                  fecha, el PDV, el consultor y el código se reconocen solos y se pueden cambiar después de correrla.
-                  Ctrl + Enter la corre.
+                  Solo SELECT o WITH, una query a la vez. Si trae una columna con el enlace de la foto se ve la
+                  galería; si no, una tabla de datos con filtros y Excel. La fecha, el PDV, el consultor y el código
+                  se reconocen solos y se pueden cambiar después de correrla. Ctrl + Enter la corre.
                 </p>
               )}
             </div>
@@ -464,10 +510,27 @@ export default function AuditoriaQuery() {
           </div>
         ))}
       </div>
-      {mapeo.foto === null && crudas.length > 0 && (
+      {crudas.length > 0 && mapeo.foto === null && (
+        <p className="mt-3 text-[12.5px] leading-snug text-[var(--color-tinta-suave)]">
+          Ninguna columna trae enlaces de fotos, así que el resultado se ve como tabla de datos. Si alguna columna
+          trae los enlaces (http o https), elígela en «Foto» para ver la galería.
+        </p>
+      )}
+      {crudas.length > 0 && mapeo.foto !== null && conteoFoto.enlaces === 0 && (
         <p className="mt-3 flex items-start gap-2 rounded-[4px] bg-[var(--color-aviso-fondo)] px-3 py-2.5 text-[13px] leading-snug text-[var(--color-aviso-tinta)]">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
-          Ninguna columna trae enlaces de fotos (http o https). Elige en «Foto» la que los trae, o cambia la query.
+          <span>
+            La columna «{mapeo.foto}» no trae ningún enlace de foto (http o https): trae {cifra(conteoFoto.texto)}{" "}
+            {conteoFoto.texto === 1 ? "valor" : "valores"} de otro tipo. Por eso se ve como tabla de datos. Si los
+            enlaces están en otra columna, elígela en «Foto»; si la query no los trae, hay que agregarlos al SELECT.
+          </span>
+        </p>
+      )}
+      {hayFotos && conteoFoto.texto > 0 && (
+        <p className="mt-3 text-[12.5px] leading-snug text-[var(--color-tinta-suave)]">
+          {cifra(conteoFoto.enlaces)} {conteoFoto.enlaces === 1 ? "fila trae" : "filas traen"} enlace de foto y{" "}
+          {cifra(conteoFoto.texto)} traen otro valor en «{mapeo.foto}»: esas no salen en la galería, pero están en «Ver
+          datos» y en el Excel.
         </p>
       )}
       {puedeEditar && elegida && corrida?.queryId === elegida.id && columnasCambiadas && (
@@ -478,16 +541,44 @@ export default function AuditoriaQuery() {
     </section>
   );
 
+  const botonVista = listo && hayFotos && (
+    <div role="group" aria-label="Cómo ver el resultado" className="flex gap-1.5">
+      {(["fotos", "datos"] as const).map((v) => (
+        <button key={v} type="button" aria-pressed={modo === v} onClick={() => setVistaElegida(v)} className="chip">
+          {v === "fotos" ? "Ver fotos" : "Ver datos"}
+        </button>
+      ))}
+    </div>
+  );
+  const acciones = (
+    <>
+      {botonVista}
+      {corrida && <BotonReconsultar trabajando={trabajando} onConsultar={() => reconsultar(true)} />}
+    </>
+  );
+  const descripcionCorrida =
+    corrida && info
+      ? `${corrida.nombre} · ${textoConsulta(info)}`
+      : "Corre una query de Athena: si trae fotos las revisas como en la auditoría de imágenes; si no, ves los datos con filtros y Excel.";
+
+  // Sin fotos (o si se pidió ver datos): la vista de datos.
+  if (listo && columnas.length > 0 && modo === "datos") {
+    return (
+      <div className="space-y-5">
+        <EncabezadoPagina titulo="Auditoría con query" descripcion={descripcionCorrida} acciones={acciones} />
+        {editor}
+        {selectorColumnas}
+        <VistaDatosQuery columnas={columnas} crudas={crudas} mapeo={mapeo} nombre={corrida?.nombre ?? "query"} />
+      </div>
+    );
+  }
+
   return (
     <GaleriaFotos
       prefijo="query"
       titulo="Auditoría con query"
-      descripcion={
-        corrida && info
-          ? `${corrida.nombre} · ${textoConsulta(info)}`
-          : "Corre una query de Athena que traiga fotos y revísalas como en la auditoría de imágenes."
-      }
-      acciones={corrida ? <BotonReconsultar trabajando={trabajando} onConsultar={() => reconsultar(true)} /> : null}
+      descripcion={descripcionCorrida}
+      acciones={corrida || botonVista ? acciones : null}
       arriba={
         <>
           {editor}
